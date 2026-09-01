@@ -666,10 +666,9 @@ function initBattle(foe) {
   Object.assign(B, { foe, party: [], enemies: [], queue: [], menu: null, actions: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'intro', t: 0, msg: null, msgT: 0, result: null, rainbow: 0 });
   B.party = Party.map(unitFromParty);
   B.arena = buildArena(foe, Game.palette); const taken = new Set();
-  const n = foe.enemies.length, prefE = n === 1 ? [[2, 4]] : n === 2 ? [[2, 3], [2, 5]] : [[2, 3], [1, 5], [3, 5]];
+  const n = foe.enemies.length, prefE = PREF_E[n], prefP = PREF_P;
   B.enemies = foe.enemies.map((id, i) => unitFromEnemy(id, i, n, foe.enemies));
   B.enemies.forEach((u, i) => { const [x, y] = arenaSpot(B.arena, prefE[i][0], prefE[i][1], taken); u.hx = u.x = x; u.hy = u.y = y; });
-  const prefP = [[8, 2], [9, 4], [7, 4]];
   B.party.forEach((u, i) => { const [x, y] = arenaSpot(B.arena, prefP[i][0], prefP[i][1], taken); u.hx = x; u.hy = y; u.x = x + 70; u.y = y + 24; if (!u.alive) u.pose = 'ko'; else u.pose = 'hop'; });
   B.units = [...B.enemies, ...B.party];
   Audio.play(foe.boss ? 'boss' : 'battle');
@@ -1153,9 +1152,19 @@ function bigRock(pal, vr) { // roca de arena 26×18
     return c;
   });
 }
+const PREF_E = { 1: [[2, 4]], 2: [[2, 3], [2, 5]], 3: [[2, 3], [1, 5], [3, 5]] }, PREF_P = [[8, 2], [9, 4], [7, 4]];
 function buildArena(foe, pal) {
-  const ftx = foe.x / TILE | 0, fty = foe.y / TILE | 0, x0 = clamp(ftx - 5, 1, MAP.w - 1 - ARENA.w), y0 = clamp(fty - 3, 1, MAP.h - 1 - ARENA.h); // evita el anillo de árboles del borde
-  const A = { x0, y0, walk: [], objs: [], tiles: [] };
+  const ftx = foe.x / TILE | 0, fty = foe.y / TILE | 0, n = foe.enemies.length;
+  // elige el encuadre (entre varios alrededor del enemigo, dentro del mapa) donde la formación queda menos tapada y más cerca de sus puestos
+  let best = null, bc = 1e9;
+  for (let dy = -4; dy <= -2; dy++) for (let dx = -7; dx <= -3; dx++) {
+    const x0 = clamp(ftx + dx, 1, MAP.w - 1 - ARENA.w), y0 = clamp(fty + dy, 1, MAP.h - 1 - ARENA.h), T = { x0, y0, walk: [] };
+    for (let j = 0; j < ARENA.h; j++) for (let i = 0; i < ARENA.w; i++) T.walk.push(!solid(tileAt(x0 + i, y0 + j)));
+    const taken = new Set(); let cost = 0;
+    for (const [i, j] of [...PREF_E[n], ...PREF_P]) cost += arenaSpot(T, i, j, taken).cost;
+    if (cost < bc) { bc = cost; best = T; }
+  }
+  const { x0, y0 } = best, A = { x0, y0, walk: [], objs: [], tiles: [] };
   for (let j = 0; j < ARENA.h; j++) for (let i = 0; i < ARENA.w; i++) {
     const tx = x0 + i, ty = y0 + j, ch = tileAt(tx, ty), [cx, cy] = isoPos(i, j);
     A.tiles.push({ tx, ty, cx, cy, water: ch === '~' });
@@ -1169,11 +1178,12 @@ function arenaSpot(A, i, j, taken) { // casilla transitable libre más cercana a
   let best = null, bd = 1e9;
   for (let jj = 0; jj < ARENA.h; jj++) for (let ii = 0; ii < ARENA.w; ii++) {
     if (!A.walk[jj * ARENA.w + ii] || taken.has(ii + ',' + jj)) continue;
-    const front = [[1, 0], [0, 1], [1, 1]].filter(([a, b]) => tileAt(A.x0 + ii + a, A.y0 + jj + b) === 'T').length; // árboles que taparían al personaje
-    const d = (ii - i) ** 2 + (jj - j) ** 2 + front * 6; if (d < bd) { bd = d; best = [ii, jj]; }
+    // árboles delante (hacia la cámara) que taparían al personaje: las copas miden 34×33 y llegan dos casillas atrás
+    let hide = 0; for (const [a, b, w] of [[1, 0, 30], [0, 1, 30], [1, 1, 40], [2, 1, 12], [1, 2, 12], [2, 2, 14], [2, 0, 6], [0, 2, 6]]) if (tileAt(A.x0 + ii + a, A.y0 + jj + b) === 'T') hide += w;
+    const d = (ii - i) ** 2 + (jj - j) ** 2 + hide; if (d < bd) { bd = d; best = [ii, jj]; }
   }
-  if (!best) best = [i, j];
-  taken.add(best.join(',')); return isoPos(best[0], best[1]);
+  if (!best) { best = [i, j]; bd = 999; }
+  taken.add(best.join(',')); const r = isoPos(best[0], best[1]); r.cost = bd; return r;
 }
 const partyC = () => { const P = alive(B.party); return [P.reduce((s, u) => s + u.x, 0) / Math.max(1, P.length), P.reduce((s, u) => s + u.y, 0) / Math.max(1, P.length)]; };
 function isoPoly(dy, col) { const [tx, ty] = isoPos(0, 0), [rx, ry] = isoPos(ARENA.w - 1, 0), [bx, by] = isoPos(ARENA.w - 1, ARENA.h - 1), [lx, ly] = isoPos(0, ARENA.h - 1); g.fillStyle = col; g.beginPath(); g.moveTo(tx, ty - 8 + dy); g.lineTo(rx + 16, ry + dy); g.lineTo(bx, by + 8 + dy); g.lineTo(lx - 16, ly + dy); g.closePath(); g.fill(); }
