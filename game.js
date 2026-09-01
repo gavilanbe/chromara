@@ -301,24 +301,160 @@ function drawDrop(def, x, y, pose = 'idle', frame = 0, extra = {}) { // anclado 
 function shadow(x, y, w) { g.fillStyle = 'rgba(10,8,20,0.28)'; g.fillRect(Math.round(x - w / 2), y - 1, w, 2); g.fillRect(Math.round(x - w / 2) + 1, y - 2, w - 2, 1); g.fillRect(Math.round(x - w / 2) + 1, y, w - 2, 1); }
 
 // --- Tiles (dos paletas: 'gris' = Chromara apagada, 'vivo' = color recuperado)
+// Autotiling por vecindad: orillas de agua, bordes de camino, puentes de madera, borde líquido de la tinta,
+// hierba con variantes (matas, flores) y árboles como sprites 16×24 ordenados por profundidad.
 const PAL = {
-  gris: { grass: '#7d8a68', grass2: '#6f7c5c', ink: '#4a4a55', ink2: '#3f3f4a', water: '#6d8a9c', water2: '#7f9cae', path: '#b3a98c', path2: '#a3997d', tree: '#5d7452', tree2: '#4b6142', trunk: '#6b5a48', rock: '#8a8a90', rock2: '#6e6e76' },
-  vivo: { grass: '#5fb64a', grass2: '#4fa23c', ink: '#5fb64a', ink2: '#4fa23c', water: '#3a8fe0', water2: '#62b0f2', path: '#e8cf8a', path2: '#d9bd74', tree: '#2f9a48', tree2: '#227a38', trunk: '#8a5a34', rock: '#a8a4b8', rock2: '#7c7890' },
+  gris: { grass: '#7d8a68', grass2: '#6f7c5c', grassHi: '#8e9b76', grassDk: '#5c694b', flower: '#c4bfb0', flower2: '#a39d92',
+          ink: '#4a4a55', ink2: '#3f3f4a', inkHi: '#5f5e6e', inkDk: '#2a2934',
+          water: '#6d8a9c', water2: '#7f9cae', waterDk: '#5c7789', foam: '#adc2ce', bank: '#565243', bank2: '#8c8672',
+          path: '#b3a98c', path2: '#a3997d', path3: '#c3b99c', plank: '#9b8669', plank2: '#75634c', plank3: '#b39d7f',
+          tree: '#5d7452', tree2: '#4b6142', treeHi: '#71886a', treeOut: '#2f3d2b', trunk: '#6b5a48', trunk2: '#4a3e31',
+          rock: '#8a8a90', rock2: '#6e6e76', rock3: '#a3a3a9', rockOut: '#454550' },
+  vivo: { grass: '#5fb64a', grass2: '#4fa23c', grassHi: '#7ecb60', grassDk: '#3d8a2f', flower: '#fbf6ff', flower2: '#f0578a',
+          ink: '#5fb64a', ink2: '#4fa23c', inkHi: '#7ecb60', inkDk: '#3d8a2f',
+          water: '#3a8fe0', water2: '#62b0f2', waterDk: '#2d76c2', foam: '#c8ecff', bank: '#6e5230', bank2: '#cfae70',
+          path: '#e8cf8a', path2: '#d9bd74', path3: '#f5e3aa', plank: '#b98450', plank2: '#865a2e', plank3: '#d8a66c',
+          tree: '#2f9a48', tree2: '#227a38', treeHi: '#62c463', treeOut: '#0f4a1c', trunk: '#8a5a34', trunk2: '#59371d',
+          rock: '#a8a4b8', rock2: '#7c7890', rock3: '#cbc7d8', rockOut: '#454060' },
 };
-function makeTile(kind, pal, frame = 0) {
-  return cached(`tile|${kind}|${pal}|${frame}`, () => {
-    const p = PAL[pal], c = document.createElement('canvas'); c.width = c.height = TILE; const x = c.getContext('2d'); const rnd = seeded(kind.length * 31 + 5);
-    const dots = (a, b, n) => { for (let i = 0; i < n; i++) { x.fillStyle = b; x.fillRect(rnd() * 16 | 0, rnd() * 16 | 0, 1, 1); } };
-    switch (kind) {
-      case '.': x.fillStyle = p.grass; x.fillRect(0, 0, 16, 16); dots(p.grass, p.grass2, 9); x.fillStyle = p.grass2; x.fillRect(3, 11, 1, 2); x.fillRect(11, 4, 1, 2); break;
-      case ',': x.fillStyle = p.ink; x.fillRect(0, 0, 16, 16); dots(p.ink, p.ink2, 10); x.fillStyle = p.ink2; x.fillRect(5, 6, 3, 2); x.fillRect(11, 12, 2, 2); break;
-      case '~': x.fillStyle = p.water; x.fillRect(0, 0, 16, 16); x.fillStyle = p.water2; const o = frame ? 4 : 0; x.fillRect((2 + o) % 16, 3, 5, 1); x.fillRect((10 + o) % 16, 9, 4, 1); x.fillRect((5 + o) % 16, 13, 3, 1); break;
-      case '=': x.fillStyle = p.path; x.fillRect(0, 0, 16, 16); dots(p.path, p.path2, 8); break;
-      case 'T': x.fillStyle = p.grass; x.fillRect(0, 0, 16, 16); dots(p.grass, p.grass2, 4);
-        x.fillStyle = p.trunk; x.fillRect(7, 11, 3, 4); x.fillStyle = shade(p.tree2, 250, .3, .1, -.15); x.fillRect(2, 3, 12, 10); x.fillRect(4, 1, 8, 1); x.fillRect(1, 5, 1, 6); x.fillRect(14, 5, 1, 6);
-        x.fillStyle = p.tree2; x.fillRect(3, 3, 10, 9); x.fillStyle = p.tree; x.fillRect(4, 2, 7, 1); x.fillRect(3, 3, 8, 6); x.fillStyle = shade(p.tree, 55, .2, 0, .14); x.fillRect(4, 3, 4, 2); x.fillRect(4, 5, 2, 1); break;
-      case 'r': x.fillStyle = p.grass; x.fillRect(0, 0, 16, 16); dots(p.grass, p.grass2, 4); x.fillStyle = shade(p.rock2, 250, .3, .1, -.2); x.fillRect(3, 6, 10, 8); x.fillRect(5, 4, 6, 2); x.fillStyle = p.rock2; x.fillRect(4, 6, 8, 7); x.fillRect(6, 5, 4, 1); x.fillStyle = p.rock; x.fillRect(5, 6, 5, 4); x.fillRect(6, 5, 3, 1); break;
-      case 'x': x.fillStyle = p.grass; x.fillRect(0, 0, 16, 16); dots(p.grass, p.grass2, 5); if (pal === 'gris') { x.fillStyle = '#2a2438'; x.fillRect(4, 5, 8, 6); x.fillRect(2, 7, 12, 3); x.fillRect(6, 3, 3, 2); x.fillRect(12, 11, 2, 2); x.fillRect(3, 11, 2, 1); } break;
+const hash2 = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; };
+// clase de suelo de cada casilla: w agua, p camino, i tinta, g hierba (árboles, rocas y manchas van encima de hierba)
+function tileCls(tx, ty, pal) {
+  const ch = tileAt(tx, ty);
+  if (ch === '~') return 'w';
+  if (ch === '=') return 'p';
+  if (pal === 'vivo') return 'g';
+  if (ch === ',') return 'i';
+  if (ch === 'x' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tileAt(tx + a, ty + b) === ',')) return 'i';
+  return 'g';
+}
+// máscara de vecinos de la misma clase: N=1 E=2 S=4 W=8 NE=16 SE=32 SW=64 NW=128
+const NB8 = [[0, -1, 1], [1, 0, 2], [0, 1, 4], [-1, 0, 8], [1, -1, 16], [1, 1, 32], [-1, 1, 64], [-1, -1, 128]];
+function nbMask(tx, ty, cls, pal) { let m = 0; for (const [a, b, bit] of NB8) if (tileCls(tx + a, ty + b, pal) === cls) m |= bit; return m; }
+const px = (x, col, X, Y, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(X, Y, w, h); };
+function speckle(x, col, n, rnd) { x.fillStyle = col; for (let i = 0; i < n; i++) x.fillRect(rnd() * 16 | 0, rnd() * 16 | 0, 1, 1); }
+function tuft(x, p, X, Y) { px(x, p.grassHi, X + 1, Y); px(x, p.grassDk, X, Y + 1); px(x, p.grass2, X + 1, Y + 1); px(x, p.grassHi, X + 2, Y + 1); px(x, p.grassDk, X, Y + 2); px(x, p.grassDk, X + 2, Y + 2); }
+function flower(x, p, X, Y, alt) { px(x, p.grassDk, X + 1, Y + 3); px(x, alt ? p.flower2 : p.flower, X, Y + 1); px(x, alt ? p.flower2 : p.flower, X + 2, Y + 1); px(x, alt ? p.flower2 : p.flower, X + 1, Y); px(x, alt ? p.flower2 : p.flower, X + 1, Y + 2); px(x, alt ? p.flower : p.flower2, X + 1, Y + 1); }
+function stain(x, dark, hi) { x.fillStyle = dark; x.fillRect(4, 5, 8, 6); x.fillRect(2, 7, 12, 3); x.fillRect(6, 3, 3, 2); x.fillRect(12, 11, 2, 2); x.fillRect(3, 11, 2, 1); x.fillRect(6, 10, 5, 2); px(x, hi, 5, 6, 2, 1); px(x, hi, 7, 5); px(x, hi, 3, 8); }
+
+function drawGrassTile(x, p, pal, kind, vr) {
+  const rnd = seeded(vr * 97 + kind.charCodeAt(0) * 7);
+  x.fillStyle = kind === 'T' ? p.grass2 : p.grass; x.fillRect(0, 0, 16, 16);
+  speckle(x, kind === 'T' ? p.grassDk : p.grass2, kind === 'T' ? 10 : 6, rnd);
+  if (kind === 'T') { speckle(x, p.grassHi, 2, rnd); return; }
+  if (kind === '.') {
+    if (vr === 3 || vr === 9) tuft(x, p, 3 + rnd() * 8 | 0, 3 + rnd() * 8 | 0);
+    else if (vr === 6) { tuft(x, p, 2, 3); tuft(x, p, 9, 9); }
+    else if (vr === 12 || (pal === 'vivo' && vr === 14)) flower(x, p, 4 + rnd() * 6 | 0, 3 + rnd() * 6 | 0, vr === 14);
+    else if (vr === 15) { px(x, p.grassHi, 5, 6, 2, 1); px(x, p.grassHi, 10, 11, 2, 1); }
+  } else if (kind === 'r') {
+    px(x, p.grassDk, 4, 14, 10, 1); px(x, p.grassDk, 3, 13, 12, 1);
+    px(x, p.rockOut, 3, 6, 10, 8); px(x, p.rockOut, 5, 4, 6, 2); px(x, p.rockOut, 4, 5, 8, 1);
+    px(x, p.rock2, 4, 6, 8, 7); px(x, p.rock2, 5, 5, 6, 1);
+    px(x, p.rock, 5, 6, 5, 4); px(x, p.rock, 6, 5, 3, 1); px(x, p.rock, 4, 7, 1, 2);
+    px(x, p.rock3, 6, 6, 2, 1); px(x, p.rock3, 6, 7, 1, 1);
+    px(x, p.rockOut, 9, 9); px(x, p.rockOut, 10, 10); px(x, p.rockOut, 8, 11); px(x, p.rockOut, 11, 8);
+  } else if (kind === 'x') stain(x, '#2a2438', '#3e3852');
+}
+function drawWaterTile(x, p, m, vr, frame) {
+  const rnd = seeded(vr * 53 + 11), sh = [0, 1, 2, 1][frame];
+  x.fillStyle = p.water; x.fillRect(0, 0, 16, 16);
+  const dashes = [[2, 3, 5], [10, 9, 4], [5, 13, 3], [13, 6, 2]];
+  dashes.forEach(([dx, dy, len], i) => {
+    const s = i & 1 ? -sh : sh;
+    for (let k = 0; k < len; k++) { px(x, p.water2, (dx + s + k) & 15, dy); }
+    for (let k = 0; k < len - 1; k++) { px(x, p.waterDk, (dx + s + k + 2) & 15, dy + 1); }
+  });
+  const has = b => m & b, foamOn = i => ((i + frame) % 5) !== 0;
+  if (!has(1)) { px(x, p.bank, 0, 0, 16, 1); for (let i = 0; i < 16; i++) if (foamOn(i)) px(x, p.foam, i, 1); }
+  if (!has(4)) { px(x, p.bank, 0, 15, 16, 1); for (let i = 0; i < 16; i++) if (foamOn(i + 2)) px(x, p.foam, i, 14); }
+  if (!has(8)) { px(x, p.bank, 0, 0, 1, 16); for (let i = 0; i < 16; i++) if (foamOn(i + 1)) px(x, p.foam, 1, i); }
+  if (!has(2)) { px(x, p.bank, 15, 0, 1, 16); for (let i = 0; i < 16; i++) if (foamOn(i + 3)) px(x, p.foam, 14, i); }
+  if (has(1) && has(2) && !has(16)) { px(x, p.bank, 15, 0); px(x, p.foam, 14, 1); px(x, p.foam, 14, 0); px(x, p.foam, 15, 1); }
+  if (has(4) && has(2) && !has(32)) { px(x, p.bank, 15, 15); px(x, p.foam, 14, 14); px(x, p.foam, 14, 15); px(x, p.foam, 15, 14); }
+  if (has(4) && has(8) && !has(64)) { px(x, p.bank, 0, 15); px(x, p.foam, 1, 14); px(x, p.foam, 1, 15); px(x, p.foam, 0, 14); }
+  if (has(1) && has(8) && !has(128)) { px(x, p.bank, 0, 0); px(x, p.foam, 1, 1); px(x, p.foam, 1, 0); px(x, p.foam, 0, 1); }
+  // esquinas exteriores: redondear el banco
+  if (!has(1) && !has(8)) px(x, p.bank, 1, 1); if (!has(1) && !has(2)) px(x, p.bank, 14, 1);
+  if (!has(4) && !has(8)) px(x, p.bank, 1, 14); if (!has(4) && !has(2)) px(x, p.bank, 14, 14);
+}
+function drawRoadTile(x, p, pm, wm, vr) {
+  const rnd = seeded(vr * 31 + 3);
+  if (wm) { // puente o embarcadero de madera: tablones perpendiculares a la marcha, barandas a los lados
+    const horiz = (wm & 1 && wm & 4) ? true : (wm & 8 && wm & 2) ? false : !!(wm & 10);
+    for (let i = 0; i < 16; i++) {
+      const col = i % 4 === 3 ? p.plank2 : i % 4 === 0 ? p.plank3 : p.plank;
+      if (horiz) px(x, col, i, 0, 1, 16); else px(x, col, 0, i, 16, 1);
+    }
+    for (let i = 0; i < 5; i++) { const a = rnd() * 16 | 0, b = rnd() * 16 | 0; px(x, p.plank2, horiz ? a : b, horiz ? b : a, 1, 1); }
+    if (horiz) { px(x, p.trunk2, 0, 0, 16, 1); px(x, p.trunk2, 0, 15, 16, 1); px(x, p.plank3, 0, 1, 16, 1); for (let i = 1; i < 16; i += 5) { px(x, p.trunk2, i, 0, 2, 2); px(x, p.trunk2, i, 14, 2, 2); } }
+    else { px(x, p.trunk2, 0, 0, 1, 16); px(x, p.trunk2, 15, 0, 1, 16); px(x, p.plank3, 1, 0, 1, 16); for (let i = 1; i < 16; i += 5) { px(x, p.trunk2, 0, i, 2, 2); px(x, p.trunk2, 14, i, 2, 2); } }
+    return;
+  }
+  x.fillStyle = p.path; x.fillRect(0, 0, 16, 16);
+  speckle(x, p.path2, 6, rnd); speckle(x, p.path3, 3, rnd);
+  const edge = (bit, fn) => { if (pm & bit) return; for (let i = 0; i < 16; i++) { const d = rnd() < .4 ? 2 : 1; fn(i, d); } };
+  edge(1, (i, d) => { px(x, p.grass, i, 0, 1, d - 1); px(x, p.path2, i, d - 1); });
+  edge(4, (i, d) => { px(x, p.grass, i, 17 - d, 1, d - 1); px(x, p.path2, i, 16 - d); });
+  edge(8, (i, d) => { px(x, p.grass, 0, i, d - 1, 1); px(x, p.path2, d - 1, i); });
+  edge(2, (i, d) => { px(x, p.grass, 17 - d, i, d - 1, 1); px(x, p.path2, 16 - d, i); });
+  if (!(pm & 1) && !(pm & 8)) px(x, p.grass, 0, 0, 2, 2); if (!(pm & 1) && !(pm & 2)) px(x, p.grass, 14, 0, 2, 2);
+  if (!(pm & 4) && !(pm & 8)) px(x, p.grass, 0, 14, 2, 2); if (!(pm & 4) && !(pm & 2)) px(x, p.grass, 14, 14, 2, 2);
+}
+function drawInkTile(x, p, m, vr, withStain) {
+  const rnd = seeded(vr * 71 + 5);
+  x.fillStyle = p.ink; x.fillRect(0, 0, 16, 16);
+  speckle(x, p.ink2, 8, rnd);
+  for (let i = 0; i < 2; i++) { const a = rnd() * 13 | 0, b = rnd() * 14 | 0; px(x, p.inkHi, a, b, 3, 1); px(x, p.inkHi, a + 3, b + 1); }
+  if (vr === 0) { const a = 2 + (rnd() * 9 | 0), b = 2 + (rnd() * 9 | 0); px(x, p.inkDk, a, b + 1, 6, 2); px(x, p.inkDk, a + 1, b, 4, 4); px(x, p.inkDk, a + 6, b + 2); px(x, p.inkHi, a + 1, b + 1, 2, 1); } // charco más profundo
+  // borde líquido: la hierba asoma con bultos irregulares, contorno oscuro y brillo del menisco
+  const depth = () => 1 + (rnd() < .45 ? 1 : 0) + (rnd() < .12 ? 1 : 0);
+  if (!(m & 1)) for (let i = 0; i < 16; i++) { const d = depth(); px(x, p.grass, i, 0, 1, d); px(x, p.inkDk, i, d); if (rnd() < .5) px(x, p.inkHi, i, d + 1); }
+  if (!(m & 4)) { // borde sur: la tinta cuelga en chorretones sobre la hierba
+    const drips = rnd() < .3 ? [] : rnd() < .6 ? [2 + (rnd() * 11 | 0)] : [1 + (rnd() * 5 | 0), 9 + (rnd() * 5 | 0)];
+    for (let i = 0; i < 16; i++) { const d = 2 + depth(); px(x, p.grass, i, 16 - d, 1, d); px(x, p.inkDk, i, 15 - d); }
+    for (const dx of drips) { const top = 10 + (rnd() * 2 | 0), len = 2 + (rnd() * (15 - top) | 0); px(x, p.inkDk, dx - 1, top, 3, len); px(x, p.ink, dx, top, 1, len - 1); px(x, p.inkDk, dx, top + len); px(x, p.inkHi, dx, top + 1); }
+  }
+  if (!(m & 8)) for (let i = 0; i < 16; i++) { const d = depth(); px(x, p.grass, 0, i, d, 1); px(x, p.inkDk, d, i); }
+  if (!(m & 2)) for (let i = 0; i < 16; i++) { const d = depth(); px(x, p.grass, 16 - d, i, d, 1); px(x, p.inkDk, 15 - d, i); }
+  if ((m & 1) && (m & 8) && !(m & 128)) { px(x, p.grass, 0, 0, 2, 1); px(x, p.grass, 0, 1); px(x, p.inkDk, 2, 0); px(x, p.inkDk, 1, 1); px(x, p.inkDk, 0, 2); }
+  if ((m & 1) && (m & 2) && !(m & 16)) { px(x, p.grass, 14, 0, 2, 1); px(x, p.grass, 15, 1); px(x, p.inkDk, 13, 0); px(x, p.inkDk, 14, 1); px(x, p.inkDk, 15, 2); }
+  if ((m & 4) && (m & 8) && !(m & 64)) { px(x, p.grass, 0, 15, 2, 1); px(x, p.grass, 0, 14); px(x, p.inkDk, 2, 15); px(x, p.inkDk, 1, 14); px(x, p.inkDk, 0, 13); }
+  if ((m & 4) && (m & 2) && !(m & 32)) { px(x, p.grass, 14, 15, 2, 1); px(x, p.grass, 15, 14); px(x, p.inkDk, 13, 15); px(x, p.inkDk, 14, 14); px(x, p.inkDk, 15, 13); }
+  if (withStain) stain(x, '#22202c', '#3a3648');
+}
+// Tile de suelo de una casilla, cacheado por su forma (clase + vecinos + variante), no por posición
+function groundTile(tx, ty, pal, frame = 0) {
+  const ch = tileAt(tx, ty), cls = tileCls(tx, ty, pal), v = hash2(tx, ty), p = PAL[pal];
+  let key, draw;
+  if (cls === 'w') { const m = nbMask(tx, ty, 'w', pal), vr = v & 3; key = `w|${m}|${vr}|${frame}`; draw = x => drawWaterTile(x, p, m, vr, frame); }
+  else if (cls === 'p') { const wm = nbMask(tx, ty, 'w', pal) & 15, pm = nbMask(tx, ty, 'p', pal) | wm, vr = v & 7; key = `p|${pm}|${wm}|${vr}`; draw = x => drawRoadTile(x, p, pm, wm, vr); }
+  else if (cls === 'i') { const m = nbMask(tx, ty, 'i', pal), vr = v & 7; key = `i|${m}|${vr}|${ch === 'x' ? 1 : 0}`; draw = x => drawInkTile(x, p, m, vr, ch === 'x'); }
+  else { const kind = ch === 'T' ? 'T' : ch === 'r' ? 'r' : (ch === 'x' && pal === 'gris') ? 'x' : '.', vr = (v >>> 8) & 15; key = `g|${kind}|${vr}`; draw = x => drawGrassTile(x, p, pal, kind, vr); }
+  return cached(`tile|${pal}|${key}`, () => { const c = document.createElement('canvas'); c.width = c.height = TILE; draw(c.getContext('2d')); return c; });
+}
+// Árbol 16×24: copa redonda con bultos de hojas, fusionada con los árboles vecinos para formar setos/muros de bosque
+function treeSprite(pal, mL, mR, vr) {
+  return cached(`tree|${pal}|${mL ? 1 : 0}|${mR ? 1 : 0}|${vr}`, () => {
+    const p = PAL[pal], c = document.createElement('canvas'); c.width = 16; c.height = 24; const x = c.getContext('2d');
+    const ph1 = vr * 1.3, ph2 = vr * 2.1;
+    const inside = (X, Y) => {
+      if (Y < 0 || Y > 17) return false;
+      const ell = (X, Y) => { const u = (X + .5 - 8) / 7.7, w = (Y + .5 - 8.5) / 8.4; return u * u + w * w <= 1 + 0.08 * Math.sin(X * 2.1 + ph1) * Math.sin(Y * 1.7 + ph2); };
+      if (X < 0) return mL && (ell(X + 16, Y) || Y >= 3 && Y <= 14); if (X > 15) return mR && (ell(X - 16, Y) || Y >= 3 && Y <= 14);
+      if (mL && X < 8 && (ell(X + 16, Y) || Y >= 3 && Y <= 14)) return true;
+      if (mR && X >= 8 && (ell(X - 16, Y) || Y >= 3 && Y <= 14)) return true;
+      return ell(X, Y);
+    };
+    // tronco
+    px(x, p.treeOut, 5, 15, 6, 9); px(x, p.trunk2, 6, 15, 4, 9); px(x, p.trunk, 7, 15, 2, 8); px(x, p.treeOut, 4, 23); px(x, p.treeOut, 11, 23); px(x, p.trunk2, 5, 22); px(x, p.trunk2, 10, 22);
+    // copa
+    for (let Y = 0; Y <= 17; Y++) for (let X = 0; X < 16; X++) {
+      if (!inside(X, Y)) continue;
+      if (!inside(X - 1, Y) || !inside(X + 1, Y) || !inside(X, Y - 1) || !inside(X, Y + 1)) { px(x, p.treeOut, X, Y); continue; }
+      const u = (X + .5 - 8) / 7.7, w = (Y + .5 - 8.5) / 8.4;
+      const lam = -u * .45 - w * .7 + .32 * Math.sin(X * 1.9 + ph1) * Math.sin(Y * 1.5 + ph2) + .12 * Math.sin(X * .9 + Y * 1.1 + vr);
+      px(x, lam > .5 ? p.treeHi : lam > .05 ? p.tree : lam > -.42 ? p.tree2 : p.treeOut, X, Y);
     }
     return c;
   });
@@ -410,11 +546,12 @@ function updateOverworld() {
 }
 function mapDef(p, size = 1) { return { color: C(p.color), shape: p.shape, w: Math.round(p.w * .5 * size), h: Math.round(p.h * .5 * size), seed: 3 }; }
 function drawOverworld() {
-  const cx = OW.cam.x, cy = OW.cam.y, wf = (OW.t / 30 | 0) % 2;
-  for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
-    const ch = tileAt(tx, ty); g.drawImage(makeTile(ch, Game.palette, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
-  }
+  const cx = OW.cam.x, cy = OW.cam.y, wf = (OW.t / 9 | 0) % 4, pal = Game.palette;
   const ents = [];
+  for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
+    const ch = tileAt(tx, ty); g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
+    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => g.drawImage(treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7), tx * TILE - cx, ty * TILE - 8 - cy) });
+  }
   // seguidores (Ámbar y Añil detrás del líder, estilo CT)
   Party.forEach((p, i) => {
     let x = OW.x, y = OW.y; if (i > 0) { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; if (h) { x = h[0]; y = h[1]; } else { x = OW.x - i * 12; } }
