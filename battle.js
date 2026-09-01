@@ -267,77 +267,7 @@ function* toolStroke(o) {
   f.dur = 0;
 }
 
-// =====================================================================
-// 5. Acciones (versión de andamio: se sustituyen por las coreografías definitivas)
-// =====================================================================
-function* actAttack(u, target) {
-  tickStatus(u); const t = target; say(u.name + ' ataca');
-  const mid = [(u.wx + t.wx) / 2, (u.wy + t.wy) / 2]; camFocus(mid[0], mid[1], { dist: 90, turn: u.kind === 'party' ? -.25 : .25 });
-  u.pose = 'attack'; const [ax, ay] = infront(u, t, t.def.w * .6 + 14); yield* whop(u, ax, ay, 10, 10);
-  if (u.kind === 'party') {
-    const kind = u.data.weapon, pts = [[t.wx - 12, t.wy - 4, t.def.h + 8], [t.wx + 10, t.wy + 4, 2]]; let done = false; Audio.sfx('brush_sweep', { pan: -.3 });
-    yield* toolStroke({ kind, color: C(u.color), pts, w: kind === 'brocha' ? 8 : 3, col: C(u.color), frames: 8, fac: -1, onTip: (k, wp) => { if (k > .55 && !done) { done = true; burst(wp[0], wp[1], wp[2], C(u.color), 8, 2, 16, .12); hitBasic(u, t); goop(t, C(u.color)); } } });
-  } else { yield* whop(u, t.wx + B.axis.dx * -8, t.wy + B.axis.dy * -8, 8, 16); hitBasic(u, t); goop(t, C('negro'), 60); yield* wait(10); }
-  u.pose = 'idle'; yield* whop(u, u.hx, u.hy, 10, 8); camReset();
-}
-function* chargeAndFuse(users, wx, wy, wz, col, frames = 26) {
-  const cols = users.map(u => C(u.color)); Audio.sfx('charge', { semi: 0 }); users.forEach((u, k) => { u.pose = 'attack'; Audio.sfx('charge', { semi: SEMI[u.id] || 0, when: k * .05 }); });
-  const rings = fx(999, () => { for (const u of users) { const [x, y, s] = PJ([u.wx, u.wy, 0]); g.strokeStyle = C(u.color); g.globalAlpha = .6; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, (10 + Math.sin(rings.t * .3) * 3) * s, 4 * s, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; } }, true);
-  for (let i = 0; i < frames; i++) { users.forEach((u, k) => { u.wz = Math.abs(Math.sin((i + k * 4) * .35)) * 5; if (i % 3 === k % 3) B.particles.push({ wx: u.wx + R(-8, 8), wy: u.wy + R(-4, 4), wz: R(0, u.def.h), vx: 0, vy: 0, vz: R(.6, 1.4), g: -.02, col: cols[k], t: 0, life: 20 }); }); yield; }
-  users.forEach(u => stream(u, { wx, wy, def: { h: wz * 2 } }, C(u.color), 12, 16));
-  const orb = { wx, wy, wz, r: 4, t: 0 }, of = fx(999, () => { const [x, y, s] = PJ([orb.wx, orb.wy, orb.wz]); const c = orb.t < 12 ? cols[(orb.t >> 1) % cols.length] : col; g.fillStyle = ramp(c).base; g.beginPath(); g.arc(x, y, orb.r * s, 0, 6.29); g.fill(); g.fillStyle = ramp(c).hi; g.fillRect(x - 2, y - orb.r * s * .6, 2, 2); orb.t++; });
-  for (let i = 0; i < 16; i++) { orb.r = 4 + i * .6; yield; } Audio.sfx('mix'); B.flash = { col: col, a: .35 }; burst(wx, wy, wz, col, 14, 1.6, 20, 0);
-  users.forEach(u => { u.wz = 0; u.pose = 'idle'; }); rings.dur = 0;
-  return { of, orb };
-}
-function* actTech(users, tech, targets, col) {
-  users.forEach(tickStatus); const names = users.map(u => u.name).join('+'); say(names + ': ' + tech.name, C(col));
-  const ec = enemyC(); camFocus(ec[0], ec[1], { dist: 110, turn: -.2, h: 60 });
-  if (users.length === 1) { const u = users[0]; u.pose = 'attack'; yield* whop(u, u.wx - B.axis.dx * -14, u.wy - B.axis.dy * -14, 8, 12); }
-  else { const { of } = yield* chargeAndFuse(users, ec[0], ec[1], 40, C(col)); yield* wait(6); of.dur = 0; }
-  if (tech.color === 'naranja') { for (let i = 0; i < 18; i++) { flames(ec[0], ec[1], 3, 30); yield; } }
-  for (const t of targets) { for (let h = 0; h < (tech.hits || 1); h++) { damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length * statusMult(users[0], 'tiznado'), t.dfn, tech.power), col, names); goop(t, C(col), 70); if (tech.status) t.status[tech.status] = 3; } }
-  if (tech.heal) for (const p of alive(B.party)) heal(p, Math.round(p.maxhp * tech.heal));
-  if (col === 'blanco') { B.rainbow = 40; B.flash = { col: '#f4f0ea', a: .8 }; Audio.sfx('rainbow'); }
-  yield* wait(14); users.forEach(u => { u.pose = 'idle'; }); for (const u of users) yield* whop(u, u.hx, u.hy, 8, 6); camReset();
-}
-function* actItem(u, itemId, target) {
-  tickStatus(u); const it = DATA.items[itemId]; Game.inventory[itemId]--; say(u.name + ' usa ' + it.name);
-  camFocus(target.wx, target.wy, { dist: 80, turn: target.kind === 'party' ? .4 : -.2 }); u.pose = 'attack'; yield* wait(6);
-  if (it.kind === 'heal') { const def = { color: C('azul'), shape: 'tall', w: 10, h: 14 }; const d = fx(999, () => { const k = clamp(d.t / 14, 0, 1), [x, y, s] = PJ([target.wx, target.wy, lerp(80, target.def.h * .5, k * k)]); drawSprite(dropSprite(def, 'hop', 0), x, y, s); });
-    Audio.sfx('drop_fall'); yield* wait(14); d.dur = 0; Audio.sfx('splash_clean'); burst(target.wx, target.wy, target.def.h * .5, C('azul'), 12, 1.8, 20, .15); heal(target, it.amount); }
-  else if (it.kind === 'mp') { const img = propSprite('tubo', C(target.color)), P = PROP.tubo; sparkle(target.wx, target.wy, target.def.h + 30);
-    const tb = fx(999, () => { const sq = tb.t > 8 ? Math.sin(tb.t * .8) * .12 : 0, [x, y, s] = PJ([target.wx, target.wy, target.def.h + 30 - Math.min(8, tb.t) * 2]); drawProp(img, x, y, P.a + sq, 1, P.tip[0], P.tip[1], 1.2 * s); });
-    Audio.sfx('squeeze'); yield* wait(8); Audio.sfx('plop', { when: .1 }); for (let i = 0; i < 16; i++) { B.particles.push({ wx: target.wx + R(-2, 2), wy: target.wy, wz: target.def.h + 12, vx: R(-.4, .4), vy: 0, vz: -R(.4, 1.4), g: -.1, col: C(target.color), t: 0, life: 18, size: 3 }); yield; }
-    tb.dur = 0; heal(target, it.amount, true); goop(target, C(target.color), 50); }
-  else { const img = propSprite('goma'), P = PROP.goma, rub = { x: 0 }, gm = fx(999, () => { const [x, y, s] = PJ([target.wx, target.wy, target.def.h * .55]); drawProp(img, x + rub.x, y, 0.25, 1, P.tip[0], P.tip[1], 1.2 * s); });
-    sparkle(target.wx, target.wy, target.def.h + 6); target.erasing = true;
-    for (let i = 0; i < 26; i++) { rub.x = Math.sin(i * .75) * 10; if (i % 2 === 0) B.particles.push({ wx: target.wx + R(-6, 6), wy: target.wy, wz: target.def.h * .3, vx: R(-.6, .6), vy: 0, vz: R(0, 1.2), g: -.12, col: i % 4 ? '#e86a8a' : '#f4f0ea', t: 0, life: 22 }); if (i % 6 === 0) Audio.sfx('rub'); if (i % 8 === 4) Audio.sfx('crumbs'); yield; }
-    gm.dur = 0; target.erasing = false;
-    const d = target.color === 'negro' ? it.amount : Math.round(it.amount / 3); target.hp = Math.max(0, target.hp - d); target.pose = 'hurt'; target.poseT = 14; num(target, d, '#f4f0ea'); Audio.sfx('hit'); B.hitstop = 3; if (target.hp <= 0) kill(target); }
-  u.pose = 'idle'; yield* wait(12); camReset();
-}
-function* actEnemy(u) {
-  tickStatus(u); u.acts++;
-  const targets = alive(B.party); if (!targets.length) return;
-  let target = pick(targets);
-  if (u.ai === 'hunter' || u.ai === 'boss') { const weak = targets.filter(t => colorMult(u.color, t.color) >= 2); if (weak.length && Math.random() < .7) target = pick(weak); }
-  if (u.ai === 'tiznar' && Math.random() < .35) {
-    say(u.name + ': Tiznar', C('violeta')); u.pose = 'attack'; Audio.sfx('ink_jet'); stream(u, target, C('negro'), 14, 20); yield* wait(22);
-    if (DATA.accessories[target.acc] && DATA.accessories[target.acc].immune === 'tiznado') { num(target, 'GOMA!', '#f4f0ea'); say(target.name + ' lo borra con la Goma', '#f4f0ea'); Audio.sfx('rub'); Audio.sfx('crumbs', { when: .2 }); burst(target.wx, target.wy, target.def.h * .5, '#e86a8a', 10, 1.2, 20, .1); yield* wait(14); }
-    else { target.status.tiznado = 3; num(target, 'TIZNADO', C('violeta')); mark({ kind: 'blob', p: [target.wx, target.wy, target.def.h * .4], w: 10, col: C('negro'), seed: target.idx, life: 70 }); burst(target.wx, target.wy, target.def.h * .5, C('negro'), 12, 1.5); }
-    u.pose = 'idle'; yield* wait(16); return;
-  }
-  if (u.ai === 'boss' && u.acts % 3 === 0) { // marea negra: una ola de tinta cruza el suelo hacia el grupo
-    say('La Tinta: Marea negra', '#8c8ab0'); u.pose = 'hurt'; u.poseT = 24; Audio.sfx('ink_jet'); Audio.sfx('hum_down', { vol: .6 }); yield* wait(8);
-    const pc = partyC(), wv = fx(999, () => { const k = clamp(wv.t / 20, 0, 1), [x, y, s] = PJ([lerp(u.wx, pc[0], k), lerp(u.wy, pc[1], k), 0]); g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(x, y, (22 + k * 10) * s, 26 * s, 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4460'; g.fillRect(Math.round(x) - 14 * s, y - (30 + k * 6) * s, 28 * s, 2); }, true);
-    for (let i = 0; i < 20; i++) { B.particles.push({ wx: u.wx + R(-20, 20), wy: u.wy + R(-10, 10), wz: R(0, 30), vx: B.axis.dx * -R(2, 4), vy: B.axis.dy * -R(2, 4), vz: R(.5, 1.5), g: .08, col: C('negro'), t: 0, life: 40 }); yield; }
-    wv.dur = 0; B.flash = { col: '#0b0912', a: .5 }; B.shake = 5;
-    for (const t of alive(B.party)) { damage(t, baseDmg(u.atk, t.dfn, .8), 'negro'); mark({ kind: 'blob', p: [t.wx, t.wy, t.def.h * .4], w: 10, col: C('negro'), seed: t.idx }); goop(t, C('negro'), 70); }
-    u.pose = 'idle'; yield* wait(24); return;
-  }
-  yield* actAttack(u, target);
-}
+// (Las acciones viven en attacks.js)
 
 // =====================================================================
 // 6. Menú de batalla, ATB, bucle de actualización, fin
@@ -466,7 +396,7 @@ function drawUnit(u) {
   // emergiendo del charco: se recorta por debajo del suelo
   let clip = false; if (u.wz < 0 && gp) { g.save(); g.beginPath(); g.rect(0, 0, W, gp[1] + 1); g.clip(); clip = true; }
   const G = u.goop, ga = G ? (G.t > G.life - 20 ? (G.life - G.t) / 20 : 1) : 0;
-  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (G) spr = tintSprite(spr, G.col, .55 * ga);
+  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (G) spr = tintSprite(spr, G.col, .55 * ga); if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
   drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx, flip, info.sy);
   if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);

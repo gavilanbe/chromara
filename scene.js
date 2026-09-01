@@ -60,7 +60,7 @@ function drawFloor(pal, skyCol, fogCol) {
   const cam = SCENE.cam, tex = sceneTexture(pal), b = camBasis(cam);
   if (!SCENE.img) SCENE.img = g.createImageData(W, H);
   const d = SCENE.img.data, td = tex.data, tw = tex.w, th = tex.h;
-  const [fr, fg, fb] = hexRgb(fogCol), [vr, vg, vb] = hexRgb('#0b0912');
+  const [fr, fg, fb] = hexRgb(fogCol);
   const fogZ0 = 150, fogZ1 = 520;
   for (let sy = 0; sy < H; sy++) {
     const dy = (sy - cam.hy) / cam.f, down = dy * b.cP + b.sP, row = sy * W * 4;
@@ -70,9 +70,9 @@ function drawFloor(pal, skyCol, fogCol) {
     let wx = ox - (W / 2) * stepX, wy = oy - (W / 2) * stepY;
     for (let sx = 0; sx < W; sx++, wx += stepX, wy += stepY) {
       const i = row + sx * 4; let r, gg, bb;
-      const tx = wx | 0, ty = wy | 0;
-      if (tx < 0 || ty < 0 || tx >= tw || ty >= th) { r = vr; gg = vg; bb = vb; }
-      else { const j = (ty * tw + tx) * 4; r = td[j]; gg = td[j + 1]; bb = td[j + 2]; }
+      let tx = wx | 0, ty = wy | 0; // fuera del mapa: se repite el borde (anillo de árboles), nunca vacío
+      if (tx < 0) tx = 0; else if (tx >= tw) tx = tw - 1; if (ty < 0) ty = 0; else if (ty >= th) ty = th - 1;
+      const j = (ty * tw + tx) * 4; r = td[j]; gg = td[j + 1]; bb = td[j + 2];
       d[i] = r * inv + fr * fog; d[i + 1] = gg * inv + fg * fog; d[i + 2] = bb * inv + fb * fog; d[i + 3] = 255;
     }
   }
@@ -106,7 +106,7 @@ function camTick() {
 }
 // Encuadre sobre un punto de mundo: acerca la cámara y gira un poco hacia él
 function camFocus(wx, wy, o = {}) {
-  const r = SCENE.rest, dist = o.dist ?? 80, yaw = r.yaw + (o.turn ?? 0);
-  camGo({ x: wx - Math.cos(yaw) * dist, y: wy - Math.sin(yaw) * dist, yaw, pitch: o.pitch ?? .5, h: o.h ?? 46, f: o.f ?? 170 }, o.ease ?? .12);
+  const r = SCENE.rest, dist = (o.dist ?? 80) * 1.15, yaw = r.yaw + (o.turn ?? 0);
+  camGo({ x: wx - Math.cos(yaw) * dist, y: wy - Math.sin(yaw) * dist, yaw, pitch: o.pitch ?? .58, h: (o.h ?? 46) * 1.25, f: o.f ?? 170, hy: 70 }, o.ease ?? .12);
 }
 function camReset(ease = .08) { camGo(SCENE.rest, ease); }

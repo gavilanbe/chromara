@@ -1,64 +1,61 @@
-# CHROMARA — PoC de JRPG (mapa → transición → batalla ATB con mezcla de colores)
+# CHROMARA — PoC de JRPG (mapa → transición de tinta → batalla Golden Sun con mezcla de colores)
 
 Prueba de concepto en HTML + JS vanilla, sin dependencias. Abrir `index.html` en Chrome (funciona por `file://`).
 
 ## Qué demuestra
-- Bucle completo: título → mapa de Chromara → encuentro visible → transición (gota negra que cae y salpica) → batalla → resultados → vuelta al mapa en el mismo punto.
-- Combate estilo Chrono Trigger: **ATB en modo Active** (el tiempo NO se para mientras eliges; los enemigos actúan aunque tengas el menú abierto y varias acciones se animan a la vez; `W` en debug alterna a Wait), menú Atacar / Tech / Objeto, **techs dobles y triple** que solo aparecen disponibles cuando los compañeros tienen la barra llena y consumen MP de todos.
+- Bucle completo: título → mapa de Chromara → encuentro visible → transición (la gota negra cae, salpica, la mancha se traga el mapa y lo inclina) → batalla sobre el mismo sitio → resultados → vuelta al mapa en el mismo punto.
+- Combate estilo Chrono Trigger: **ATB en modo Active** (el tiempo no se para mientras eliges; los enemigos actúan aunque tengas el menú abierto y varias acciones se animan a la vez; `W` en debug alterna a Wait), menú Atacar / Tech / Objeto, **techs dobles y triple** que solo aparecen disponibles cuando los compañeros tienen la barra llena y consumen MP de todos.
 - El corazón temático: **mezcla RYB**. Rojo+Amarillo=Naranja (Llamarada), Amarillo+Azul=Verde (Brote), Rojo+Azul=Violeta (Eclipse), los tres=Arcoíris. Un ataque hace 2× contra el color complementario y 0.5× contra el mismo color. Las Gotas Negras llevan el color que han robado en el núcleo; al morir dejan un charquito de ese color.
 - Equipo temático: armas (Brocha, Lápiz, Pincel) y accesorios (Paleta, Goma, Sacapuntas, Lienzo, Difumino) con efectos reales. Objetos: Gota de agua, Tubo de pintura, Goma de borrar.
-- Jefe: La Tinta. Al vencerla, la paleta del mundo pasa de apagada a viva.
+- Jefa: La Tinta. Al vencerla, la paleta del mundo pasa de apagada a viva.
 
 ## Controles
 Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás (en el menú de batalla, X cede el turno al siguiente listo) · Enter en el mapa: menú de estado/equipo (◄► cambia accesorio) · F1 panel debug (1-6/B batalla, H curar, F ATB lleno, K enemigos a 1 HP, C paleta).
 
-## Dirección de arte aplicada
-- Grid único 320×180, escalado por entero, UI incluida.
-- Gotas generadas proceduralmente (`makeDrop`): rampa de 4 tonos con **hue-shifting** (sombras hacia azul, luces hacia amarillo; los amarillos limitados para no parecer fuego), **selout** en el contorno, brillo especular, forma = rol (redonda/guardia, alargada/veloz, salpicadura/pigmento).
-- Mundo desaturado ("Chromara apagada") frente a personajes saturados. Dos paletas de tiles: `gris` y `vivo`.
-- Overworld con **autotiling por vecindad** (`groundTile`, cacheado por forma, no por posición): agua con banco de tierra + espuma animada (4 frames en vaivén) y esquinas interiores; camino con borde irregular donde asoma la hierba; **puentes y embarcaderos** de tablones (orientados según el agua que cruzan, con barandas); zona de tinta con borde líquido (bultos, contorno oscuro, menisco brillante y chorretones al sur, charcos más profundos); hierba con 16 variantes (matas, flores muertas en gris / rosas y blancas en vivo); rocas con contorno y sombra. **Árboles como sprites 16×24** (`treeSprite`) ordenados por profundidad con el resto de entidades: el grupo pasa por detrás de la copa; los árboles contiguos fusionan sus copas en setos con hendiduras.
-- Animación: idle con squash & stretch (4 frames), poses hurt/attack/ko/happy, lunge en el ataque, chorros de partículas del color de cada usuario que convergen y estallan en el color mezclado, **hit-stop**, shake, flash, números flotantes (amarillo grande = golpe débil).
-- Sonido: SFX por osciladores. **Música con samples SNES** (v2): compuesta en ~/composer (YAML `chromara2_*`), renderizada con fluidsynth sobre `Chrono Trigger.sf2` + `snes.sf2` (máx. 8 voces como el SPC700, dinámicas nota a nota, eco), empaquetada por `tools/pack_music.py` a Ogg/Opus base64 en `music_samples.js` y reproducida con `AudioBufferSource` y loop points sample-exactos (render intro + loop×2; el loop es la segunda repetición para que la cola de reverb suene bajo el reenganche). Todo sobre Re: mapa Re dorio→Fa lidio (100 bpm, loop 86 s), batalla La eólico con B en Re menor (150 bpm, 45 s), jefa Re frigio con clave, timbales y tam-tam (144 bpm, 53 s, respiro = tema del mapa en caja de música), victoria Re mayor add9, game over Re→Mib. Leitmotiv "Célula del Prisma" 1–b3–2–5. `music.js` (chiptune v1) queda como fallback si faltan samples. Ficha en `music/FICHA.md`.
+## Vista de batalla: Golden Sun sobre el propio mapa (`scene.js`)
+- **Suelo Mode 7**: por cada fila de pantalla se lanza un rayo desde la cámara (guiñada, cabeceo, altura, focal) y se muestrea la textura cenital del mapa (`sceneTexture`, montada con los mismos autotiles del overworld). Niebla hacia el horizonte, cielo en bandas con sol de pintura y silueta de bosque que gira con la cámara.
+- **Proyección** (`project`): cada unidad, partícula, marca y prop vive en coordenadas de mundo `(wx, wy, wz)`; la escala del sprite depende de la profundidad. Árboles y rocas del mapa se dibujan como siluetas (`bigTree`, `bigRock`) salvo los que pisaría alguien.
+- **Formación** alrededor del punto del encuentro: eje grupo→enemigo; enemigos delante, grupo detrás en escalera. La cámara de reposo (`camRest`) se calcula para dejar a los enemigos arriba-izquierda y al grupo abajo-derecha; `camFocus` la gira y acerca a cada acción y `camReset` la devuelve.
 
-## Animaciones de ataque (cada acción se ve como lo que es)
-Las herramientas **no las empuña la gota**: aparecen como assets independientes (destello), actúan sobre el objetivo y se retiran.
-- Assets pixel art en `propSprite`: Brocha plana de pintor 60×22 (mango-pala de madera clara con agujero, virola ancha con remaches, cerdas naturales con la punta cargada del color), Lápiz (goma, virola, cuerpo hexagonal facetado, cono de madera, mina), Pincel (mango lacado con anilla del color, virola con pliegues, mechón afilado), Goma bicolor con funda, Tubo con etiqueta y tapón.
-- `toolStroke` mueve la herramienta con la **punta siguiendo un camino** y deja el trazo detrás (marcas `path`, con grafito debajo en el lápiz).
-- Básicos: Brocha = pincelada diagonal que cae sobre el enemigo · Lápiz = dash con estelas + garabato en zigzag · Pincel = voluta pintada en el aire que sale disparada y salpica.
-- Techs simples: Brochazo = brocha gigante que pinta una Z roja · Trazo doble = X gigante mientras Ámbar atraviesa dos veces · Salpicón = salto + pincel-látigo que salpica a todos.
-- Combos: fase común `chargeAndFuse` (anillos bajo los usuarios, partículas subiendo, chorros que convergen en un orbe que alterna colores y se funde en el mezclado) y liberación propia: Llamarada = orbe que cae y lenguas de fuego bajo cada enemigo · Brote = onda verde por el suelo, zarcillos que trepan por los enemigos, brotes con flor bajo el grupo · Eclipse = disco negro con corona violeta que oscurece el campo y se estrella con onda de choque · Arcoíris = tres orbes que orbitan y se funden en blanco, prisma de seis haces + arco.
-- Enemigos por forma: redondas saltan y planchan (mancha negra), salpicaduras escupen pegotes, alargadas embisten y tiznan en diagonal, charcos mandan una ola de tinta por el suelo; La Tinta: Marea negra como ola grande.
-- **Pringue** (`goop`): al recibir pintura, el objetivo se tiñe del color (sprite compuesto `source-atop`, cacheado) y le caen churretes que van bajando; a los ~1,5 s se desvanece y vuelve a la normalidad. Lo aplican brocha, pincel, Brochazo, Salpicón, Eclipse, Arcoíris, el Tubo (color del aliado) y los ataques de tinta de las Gotas Negras (negro).
-- Objetos: Gota de agua cae del cielo y salpica · Tubo se coloca encima, apunta abajo y se exprime · Goma frota de lado a lado mientras el enemigo parpadea (virutas rosas).
+## Transición (`transitionGen`, siete fases)
+1. **Detección**: el mapa se congela, el enemigo late con un `!`, y sobre el grupo crece la sombra de la gota que viene. El tema del mapa frena.
+2. **Caída** con aceleración; la sombra se cierra.
+3. **Salpicón**: hit-stop, sacudida, anillos de onda y gotas grandes que vuelan hacia la cámara.
+4. **Mancha orgánica** (metabolas + tentáculos) que crece desde el impacto; por delante va una onda que **desatura** el mapa (composición `saturation`). Mientras cubre, la cámara pasa de cenital a la vista de batalla: el mapa se inclina.
+5. **Drenaje**: la tinta se escurre hacia los enemigos y se vuelve su charco; los enemigos emergen con chorreones, el grupo rebota a su formación como tres gotas de color.
 
-## Batalla estilo Chrono Trigger: la arena es el mapa
-- **Diorama isométrico** (`buildArena`, `isoTile`): al empezar la batalla se recorta el trozo de mapa 11×7 donde te han pillado y se proyecta en 2:1 (cada tile cenital se gira 45° y se aplasta, así conserva orillas, bordes de camino y chorretones de tinta). Flota sobre la tinta negra con grosor de tierra, sombra y ondas lentas. Árboles y rocas se dibujan a escala de batalla (`bigTree`, `bigRock`) y se ordenan por profundidad con las unidades: el grupo puede pasar por detrás de un árbol.
-- La ventana se recorta al interior del mapa (evita el anillo de árboles del borde) y cada unidad ocupa la casilla transitable libre más cercana a su puesto en la formación en diagonal (enemigos arriba-izquierda, grupo abajo-derecha), penalizando casillas que quedarían tapadas por un árbol.
-- El grupo **entra corriendo** a su posición durante la intro; las techs de área (Llamarada, Brote, Marea negra) se anclan al centro real de cada bando en vez de a coordenadas fijas.
+## Personajes (`sprites.js`)
+Sprites dibujados a mano como matrices de caracteres con rampa por color (contorno, oscuro, sombra, base, luz, brillo) más paleta fija por sprite. Grupo en tres vistas (espaldas tres cuartos para el reposo, perfil para actuar, frente para herido/KO/victoria): Carmín gota gorda con boina, Ámbar afilada como punta de lápiz con la mina arriba, Añil salpicadura con cresta y tres gotitas satélite que orbitan. Gotas Negras de frente con el color robado en el núcleo; La Tinta ocupa media pantalla. Expresiones (normal, parpadeo, herido, KO, feliz, cejas) y squash & stretch por pose.
 
-## GUI estilo Chrono Trigger con el tema de los colores
-- Ventanas de tinta con degradado, marco biselado claro/oscuro y un **hilo prismático** (rojo→violeta) en el borde superior (`win`); texto blanco con sombra (`ui`), etiquetas en lila, resaltes en amarillo.
-- Batalla: ventana de comandos a la izquierda (teñida del color del personaje activo) y ventana de estado a la derecha, con **brocha que se carga de pintura = ATB**, nombre en el color de cada gota (blanco al estar activo sobre su pincelada), `HP`/`MP` con barras de pintura. La lista de techs/objetos se abre **sobre el campo** con el coste de MP a la derecha y las gotas de los compañeros necesarios para cada combo; arriba, la **ecuación de color** (`■+■=■ Llamarada · 6 MP · con Ámbar`) y la descripción.
-- Cursor = gota del color del personaje; resaltes = pincelada translúcida de su color (`hilite`). Letreros superiores como pincelada del color de la acción; cursor de objetivo con etiqueta de nombre y HP.
-- Mapa: HUD de pigmento, aviso a página completa y menú de estado/equipo con el mismo estilo.
+## Ataques (`attacks.js`): cada acción se ve como lo que es
+Las herramientas son props (`propSprite`) que entran en escena y actúan sobre el objetivo; la cámara se gira hacia la acción.
+- **Brocha** (Carmín): entra enorme por el borde en primer plano, cruza al enemigo dejando un trazo de cerdas que lo tapa; el trazo se seca y se descascarilla. **Lápiz** (Ámbar): dash con estelas, garabato en espiral alrededor del enemigo y tachón de dos rayas; virutas. **Pincel** (Añil): el pincel se moja en ella (se agita, gotea), pinta una voluta en el aire que sale disparada como latigazo y salpica gotas que ruedan por el suelo.
+- **Brochazo**: la brocha cae desde arriba como un mazo y estampa una Z en tres golpes; el suelo queda pintado. **Trazo doble**: Ámbar se vuelve una línea de lápiz que atraviesa al enemigo ida y vuelta dejando una X de grafito. **Salpicón**: Añil salta, el pincel gira como aspa y llueven gotas con sombra que anuncia dónde cae cada una.
+- **Llamarada**: tras la fusión, lápiz y brocha se cruzan como una cerilla, el lápiz raspa, prende, y el fuego recorre el suelo hasta los enemigos. **Brote**: el pincel pinta un tallo que trepa por cada enemigo y florece; el polen cura al grupo. **Eclipse**: la pantalla se oscurece, un disco rojo y otro azul se superponen y el violeta cae como un tampón que deja la silueta estampada. **Arcoíris**: los tres orbitan, la pantalla se vuelve papel, un prisma dibuja una cinta de arcoíris hasta cada enemigo y los colorea hasta borrarlos.
+- Objetos: nube a lápiz que llueve (Gota de agua), tubo que se exprime como un bote de salsa (Tubo), el enemigo se vuelve dibujo a lápiz y se borra en virutas (Goma).
+- Enemigos por forma: redondas saltan y se estampan (planchazo), salpicaduras escupen tres pegotes, alargadas embisten dejando un tachón en el suelo, charcos mandan una ola de tinta; Borrón tizna; La Tinta inunda la página (Marea negra).
+- **Pringue** (`goop`): el objetivo se tiñe del color y le caen churretes. Marcas de pintura en el mundo (`mark`: trazo, camino, mancha, charco) y partículas con gravedad y rebote en el suelo.
 
-## SFX: agua, pintura, papel y herramientas (`sfx.js`)
-Kit sintetizado en Web Audio (ruido blanco/rosa/marrón filtrado, gotas con barrido de tono, campanas inarmónicas, reverb por convolución generada, ducking de la música). Todo varía ±4 % de tono y hay antirrepetición de 30 ms.
-- **UI cuaderno**: cursor = gotita con la nota del personaje (Carmín Re, Ámbar Fa#, Añil La), confirmar = pincelada + gota, cancelar = goma, abrir/cerrar cuaderno, pasar página (cambiar personaje / cerrar mensaje), estuche al cambiar accesorio, rasca de lápiz sin mina si no se puede.
-- **ATB**: brocha llena = gota en vaso con la nota del personaje; combo disponible = tres gotas en acorde; enemigo a punto de actuar (82 %) = burbuja de tinta.
-- **Herramientas**: barrido de cerdas + splat (brocha), dash + rascado de grafito (lápiz), siseo + fwip + splat pequeño (pincel), brocha grande y barrido largo (Brochazo), látigo + rascados largos (Trazo doble), látigo + chapoteo limpio (Salpicón), frotado + virutas (goma), squeeze + plop (tubo), caída + chapoteo + burbujas (gota de agua).
-- **Mezclas**: carga = glissandos con la nota de cada usuario; fusión = campanazo de mezcla con ducking; Llamarada fwoom + crepitar; Brote crujidos de tallo + hojas + campanitas; Eclipse zumbido descendente → impacto sub + cristales; Arcoíris arpegio de 8 + shimmer.
-- **Daño/estados**: splat normal, splat + crack + campana en golpe débil (2×), golpe sordo de cera al resistir, chorro de tinta al tiznar, goteo lento, disolución con burbujas al morir un enemigo, gota aplastada en KO aliado.
-- **Mapa**: pasos por terreno (hierba/camino/madera del puente), detección de enemigo (burbuja + latido), encuentro (silbido de caída + splash grande con ducking), tintineo de pigmento en resultados, acorde que se satura al recuperar el color, ambiente continuo (viento + gotas lejanas en gris; viento + pájaros en vivo).
+## GUI: cuaderno de pintor (`gui.js`)
+- Páginas de bloc (`page`) con grano, borde rasgado, línea a lápiz y anillas; cinta de carrocero (`tape`) para el objetivo y la ecuación de color; pegatinas-retrato (`sticker`).
+- Batalla: página izquierda de comandos teñida del color del personaje activo (cursor = gota de su color, resalte = pincelada translúcida), página derecha con nombre en su color, HP y MP en rectángulos a lápiz rellenos de pintura y brocha que se carga de pintura como ATB (gotea al estar lista). La lista de techs/objetos es una **hoja que se pasa** sobre el campo con el coste de MP y las gotas de los compañeros necesarios; arriba, cinta con `■+■=■ Llamarada · 6 MP · con Ámbar` y la descripción.
+- Mapa: HUD de pigmento, aviso a página completa y menú de estado/equipo con el mismo papel.
+
+## Overworld (`game.js`)
+Autotiling por vecindad (`groundTile`, cacheado por forma): agua con banco de tierra y espuma animada, camino con borde irregular, puentes y embarcaderos de tablones, zona de tinta con borde líquido y chorretones, 16 variantes de hierba (flores muertas en gris, rosas y blancas en vivo), rocas. Árboles como sprites 16×24 ordenados por profundidad; los contiguos fusionan sus copas en setos.
+
+## Sonido
+- SFX sintetizados en Web Audio (`sfx.js`): agua, pintura, papel y herramientas; cada gota tiene su nota (Carmín Re, Ámbar Fa#, Añil La).
+- **Música con samples SNES** (v2): compuesta en ~/composer (YAML `chromara2_*`), renderizada con fluidsynth sobre `Chrono Trigger.sf2` + `snes.sf2`, empaquetada por `tools/pack_music.py` a Ogg/Opus base64 en `music_samples.js` y reproducida con `AudioBufferSource` y loop points. `music.js` (chiptune v1) queda como fallback. Ficha en `music/FICHA.md`.
 
 ## Estructura
 - `data.js` — todo lo tuneable: colores, complementarios, equipo, objetos, grupo, techs, enemigos, encuentros, mapa (strings), textos.
-- `sfx.js` — kit de efectos; `music_samples.js` — audio embebido; `tools/pack_music.py` — empaquetador.
-- `game.js` — motor: núcleo/input/color · audio · arte procedural · mapa · transición · batalla (corrutinas con generadores) · bucle y debug.
-- Hooks: `window.__chromara` → `battle('2')`, `atb()`, `kill()`, `win()`, `heal()`, `colorize()`, `pause()`, `sprite({...})`.
+- `game.js` — núcleo/input/color · audio · arte procedural del mapa (gotas pequeñas, tiles) · overworld · título y bucle.
+- `sprites.js` — sprites a mano y expresiones. `scene.js` — suelo Mode 7, cámara y proyección. `gui.js` — cuaderno. `battle.js` — estado, transición, efectos en el mundo, menú, ATB, fin. `attacks.js` — coreografías.
+- Hooks: `window.__chromara` → `start()`, `battle('2')`, `atb()`, `kill()`, `win()`, `heal()`, `colorize()`, `pause()`.
 
 ## Decisiones de PoC (a revisar si pasa a vertical slice)
-- Batalla en pantalla aparte pero **sobre el propio trozo de mapa** en isométrico (diorama): se queda el momento visual de la transición y la sensación CT de luchar donde estabas. In-situ puro (sin cambio de pantalla) queda para la vertical slice.
+- La batalla ocurre sobre el propio trozo de mapa (misma textura, misma posición), pero con cámara propia y sin enemigos "de campo" durante el combate.
 - Sin niveles ni subida de stats: el "Pigmento" solo se acumula. Sin guardado. Un mapa. Sin huir.
-- Los accesorios se pueden repetir entre personajes (no hay inventario de equipo real).
+- Los sprites del mapa siguen siendo las gotas procedurales pequeñas; los sprites a mano se usan en batalla y en las pegatinas.
 - Texto con Press Start 2P (Google Fonts, cae a monospace sin red).
