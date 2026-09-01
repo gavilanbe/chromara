@@ -31,11 +31,16 @@ Las herramientas **no las empuña la gota**: aparecen como assets independientes
 - **Pringue** (`goop`): al recibir pintura, el objetivo se tiñe del color (sprite compuesto `source-atop`, cacheado) y le caen churretes que van bajando; a los ~1,5 s se desvanece y vuelve a la normalidad. Lo aplican brocha, pincel, Brochazo, Salpicón, Eclipse, Arcoíris, el Tubo (color del aliado) y los ataques de tinta de las Gotas Negras (negro).
 - Objetos: Gota de agua cae del cielo y salpica · Tubo se coloca encima, apunta abajo y se exprime · Goma frota de lado a lado mientras el enemigo parpadea (virutas rosas).
 
-## GUI: cuaderno de pintor
-- Ventanas de papel con grano, borde de tinta y sombra (`win`), texto en tinta (`ui`).
-- Panel de batalla: **paleta de estado** (brocha en miniatura que se carga de pintura = ATB y brilla al estar lista; nombre; `HP`/`MP` etiquetados con barras de pintura) y **bandeja de herramientas** con iconos (tu arma: brocha/lápiz/pincel; paleta = Tech; tubo = Objeto). Selección con gota-cursor del color del personaje y una pincelada translúcida.
-- Lista de techs con muestra del color resultante (`+` en combos); la ventana de descripción muestra `Rojo+Amarillo = Naranja`, coste en MP, compañero necesario y motivo si no está disponible.
-- Letreros superiores como pinceladas del color de la acción; cursor de objetivo = gota del color del personaje activo con etiqueta de papel.
+## Batalla estilo Chrono Trigger: la arena es el mapa
+- **Diorama isométrico** (`buildArena`, `isoTile`): al empezar la batalla se recorta el trozo de mapa 11×7 donde te han pillado y se proyecta en 2:1 (cada tile cenital se gira 45° y se aplasta, así conserva orillas, bordes de camino y chorretones de tinta). Flota sobre la tinta negra con grosor de tierra, sombra y ondas lentas. Árboles y rocas se dibujan a escala de batalla (`bigTree`, `bigRock`) y se ordenan por profundidad con las unidades: el grupo puede pasar por detrás de un árbol.
+- La ventana se recorta al interior del mapa (evita el anillo de árboles del borde) y cada unidad ocupa la casilla transitable libre más cercana a su puesto en la formación en diagonal (enemigos arriba-izquierda, grupo abajo-derecha), penalizando casillas que quedarían tapadas por un árbol.
+- El grupo **entra corriendo** a su posición durante la intro; las techs de área (Llamarada, Brote, Marea negra) se anclan al centro real de cada bando en vez de a coordenadas fijas.
+
+## GUI estilo Chrono Trigger con el tema de los colores
+- Ventanas de tinta con degradado, marco biselado claro/oscuro y un **hilo prismático** (rojo→violeta) en el borde superior (`win`); texto blanco con sombra (`ui`), etiquetas en lila, resaltes en amarillo.
+- Batalla: ventana de comandos a la izquierda (teñida del color del personaje activo) y ventana de estado a la derecha, con **brocha que se carga de pintura = ATB**, nombre en el color de cada gota (blanco al estar activo sobre su pincelada), `HP`/`MP` con barras de pintura. La lista de techs/objetos se abre **sobre el campo** con el coste de MP a la derecha y las gotas de los compañeros necesarios para cada combo; arriba, la **ecuación de color** (`■+■=■ Llamarada · 6 MP · con Ámbar`) y la descripción.
+- Cursor = gota del color del personaje; resaltes = pincelada translúcida de su color (`hilite`). Letreros superiores como pincelada del color de la acción; cursor de objetivo con etiqueta de nombre y HP.
+- Mapa: HUD de pigmento, aviso a página completa y menú de estado/equipo con el mismo estilo.
 
 ## SFX: agua, pintura, papel y herramientas (`sfx.js`)
 Kit sintetizado en Web Audio (ruido blanco/rosa/marrón filtrado, gotas con barrido de tono, campanas inarmónicas, reverb por convolución generada, ducking de la música). Todo varía ±4 % de tono y hay antirrepetición de 30 ms.
@@ -53,7 +58,7 @@ Kit sintetizado en Web Audio (ruido blanco/rosa/marrón filtrado, gotas con barr
 - Hooks: `window.__chromara` → `battle('2')`, `atb()`, `kill()`, `win()`, `heal()`, `colorize()`, `pause()`, `sprite({...})`.
 
 ## Decisiones de PoC (a revisar si pasa a vertical slice)
-- Batalla en pantalla aparte (FF) y no in-situ (CT puro): más barato y la transición es el momento visual.
+- Batalla en pantalla aparte pero **sobre el propio trozo de mapa** en isométrico (diorama): se queda el momento visual de la transición y la sensación CT de luchar donde estabas. In-situ puro (sin cambio de pantalla) queda para la vertical slice.
 - Sin niveles ni subida de stats: el "Pigmento" solo se acumula. Sin guardado. Un mapa. Sin huir.
 - Los accesorios se pueden repetir entre personajes (no hay inventario de equipo real).
 - Texto con Press Start 2P (Google Fonts, cae a monospace sin red).

@@ -482,12 +482,16 @@ function txt(s, x, y, col = '#f4f0ea', shadowCol = '#14121c') {
   g.fillStyle = col; g.fillText(s, x, y);
 }
 function txtC(s, cx, y, col, sh) { g.font = FONT; const w = g.measureText(s).width; txt(s, Math.round(cx - w / 2), y, col, sh); }
-function win(x, y, w, h, opt = {}) { // papel de cuaderno con borde de tinta y sombra
-  g.fillStyle = 'rgba(20,18,28,.35)'; g.fillRect(x + 2, y + 2, w, h);
-  g.fillStyle = opt.solid || '#f1e9d6'; g.fillRect(x, y, w, h);
-  if (!opt.solid) { const rnd = seeded(x * 31 + y * 17 + w); g.fillStyle = '#e3d8bd'; for (let i = 0; i < w * h / 48; i++) g.fillRect(x + 1 + rnd() * (w - 2) | 0, y + 1 + rnd() * (h - 2) | 0, 1, 1); }
-  g.fillStyle = '#2a2438'; g.fillRect(x + 1, y, w - 2, 1); g.fillRect(x + 1, y + h - 1, w - 2, 1); g.fillRect(x, y + 1, 1, h - 2); g.fillRect(x + w - 1, y + 1, 1, h - 2);
-  g.fillStyle = '#c9bd9c'; g.fillRect(x + 1, y + h - 2, w - 2, 1); g.fillRect(x + w - 2, y + 1, 1, h - 2);
+function win(x, y, w, h, opt = {}) { // ventana estilo Chrono Trigger: tinta con degradado, marco biselado y un hilo prismático arriba
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x + 2, y + 2, w, h);
+  if (opt.solid) { g.fillStyle = opt.solid; g.fillRect(x, y, w, h); }
+  else { const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, '#13123a'); gr.addColorStop(1, '#2b2a6e'); g.fillStyle = gr; g.fillRect(x, y, w, h); }
+  if (opt.tint) { g.globalAlpha = .13; g.fillStyle = opt.tint; g.fillRect(x + 2, y + 2, w - 4, h - 4); g.globalAlpha = 1; }
+  const box = (X, Y, Wd, Hh, col) => { g.fillStyle = col; g.fillRect(X, Y, Wd, 1); g.fillRect(X, Y + Hh - 1, Wd, 1); g.fillRect(X, Y, 1, Hh); g.fillRect(X + Wd - 1, Y, 1, Hh); };
+  box(x, y, w, h, '#0b0912'); box(x + 1, y + 1, w - 2, h - 2, '#e8e4f4');
+  g.fillStyle = '#8b86c0'; g.fillRect(x + 2, y + 2, w - 4, 1); g.fillRect(x + 2, y + 2, 1, h - 4); g.fillStyle = '#403d70'; g.fillRect(x + 2, y + h - 3, w - 4, 1); g.fillRect(x + w - 3, y + 2, 1, h - 4);
+  const pg = g.createLinearGradient(x, 0, x + w, 0); ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].forEach((c, i) => pg.addColorStop(i / 5, C(c)));
+  g.fillStyle = pg; g.globalAlpha = .7; g.fillRect(x + 3, y + 3, w - 6, 1); g.globalAlpha = 1;
 }
 function bar(x, y, w, h, t, col, bg = '#0b0912') { g.fillStyle = bg; g.fillRect(x, y, w, h); g.fillStyle = col; g.fillRect(x + 1, y + 1, Math.round((w - 2) * clamp(t, 0, 1)), h - 2); }
 function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 5); g.fillRect(x + 1, y + 1, 1, 3); g.fillRect(x + 2, y + 2, 1, 1); g.fillStyle = '#14121c'; g.fillRect(x, y + 5, 3, 1); }
@@ -566,14 +570,14 @@ function drawOverworld() {
   }
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
   // HUD
-  win(4, 4, 124, 16); swatch(8, 8, C('amarillo')); ui('PIGMENTO ' + Game.pigmento, 18, 8, INK);
+  win(4, 4, 124, 16); swatch(8, 8, C('amarillo')); ui('PIGMENTO ' + Game.pigmento, 18, 8, TXT);
   if (OW.msg) drawMessage(OW.msg.lines);
   if (OW.menu) drawMenu();
 }
 function drawMessage(lines) {
-  const h = lines.length * 10 + 14; win(24, H - h - 8, W - 48, h);
-  lines.forEach((l, i) => ui(l, 32, H - h - 1 + i * 10, i === 0 ? GOLD : INK));
-  if ((Game.t / 20 | 0) % 2) ui('▼', W - 40, H - 14, INK2);
+  const h = lines.length * 10 + 14; win(8, H - h - 8, W - 16, h);
+  lines.forEach((l, i) => ui(l, 16, H - h - 1 + i * 10, i === 0 ? GOLD : TXT));
+  if ((Game.t / 20 | 0) % 2) ui('▼', W - 24, H - 16, TXT2);
 }
 // --- Menú de estado/equipo (Enter en el mapa)
 const ACC_LIST = Object.keys(DATA.accessories);
@@ -592,23 +596,23 @@ function updateMenu() {
 function drawMenu() {
   g.fillStyle = 'rgba(11,9,18,0.45)'; g.fillRect(0, 0, W, H);
   win(8, 8, 304, 164);
-  ui('CHROMARA', 16, 14, GOLD); swatch(196, 14, C('amarillo')); ui('Pigmento ' + Game.pigmento, 206, 14, INK);
+  ui('CHROMARA', 16, 14, GOLD); swatch(196, 14, C('amarillo')); ui('Pigmento ' + Game.pigmento, 206, 14, TXT);
   Party.forEach((p, i) => {
     const y = 28 + i * 34, s = effStats(p), sel = OW.menu.idx === i;
-    if (sel) { g.globalAlpha = .22; pstroke(16, y + 14, 304, y + 14, 30, C(p.color), 1, 0, false); g.globalAlpha = 1; dropCursor(16, y + 8, C(p.color)); }
+    if (sel) { hilite(24, y + 14, 296, 28, C(p.color), .2); dropCursor(16, y + 8, C(p.color)); }
     drawDrop({ color: C(p.color), shape: p.shape, w: Math.round(p.w * .7), h: Math.round(p.h * .7) }, 36, y + 26, 'idle', (Game.t / 12 + i | 0) % 4);
-    ui(p.name, 56, y, ramp(C(p.color)).sh); ui(p.role, 56, y + 10, INK2);
-    ui(`HP ${p.cur.hp}/${s.hp}`, 120, y, INK); ui(`MP ${p.cur.mp}/${s.mp}`, 120, y + 10, INK);
-    ui(`ATK${s.atk} DEF${s.def} SPD${s.spd}`, 120, y + 20, INK2);
-    g.drawImage(iconSprite(p.weapon, C(p.color)), 220, y - 2); ui(DATA.weapons[p.weapon].name, 234, y, INK);
-    ui((sel ? '◄' : ' ') + DATA.accessories[p.acc].name + (sel ? '►' : ''), 226, y + 10, sel ? GOLD : INK);
+    ui(p.name, 56, y, sel ? TXT : C(p.color)); ui(p.role, 56, y + 10, TXT2);
+    ui(`HP ${p.cur.hp}/${s.hp}`, 120, y, TXT); ui(`MP ${p.cur.mp}/${s.mp}`, 120, y + 10, TXT);
+    ui(`ATK${s.atk} DEF${s.def} SPD${s.spd}`, 120, y + 20, TXT2);
+    g.drawImage(iconSprite(p.weapon, C(p.color)), 220, y - 2); ui(DATA.weapons[p.weapon].name, 234, y, TXT);
+    ui((sel ? '◄' : ' ') + DATA.accessories[p.acc].name + (sel ? '►' : ''), 226, y + 10, sel ? GOLD : TXT);
   });
   const p = Party[OW.menu.idx];
   win(8, 132, 304, 40);
-  ui(DATA.accessories[p.acc].desc, 16, 138, INK);
+  ui(DATA.accessories[p.acc].desc, 16, 138, TXT);
   const inv = Object.entries(Game.inventory).filter(([, n]) => n > 0).map(([k, n]) => `${DATA.items[k].short || DATA.items[k].name} x${n}`).join('  ');
-  ui(inv || 'Sin objetos', 16, 150, INK2);
-  ui('◄► accesorio   X cerrar', 16, 161, INK3);
+  ui(inv || 'Sin objetos', 16, 150, TXT2);
+  ui('◄► accesorio   X cerrar', 16, 161, TXT3);
 }
 
 // =====================================================================
@@ -1080,6 +1084,7 @@ function updateBattle() {
 // marca la unidad como "actuando" mientras dura su corrutina (no acumula ATB ni se le encola otra acción)
 function* tracked(u, gen) { u.acting = true; u.warned = false; try { yield* gen; } finally { u.acting = false; } }
 function checkEnd() {
+  B.menu = null; B.queue = [];
   if (!alive(B.enemies).length) { B.phase = 'victory'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.victory) Audio.play('victory'); else Audio.sfx('victory'); B.party.forEach(u => { if (u.alive) u.pose = 'happy'; }); }
   else if (!alive(B.party).length) { B.phase = 'defeat'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.gameover) Audio.play('gameover'); }
 }
@@ -1209,7 +1214,7 @@ function drawBattle() {
   // cursor de objetivo
   if (B.menu && B.menu.level === 'target') {
     const T = B.menu.targets, ucol = C(B.menu.unit.color); T.forEach((t, i) => { if (i !== B.menu.tidx) return; const bob = Math.abs(Math.sin(B.t * .2)) * 3 | 0; g.drawImage(iconSprite('drop', ucol), Math.round(t.x - 6), Math.round(t.y - t.def.h - 16 - bob));
-      const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 20, x0 = clamp(t.x - w / 2, 2, W - w - 2); win(x0, 4, w, 14); swatch(x0 + 4, 7, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 14, 7, INK); });
+      const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 20, x0 = clamp(t.x - w / 2, 2, W - w - 2); win(x0, 4, w, 14); swatch(x0 + 4, 7, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 14, 7, TXT); });
   }
   g.restore();
   if (B.flash) { g.fillStyle = B.flash.col; g.globalAlpha = B.flash.a; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
@@ -1219,12 +1224,12 @@ function drawBattle() {
   if (B.msg && !(B.menu && B.menu.level === 'target')) banner(B.msg.s, B.msg.col === '#f4f0ea' ? INK : B.msg.col);
   drawBattleUI();
   if (B.phase === 'intro') { const k = clamp(1 - B.t / 24, 0, 1); if (k > 0) { g.fillStyle = '#0b0912'; g.beginPath(); g.rect(0, 0, W, H); g.arc(W / 2, H / 2 + 10, (1 - k) * 300, 0, 6.29, true); g.fill(); } }
-  if (B.phase === 'victory' && B.t > 60) { win(80, 56, 160, 46); banner('¡VICTORIA!', C('amarillo'), 58); g.font = FONT; const rs = 'Pigmento +' + B.result; ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 80, INK); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 90, INK2); }
+  if (B.phase === 'victory' && B.t > 60) { win(80, 56, 160, 46); banner('¡VICTORIA!', C('amarillo'), 58); g.font = FONT; const rs = 'Pigmento +' + B.result; ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 80, TXT); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 90, TXT2); }
   if (B.phase === 'defeat') { g.fillStyle = 'rgba(11,9,18,' + clamp(B.t / 60, 0, .8) + ')'; g.fillRect(0, 0, W, H); if (B.t > 40) DATA.texts.gameover.forEach((l, i) => txtC(l, W / 2, 70 + i * 12, i === 0 ? '#8c8ab0' : '#f4f0ea')); }
 }
 // ---- GUI temática: cuaderno de pintor (papel, tinta, paleta, herramientas)
-const INK = '#2a2438', INK2 = '#6a6480', INK3 = '#9a90a8', PAPER = '#f1e9d6', PAPER2 = '#e3d8bd', GOLD = '#b8860b';
-function ui(s, x, y, col = INK) { txt(s, x, y, col, '#d9cdb0'); }
+const INK = '#2a2438', TXT = '#f4f0ea', TXT2 = '#b9b4d2', TXT3 = '#7d7899', GOLD = '#f2c93a';
+function ui(s, x, y, col = TXT) { txt(s, x, y, col, '#0b0912'); }
 function iconSprite(name, color) {
   return cached(`icon|${name}|${color || ''}`, () => {
     const c = document.createElement('canvas'); c.width = c.height = 12; const x = c.getContext('2d'); const F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
@@ -1250,7 +1255,7 @@ function atbBrush(x, y, f, col, t) {
   g.fillStyle = INK; g.fillRect(x + 20, y, 1, 6); g.fillRect(x + 11, y - 1, 9, 1); g.fillRect(x + 11, y + 6, 9, 1);
   if (f >= 1) { const k = (t >> 2) & 3; g.fillStyle = k < 2 ? '#fff3c0' : rp.hi; g.fillRect(x + 21, y - 2 + k, 1, 1); g.fillRect(x + 22 + (k & 1), y + 1, 1, 1); g.fillRect(x + 19, y + 6 + (k >> 1), 1, 1); }
 }
-function paintBar(x, y, w, h, f, col) { g.fillStyle = INK; g.fillRect(x, y, w, h); g.fillStyle = PAPER2; g.fillRect(x + 1, y + 1, w - 2, h - 2); const n = Math.round((w - 2) * clamp(f, 0, 1)); if (n) { g.fillStyle = ramp(col).base; g.fillRect(x + 1, y + 1, n, h - 2); g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, n, 1); } }
+function paintBar(x, y, w, h, f, col) { g.fillStyle = INK; g.fillRect(x, y, w, h); g.fillStyle = '#3a3860'; g.fillRect(x + 1, y + 1, w - 2, h - 2); const n = Math.round((w - 2) * clamp(f, 0, 1)); if (n) { g.fillStyle = ramp(col).base; g.fillRect(x + 1, y + 1, n, h - 2); g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, n, 1); } }
 function swatch(x, y, col, dim) { g.fillStyle = INK; g.fillRect(x, y, 7, 7); g.fillStyle = dim ? '#b8b0a0' : ramp(col).base; g.fillRect(x + 1, y + 1, 5, 5); if (!dim) { g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, 2, 1); } }
 // letrero superior como pincelada del color de la acción
 function banner(s, col, y = 4) {
@@ -1258,39 +1263,66 @@ function banner(s, col, y = 4) {
   const light = rgbHsl(...hexRgb(col))[2] > .6; txt(s, x0 + 10, y + 2, light ? INK : '#f4f0ea', light ? null : '#14121c');
 }
 function drawBattleUI() {
-  const y0 = 128; win(0, y0, W, H - y0); g.fillStyle = INK; g.fillRect(100, y0 + 4, 1, H - y0 - 8);
-  // ---- paleta de estado: brocha ATB · nombre · HP · MP
+  const y0 = 128, m = B.menu, act = m ? m.unit : null, tint = act ? C(act.color) : null;
+  win(102, y0, W - 102, H - y0); win(0, y0, 100, H - y0, { tint });
+  // ---- estado del grupo (CT): brocha que se carga = tiempo · nombre en su color · HP · MP
   B.party.forEach((u, i) => {
-    const y = y0 + 5 + i * 15, active = B.menu && B.menu.unit === u, col = C(u.color), nm = u.alive ? ramp(col).sh : INK3;
-    if (active) { g.globalAlpha = .16; pstroke(104, y + 6, 314, y + 6, 12, col, 1, 0, true); g.globalAlpha = 1; }
-    atbBrush(104, y + 2, u.alive ? u.atb / 100 : 0, col, B.t);
-    ui(u.name, 130, y, nm);
-    ui('HP', 184, y, INK2); ui(String(u.hp).padStart(3), 202, y, u.hp <= 0 ? INK3 : u.hp < u.maxhp * .25 ? C('rojo') : INK); paintBar(184, y + 9, 42, 4, u.hp / u.maxhp, col);
-    ui('MP', 236, y, INK2); ui(String(u.mp).padStart(2), 254, y, INK); paintBar(236, y + 9, 42, 4, u.mp / u.maxmp, desat(col, .5, .15));
-    if (u.status.tiznado) { g.fillStyle = INK; g.fillRect(292, y + 2, 6, 3); } if (u.status.lento) ui('z', 300, y, C('violeta'));
+    const y = y0 + 6 + i * 15, active = act === u, col = C(u.color);
+    if (active) { hilite(108, y + 5, 314, 12, col, .3); }
+    atbBrush(108, y + 1, u.alive ? u.atb / 100 : 0, col, B.t);
+    ui(u.name, 132, y - 1, !u.alive ? TXT3 : active ? TXT : col);
+    ui('HP', 190, y - 1, TXT2); ui(String(u.hp).padStart(3), 208, y - 1, u.hp <= 0 ? TXT3 : u.hp < u.maxhp * .25 ? C('rojo') : TXT); paintBar(190, y + 8, 42, 4, u.hp / u.maxhp, col);
+    ui('MP', 242, y - 1, TXT2); ui(String(u.mp).padStart(2), 260, y - 1, TXT); paintBar(242, y + 8, 42, 4, u.mp / u.maxmp, desat(col, .4, .1));
+    if (u.status.tiznado) smudgeIcon(292, y + 1); if (u.status.lento) ui('z', 302, y - 1, C('violeta'));
   });
-  const m = B.menu; if (!m) { ui('...', 8, y0 + 6, INK3); return; }
-  const u = m.unit, ucol = C(u.color);
-  if (m.level === 'cmd' || m.level === 'target' && m.pending.type === 'attack') {
-    // ---- bandeja de herramientas
-    const entries = [[u.data.weapon, 'Atacar'], ['tech', 'Tech'], ['item', 'Objeto']];
-    entries.forEach(([ic, label], i) => { const y = y0 + 5 + i * 15, sel = m.level === 'cmd' && m.idx === i; if (sel) { g.globalAlpha = .2; pstroke(6, y + 6, 96, y + 6, 12, ucol, 1, 0, true); g.globalAlpha = 1; dropCursor(2, y + 2, ucol); } g.drawImage(iconSprite(ic, ucol), 14, y); ui(label, 30, y + 2, sel ? INK : INK2); });
-  } else {
-    const L = m.list, sel = m.level === 'target' ? L.findIndex(e => e.id === (m.pending.tech ? m.pending.tech.id : m.pending.item)) : m.idx;
-    const top = clamp(sel - 1, 0, Math.max(0, L.length - 3));
-    if (!L.length) ui('Nada', 14, y0 + 6, INK3);
-    L.slice(top, top + 3).forEach((e, k) => {
-      const i = top + k, y = y0 + 5 + k * 15; if (i === sel) { g.globalAlpha = .2; pstroke(6, y + 6, 96, y + 6, 12, ucol, 1, 0, true); g.globalAlpha = 1; dropCursor(2, y + 2, ucol); }
-      if (m.level === 'tech' || m.pending && m.pending.tech) {
-        swatch(12, y + 2, C(e.t.color), !e.avail); if (e.combo) { g.fillStyle = e.avail ? INK : INK3; g.fillRect(20, y + 1, 3, 1); g.fillRect(21, y, 1, 3); }
-        ui(e.t.name, 26, y + 2, e.avail ? INK : INK3);
-      } else { g.drawImage(iconSprite('item', e.it.kind === 'mp' ? C('azul') : e.it.kind === 'heal' ? C('verde') : '#e86a8a'), 12, y); ui(e.it.short || e.it.name, 28, y + 2, INK); ui('x' + e.n, 82, y + 2, INK2); }
-    });
-    if (L.length > 3) { ui(top > 0 ? '▲' : ' ', 90, y0 + 2, INK2); ui(top + 3 < L.length ? '▼' : ' ', 90, H - 10, INK2); }
-    if (m.level === 'tech' && L[sel]) { const e = L[sel]; const head = e.t.name + ' · ' + e.cost + ' MP' + (e.combo ? ' · con ' + e.users.filter(x => x !== u).map(x => x.name).join(' y ') : ''); win(0, y0 - 27, W, 25); e.users.forEach((us, j) => swatch(6 + j * 5, y0 - 22, C(us.color))); if (e.combo) { ui('=', 8 + e.users.length * 5, y0 - 23, INK2); swatch(18 + e.users.length * 5, y0 - 22, C(e.t.color)); } ui(head, e.combo ? 30 + e.users.length * 5 : 16, y0 - 23, e.avail ? ramp(C(e.t.color)).sh : INK3); ui(e.t.desc.slice(0, 38), 6, y0 - 13, e.avail ? INK : INK3); if (!e.avail) ui(!e.ready ? '(compañero no listo)' : '(sin MP)', W - 168, y0 - 23, C('rojo')); }
-    if (m.level === 'item' && L[sel]) { win(0, y0 - 16, W, 14); ui(L[sel].it.desc, 6, y0 - 12, INK); }
+  if (!m) { ui('...', 8, y0 + 6, TXT3); return; }
+  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item' || (m.level === 'target' && m.pending.type !== 'attack');
+  // ---- ventana de comandos (siempre visible; el comando en curso queda marcado)
+  const cmdSel = m.level === 'cmd' ? m.idx : (m.level === 'target' && m.pending.type === 'attack') ? 0 : (m.level === 'tech' || m.pending && m.pending.type === 'tech') ? 1 : 2;
+  [[u.data.weapon, 'Atacar'], ['tech', 'Tech'], ['item', 'Objeto']].forEach(([ic, label], i) => {
+    const y = y0 + 6 + i * 15, sel = cmdSel === i;
+    if (sel) { hilite(6, y + 5, 96, 12, ucol, listing ? .18 : .3); if (!listing) dropCursor(2, y + 1, ucol); }
+    g.drawImage(iconSprite(ic, ucol), 14, y - 1); ui(label, 30, y + 1, sel ? TXT : TXT2);
+  });
+  if (!listing) return;
+  // ---- lista de techs / objetos: ventana que se abre sobre el campo, a la izquierda (CT)
+  const isTech = m.level === 'tech' || (m.pending && m.pending.type === 'tech'), L = m.list;
+  const sel = m.level === 'target' ? L.findIndex(e => e.id === (m.pending.tech ? m.pending.tech.id : m.pending.item)) : m.idx;
+  const rows = Math.max(1, Math.min(4, L.length)), top = clamp(sel - 3, 0, Math.max(0, L.length - 4));
+  const ww = 156, wh = rows * 12 + 10, wy = y0 - wh - 2;
+  win(0, wy, ww, wh, { tint });
+  if (!L.length) ui('Nada', 14, wy + 5, TXT3);
+  L.slice(top, top + 4).forEach((e, k) => {
+    const i = top + k, y = wy + 5 + k * 12;
+    if (i === sel) { hilite(6, y + 3, ww - 6, 11, ucol, .3); dropCursor(2, y - 1, ucol); }
+    if (isTech) {
+      swatch(12, y, C(e.t.color), !e.avail); ui(e.t.name, 23, y, e.avail ? TXT : TXT3);
+      e.users.filter(x => x !== u).forEach((x, q) => { g.globalAlpha = e.avail ? 1 : .4; g.drawImage(iconSprite('drop', C(x.color)), 118 + q * 9, y - 3); g.globalAlpha = 1; });
+      const cs = String(e.cost); ui(cs, ww - 8 - cs.length * 8, y, e.avail ? TXT2 : TXT3);
+    } else {
+      g.drawImage(iconSprite('item', e.it.kind === 'mp' ? C('azul') : e.it.kind === 'heal' ? C('verde') : '#e86a8a'), 12, y - 2); ui(e.it.short || e.it.name, 28, y, TXT);
+      const ns = 'x' + e.n; ui(ns, ww - 8 - ns.length * 8, y, TXT2);
+    }
+  });
+  if (L.length > 4) { ui(top > 0 ? '▲' : ' ', ww - 14, wy + 1, TXT2); ui(top + 4 < L.length ? '▼' : ' ', ww - 14, wy + wh - 9, TXT2); }
+  // ---- arriba: la ecuación de color de la tech (Rojo + Amarillo = Naranja) y su descripción
+  if (isTech && L[sel]) {
+    const e = L[sel]; win(0, 4, W, 24);
+    let x = 8; e.users.forEach((us, j) => { swatch(x, 8, C(us.color)); x += 8; if (j < e.users.length - 1) { ui('+', x, 8, TXT2); x += 9; } });
+    if (e.combo) { ui('=', x + 1, 8, TXT2); x += 10; swatch(x, 8, C(e.t.color)); x += 10; }
+    ui(e.t.name + ' · ' + e.cost + ' MP', x + 2, 8, e.avail ? ramp(C(e.t.color)).hi : TXT3);
+    if (e.combo) ui('con ' + e.users.filter(q => q !== u).map(q => q.name).join(' y '), W - 8 - (4 + e.users.filter(q => q !== u).map(q => q.name).join(' y ').length) * 8, 8, e.avail ? TXT2 : TXT3);
+    ui(e.t.desc.slice(0, 38), 8, 18, e.avail ? TXT : TXT3);
+    if (!e.avail) ui(!e.ready ? '(compañero no listo)' : '(sin MP)', W - 8 - (e.ready ? 8 : 20) * 8, 18, C('rojo'));
   }
+  if (!isTech && L[sel]) { win(0, 4, W, 14); ui(L[sel].it.desc, 8, 7, TXT); }
 }
+function hilite(x0, y, x1, w, col, a = .3) { // banda de pincelada translúcida (pstroke acumula alpha al solapar cuadrados)
+  g.globalAlpha = a; g.fillStyle = col; const len = x1 - x0;
+  for (let i = 0; i <= len; i++) { const t = i / len, ww = Math.max(1, Math.round(w * (0.55 + 0.45 * Math.sin(Math.PI * t)))); g.fillRect(x0 + i, Math.round(y - ww / 2), 1, ww); }
+  g.globalAlpha = 1;
+}
+function smudgeIcon(x, y) { g.fillStyle = '#0b0912'; g.fillRect(x, y, 6, 3); g.fillRect(x + 1, y - 1, 4, 1); g.fillRect(x + 1, y + 3, 3, 1); g.fillStyle = '#7d7899'; g.fillRect(x + 1, y, 1, 1); }
 
 // =====================================================================
 // 7. Título, bucle principal, debug
