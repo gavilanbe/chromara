@@ -14,6 +14,38 @@ function sceneTexture(pal) {
   const d = x.getImageData(0, 0, tw, th);
   return SCENE.texCache[pal] = { data: d.data, w: tw, h: th };
 }
+// Árbol y roca a escala de batalla (siluetas del mapa en la escena)
+function bigTree(pal, vr) { // árbol de arena 34×48 (el del mapa a escala de batalla)
+  return cached(`bigtree|${pal}|${vr}`, () => {
+    const p = PAL[pal], c = document.createElement('canvas'); c.width = 34; c.height = 48; const x = c.getContext('2d');
+    const ph1 = vr * 1.3, ph2 = vr * 2.1, cx = 17, cy = 16, rx = 16, ry = 15.5;
+    const ell = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.09 * Math.sin(X * 1.1 + ph1) * Math.sin(Y * .9 + ph2); };
+    px(x, p.treeOut, 12, 28, 10, 20); px(x, p.trunk2, 13, 28, 8, 20); px(x, p.trunk, 15, 28, 3, 18); px(x, p.treeOut, 10, 46, 2, 2); px(x, p.treeOut, 22, 46, 2, 2); px(x, p.trunk2, 12, 45, 1, 2); px(x, p.trunk2, 21, 45, 1, 2);
+    for (let Y = 0; Y < 33; Y++) for (let X = 0; X < 34; X++) {
+      if (!ell(X, Y)) continue;
+      if (!ell(X - 1, Y) || !ell(X + 1, Y) || !ell(X, Y - 1) || !ell(X, Y + 1)) { px(x, p.treeOut, X, Y); continue; }
+      const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry;
+      const lam = -u * .45 - w * .7 + .32 * Math.sin(X * .95 + ph1) * Math.sin(Y * .8 + ph2) + .12 * Math.sin(X * .5 + Y * .6 + vr);
+      px(x, lam > .5 ? p.treeHi : lam > .05 ? p.tree : lam > -.42 ? p.tree2 : p.treeOut, X, Y);
+    }
+    return c;
+  });
+}
+function bigRock(pal, vr) { // roca de arena 26×18
+  return cached(`bigrock|${pal}|${vr}`, () => {
+    const p = PAL[pal], c = document.createElement('canvas'); c.width = 26; c.height = 18; const x = c.getContext('2d');
+    const cx = 13, cy = 9.5, rx = 12.5, ry = 8, ph = vr * 1.7;
+    const ins = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.12 * Math.sin(X * 1.3 + ph) * Math.sin(Y * 1.1 + ph); };
+    for (let Y = 0; Y < 18; Y++) for (let X = 0; X < 26; X++) {
+      if (!ins(X, Y)) continue;
+      if (!ins(X - 1, Y) || !ins(X + 1, Y) || !ins(X, Y - 1) || !ins(X, Y + 1)) { px(x, p.rockOut, X, Y); continue; }
+      const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry, lam = -u * .5 - w * .65 + .25 * Math.sin(X * 1.7 + ph) * Math.sin(Y * 1.9 + ph * 2);
+      px(x, lam > .45 ? p.rock3 : lam > 0 ? p.rock : lam > -.5 ? p.rock2 : p.rockOut, X, Y);
+    }
+    px(x, p.rockOut, 15, 9); px(x, p.rockOut, 16, 10); px(x, p.rockOut, 17, 11); px(x, p.rockOut, 8, 12); px(x, p.rockOut, 9, 13);
+    return c;
+  });
+}
 function camBasis(cam) { const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw); return { Fx: cy, Fy: sy, Rx: -sy, Ry: cy, cP: Math.cos(cam.pitch), sP: Math.sin(cam.pitch) }; }
 // Proyección de un punto de mundo (wx, wy, wz=altura) → [sx, sy, escala, z]
 function project(wx, wy, wz = 0, cam = SCENE.cam) {
@@ -61,9 +93,9 @@ function drawSky(pal) {
 // Cámara: pose de reposo calculada para que el grupo quede abajo-derecha y los enemigos arriba-izquierda
 function camRest(pc, ec) {
   const dx = ec[0] - pc[0], dy = ec[1] - pc[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
-  const yaw = Math.atan2(uy, ux) - 0.55; // giro para la diagonal
+  const yaw = Math.atan2(uy, ux) + 0.7; // giro para la diagonal
   const cx = (pc[0] + ec[0]) / 2, cy = (pc[1] + ec[1]) / 2;
-  const back = 118; return { x: cx - Math.cos(yaw) * back + Math.sin(yaw) * 10, y: cy - Math.sin(yaw) * back - Math.cos(yaw) * 10, yaw, pitch: 0.62, h: 72, f: 150, hy: 62 };
+  const back = 128; return { x: cx - Math.cos(yaw) * back - Math.sin(yaw) * 12, y: cy - Math.sin(yaw) * back + Math.cos(yaw) * 12, yaw, pitch: 0.62, h: 84, f: 180, hy: 58 };
 }
 function camGo(goal, ease = .14) { SCENE.goal = Object.assign({}, SCENE.cam, goal); SCENE.ease = ease; }
 function camSet(pose) { Object.assign(SCENE.cam, pose); SCENE.goal = null; }
