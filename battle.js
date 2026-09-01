@@ -455,10 +455,10 @@ function resetGame() {
 // =====================================================================
 // 7. Render: cielo, suelo Mode 7, capa de suelo (charcos, marcas), entidades por profundidad, partículas, GUI
 // =====================================================================
-function drawSprite(s, x, y, sc = 1, flip = false) { const w = s.width * sc, h = s.height * sc; g.save(); g.translate(Math.round(x), Math.round(y)); if (flip) g.scale(-1, 1); g.imageSmoothingEnabled = false; g.drawImage(s, -Math.round(w / 2), -Math.round(h) + 1, Math.round(w), Math.round(h)); g.restore(); }
-function unitSprite(u, frame) { return dropSprite(u.def, u.pose, frame, { dark: u.kind === 'enemy' && !u.def.core }); }
+function drawSprite(s, x, y, sc = 1, flip = false, sy = 1) { const w = s.width * sc, h = s.height * sc * sy; g.save(); g.translate(Math.round(x), Math.round(y)); if (flip) g.scale(-1, 1); g.imageSmoothingEnabled = false; g.drawImage(s, -Math.round(w / 2), -Math.round(h) + 1, Math.round(w), Math.round(h)); g.restore(); }
+function unitSprite(u, frame) { return unitSpriteInfo(u, frame).spr; }
 function drawUnit(u) {
-  const s = u.sc * B.unitScale, frame = (B.t / 9 + u.idx * 2 | 0) % 4, ready = u.kind === 'party' && u.atb >= 100 && u.alive && !u.acting && B.phase === 'fight';
+  const s = u.sc * B.unitScale * (u.kind === 'enemy' ? (u.boss ? 1.35 : 1.6) : 1), frame = (B.t / 9 + u.idx * 2 | 0) % 4, ready = u.kind === 'party' && u.atb >= 100 && u.alive && !u.acting && B.phase === 'fight';
   if (u.dead && u.dead > 1.6) return;
   if (u.dead) g.globalAlpha = clamp(1.6 - u.dead, 0, 1);
   if (u.erasing && (B.t >> 1) & 1) g.globalAlpha = .35;
@@ -466,8 +466,10 @@ function drawUnit(u) {
   // emergiendo del charco: se recorta por debajo del suelo
   let clip = false; if (u.wz < 0 && gp) { g.save(); g.beginPath(); g.rect(0, 0, W, gp[1] + 1); g.clip(); clip = true; }
   const G = u.goop, ga = G ? (G.t > G.life - 20 ? (G.life - G.t) / 20 : 1) : 0;
-  let spr = unitSprite(u, frame); if (G) spr = tintSprite(spr, G.col, .55 * ga);
-  drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s, u.kind === 'party');
+  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (G) spr = tintSprite(spr, G.col, .55 * ga);
+  const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
+  drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx, flip, info.sy);
+  if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
   if (clip) g.restore();
   g.globalAlpha = 1;
@@ -500,7 +502,7 @@ function drawBattle() {
   // cursor de objetivo
   if (B.menu && B.menu.level === 'target') {
     const TT = B.menu.targets, ucol = C(B.menu.unit.color); TT.forEach((t, i) => { if (i !== B.menu.tidx) return; const bob = Math.abs(Math.sin(B.t * .2)) * 3 | 0; g.drawImage(iconSprite('drop', ucol), Math.round(t.x - 6), Math.round(t.y - t.def.h * t.sc - 16 - bob));
-      const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 20, x0 = clamp(t.x - w / 2, 2, W - w - 2); win(x0, 4, w, 14); swatch(x0 + 4, 7, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 14, 7, TXT); });
+      targetLabel(t); });
   }
   g.restore();
   if (T) drawTransitionFx();
@@ -509,103 +511,6 @@ function drawBattle() {
   for (const n of B.nums) { g.font = FONT; if (n.big) { txt(n.v, Math.round(n.x) + 1, Math.round(n.y) + 1, n.col, null); } txt(n.v, Math.round(n.x), Math.round(n.y), n.col); }
   if (B.msg && !(B.menu && B.menu.level === 'target') && B.phase === 'fight') banner(B.msg.s, B.msg.col === '#f4f0ea' ? INK : B.msg.col);
   if (B.phase !== 'trans') drawBattleUI();
-  if (B.phase === 'victory' && B.t > 60) { win(80, 56, 160, 46); banner('¡VICTORIA!', C('amarillo'), 58); g.font = FONT; const rs = 'Pigmento +' + B.result; ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 80, TXT); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 90, TXT2); }
+  if (B.phase === 'victory' && B.t > 60) { page(80, 56, 160, 46, { rings: true }); banner('¡VICTORIA!', C('amarillo'), 58); g.font = FONT; const rs = 'Pigmento +' + B.result; ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 80, TXT); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 90, TXT2); }
   if (B.phase === 'defeat') { g.fillStyle = 'rgba(11,9,18,' + clamp(B.t / 60, 0, .8) + ')'; g.fillRect(0, 0, W, H); if (B.t > 40) DATA.texts.gameover.forEach((l, i) => txtC(l, W / 2, 70 + i * 12, i === 0 ? '#8c8ab0' : '#f4f0ea')); }
 }
-// ---- GUI temática: cuaderno de pintor (papel, tinta, paleta, herramientas)
-const INK = '#2a2438', TXT = '#f4f0ea', TXT2 = '#b9b4d2', TXT3 = '#7d7899', GOLD = '#f2c93a';
-function ui(s, x, y, col = TXT) { txt(s, x, y, col, '#0b0912'); }
-function iconSprite(name, color) {
-  return cached(`icon|${name}|${color || ''}`, () => {
-    const c = document.createElement('canvas'); c.width = c.height = 12; const x = c.getContext('2d'); const F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
-    const rp = color ? ramp(color) : null;
-    switch (name) {
-      case 'brocha': for (let i = 0; i < 5; i++) F('#b07a48', 1 + i, 10 - i, 2, 1); F('#5a4630', 0, 11, 1, 1); F('#c9c4d4', 5, 5, 3, 2); F('#8c8ab0', 6, 6, 2, 1); F(rp.base, 7, 1, 4, 5); F(rp.hi, 7, 1, 4, 1); F(rp.dk, 10, 2, 1, 4); F(rp.sh, 7, 5, 4, 1); break;
-      case 'lapiz': for (let i = 0; i < 8; i++) { F('#f2c93a', 1 + i, 10 - i, 2, 1); F('#c9a02a', 2 + i, 11 - i, 1, 1); } F('#e89aa8', 0, 11, 2, 1); F('#e8cf9a', 9, 2, 2, 1); F('#2a2438', 11, 0, 1, 2); F('#e8cf9a', 10, 1, 1, 1); break;
-      case 'pincel': for (let i = 0; i < 7; i++) F('#1e1a2c', 1 + i, 10 - i, 1, 1); F('#4a4460', 1, 9, 1, 1); F('#c9c4d4', 8, 3, 1, 1); F('#c9c4d4', 7, 4, 1, 1); F(rp.base, 9, 1, 2, 2); F(rp.dk, 11, 0, 1, 1); F(rp.hi, 9, 1, 1, 1); break;
-      case 'tech': x.fillStyle = '#d9b07a'; x.beginPath(); x.ellipse(6, 6.5, 5.5, 4.5, 0, 0, 6.29); x.fill(); x.fillStyle = '#8a5a34'; x.beginPath(); x.ellipse(6, 6.5, 5.5, 4.5, 0, 0, 6.29); x.stroke(); F('#8a5a34', 2, 7, 2, 2); F(C('rojo'), 4, 3, 2, 2); F(C('amarillo'), 7, 3, 2, 2); F(C('azul'), 8, 7, 2, 2); F(C('verde'), 5, 8, 2, 1); break;
-      case 'item': F('#8c8ab0', 4, 0, 4, 2); F('#c9c4d4', 3, 2, 6, 7); F('#f0eef6', 4, 2, 1, 7); F('#f4f0ea', 4, 4, 4, 2); F(rp ? rp.base : C('rojo'), 5, 4, 2, 2); F('#6a6480', 4, 9, 4, 1); F(rp ? rp.base : C('rojo'), 4, 10, 4, 2); break;
-      case 'drop': F(rp.out, 5, 0, 2, 1); F(rp.out, 4, 1, 4, 1); F(rp.out, 3, 2, 6, 4); F(rp.out, 4, 6, 4, 1); F(rp.base, 5, 1, 2, 1); F(rp.base, 4, 2, 4, 3); F(rp.hi, 4, 2, 1, 2); F(rp.sh, 5, 5, 2, 1); break;
-    }
-    return c;
-  });
-}
-function dropCursor(x, y, col) { const s = iconSprite('drop', col); g.drawImage(s, Math.round(x), Math.round(y) + (((B.t || Game.t) >> 3) & 1)); }
-// brocha en miniatura que se carga de pintura = barra ATB
-function atbBrush(x, y, f, col, t) {
-  g.fillStyle = '#5a4630'; g.fillRect(x, y + 1, 8, 4); g.fillStyle = '#b07a48'; g.fillRect(x + 1, y + 2, 6, 2); g.fillStyle = '#d9a06a'; g.fillRect(x + 1, y + 2, 6, 1);
-  g.fillStyle = '#8c8ab0'; g.fillRect(x + 8, y, 3, 6); g.fillStyle = '#e8e6f0'; g.fillRect(x + 8, y, 3, 1);
-  g.fillStyle = '#d8cbaa'; g.fillRect(x + 11, y, 9, 6); g.fillStyle = '#b8a888'; g.fillRect(x + 11, y + 2, 9, 1); g.fillRect(x + 11, y + 5, 9, 1);
-  const rp = ramp(col), n = Math.round(9 * clamp(f, 0, 1)); if (n) { g.fillStyle = rp.base; g.fillRect(x + 11, y, n, 6); g.fillStyle = rp.hi; g.fillRect(x + 11, y, n, 1); g.fillStyle = rp.sh; g.fillRect(x + 11, y + 5, n, 1); }
-  g.fillStyle = INK; g.fillRect(x + 20, y, 1, 6); g.fillRect(x + 11, y - 1, 9, 1); g.fillRect(x + 11, y + 6, 9, 1);
-  if (f >= 1) { const k = (t >> 2) & 3; g.fillStyle = k < 2 ? '#fff3c0' : rp.hi; g.fillRect(x + 21, y - 2 + k, 1, 1); g.fillRect(x + 22 + (k & 1), y + 1, 1, 1); g.fillRect(x + 19, y + 6 + (k >> 1), 1, 1); }
-}
-function paintBar(x, y, w, h, f, col) { g.fillStyle = INK; g.fillRect(x, y, w, h); g.fillStyle = '#3a3860'; g.fillRect(x + 1, y + 1, w - 2, h - 2); const n = Math.round((w - 2) * clamp(f, 0, 1)); if (n) { g.fillStyle = ramp(col).base; g.fillRect(x + 1, y + 1, n, h - 2); g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, n, 1); } }
-function swatch(x, y, col, dim) { g.fillStyle = INK; g.fillRect(x, y, 7, 7); g.fillStyle = dim ? '#b8b0a0' : ramp(col).base; g.fillRect(x + 1, y + 1, 5, 5); if (!dim) { g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, 2, 1); } }
-// letrero superior como pincelada del color de la acción
-function banner(s, col, y = 4) {
-  g.font = FONT; const w = g.measureText(s).width + 20, x0 = (W - w) / 2 | 0; pstroke(x0, y + 6, x0 + w, y + 6, 13, ramp(col).sh, 1, 0, true); pstroke(x0 + 3, y + 5, x0 + w - 3, y + 5, 11, col, 1, 0, true);
-  const light = rgbHsl(...hexRgb(col))[2] > .6; txt(s, x0 + 10, y + 2, light ? INK : '#f4f0ea', light ? null : '#14121c');
-}
-function drawBattleUI() {
-  const y0 = 128, m = B.menu, act = m ? m.unit : null, tint = act ? C(act.color) : null;
-  win(102, y0, W - 102, H - y0); win(0, y0, 100, H - y0, { tint });
-  // ---- estado del grupo (CT): brocha que se carga = tiempo · nombre en su color · HP · MP
-  B.party.forEach((u, i) => {
-    const y = y0 + 6 + i * 15, active = act === u, col = C(u.color);
-    if (active) { hilite(108, y + 5, 314, 12, col, .3); }
-    atbBrush(108, y + 1, u.alive ? u.atb / 100 : 0, col, B.t);
-    ui(u.name, 132, y - 1, !u.alive ? TXT3 : active ? TXT : col);
-    ui('HP', 190, y - 1, TXT2); ui(String(u.hp).padStart(3), 208, y - 1, u.hp <= 0 ? TXT3 : u.hp < u.maxhp * .25 ? C('rojo') : TXT); paintBar(190, y + 8, 42, 4, u.hp / u.maxhp, col);
-    ui('MP', 242, y - 1, TXT2); ui(String(u.mp).padStart(2), 260, y - 1, TXT); paintBar(242, y + 8, 42, 4, u.mp / u.maxmp, desat(col, .4, .1));
-    if (u.status.tiznado) smudgeIcon(292, y + 1); if (u.status.lento) ui('z', 302, y - 1, C('violeta'));
-  });
-  if (!m) { ui('...', 8, y0 + 6, TXT3); return; }
-  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item' || (m.level === 'target' && m.pending.type !== 'attack');
-  // ---- ventana de comandos (siempre visible; el comando en curso queda marcado)
-  const cmdSel = m.level === 'cmd' ? m.idx : (m.level === 'target' && m.pending.type === 'attack') ? 0 : (m.level === 'tech' || m.pending && m.pending.type === 'tech') ? 1 : 2;
-  [[u.data.weapon, 'Atacar'], ['tech', 'Tech'], ['item', 'Objeto']].forEach(([ic, label], i) => {
-    const y = y0 + 6 + i * 15, sel = cmdSel === i;
-    if (sel) { hilite(6, y + 5, 96, 12, ucol, listing ? .18 : .3); if (!listing) dropCursor(2, y + 1, ucol); }
-    g.drawImage(iconSprite(ic, ucol), 14, y - 1); ui(label, 30, y + 1, sel ? TXT : TXT2);
-  });
-  if (!listing) return;
-  // ---- lista de techs / objetos: ventana que se abre sobre el campo, a la izquierda (CT)
-  const isTech = m.level === 'tech' || (m.pending && m.pending.type === 'tech'), L = m.list;
-  const sel = m.level === 'target' ? L.findIndex(e => e.id === (m.pending.tech ? m.pending.tech.id : m.pending.item)) : m.idx;
-  const rows = Math.max(1, Math.min(4, L.length)), top = clamp(sel - 3, 0, Math.max(0, L.length - 4));
-  const ww = 156, wh = rows * 12 + 10, wy = y0 - wh - 2;
-  win(0, wy, ww, wh, { tint });
-  if (!L.length) ui('Nada', 14, wy + 5, TXT3);
-  L.slice(top, top + 4).forEach((e, k) => {
-    const i = top + k, y = wy + 5 + k * 12;
-    if (i === sel) { hilite(6, y + 3, ww - 6, 11, ucol, .3); dropCursor(2, y - 1, ucol); }
-    if (isTech) {
-      swatch(12, y, C(e.t.color), !e.avail); ui(e.t.name, 23, y, e.avail ? TXT : TXT3);
-      e.users.filter(x => x !== u).forEach((x, q) => { g.globalAlpha = e.avail ? 1 : .4; g.drawImage(iconSprite('drop', C(x.color)), 118 + q * 9, y - 3); g.globalAlpha = 1; });
-      const cs = String(e.cost); ui(cs, ww - 8 - cs.length * 8, y, e.avail ? TXT2 : TXT3);
-    } else {
-      g.drawImage(iconSprite('item', e.it.kind === 'mp' ? C('azul') : e.it.kind === 'heal' ? C('verde') : '#e86a8a'), 12, y - 2); ui(e.it.short || e.it.name, 28, y, TXT);
-      const ns = 'x' + e.n; ui(ns, ww - 8 - ns.length * 8, y, TXT2);
-    }
-  });
-  if (L.length > 4) { ui(top > 0 ? '▲' : ' ', ww - 14, wy + 1, TXT2); ui(top + 4 < L.length ? '▼' : ' ', ww - 14, wy + wh - 9, TXT2); }
-  // ---- arriba: la ecuación de color de la tech (Rojo + Amarillo = Naranja) y su descripción
-  if (isTech && L[sel]) {
-    const e = L[sel]; win(0, 4, W, 24);
-    let x = 8; e.users.forEach((us, j) => { swatch(x, 8, C(us.color)); x += 8; if (j < e.users.length - 1) { ui('+', x, 8, TXT2); x += 9; } });
-    if (e.combo) { ui('=', x + 1, 8, TXT2); x += 10; swatch(x, 8, C(e.t.color)); x += 10; }
-    ui(e.t.name + ' · ' + e.cost + ' MP', x + 2, 8, e.avail ? ramp(C(e.t.color)).hi : TXT3);
-    if (e.combo) ui('con ' + e.users.filter(q => q !== u).map(q => q.name).join(' y '), W - 8 - (4 + e.users.filter(q => q !== u).map(q => q.name).join(' y ').length) * 8, 8, e.avail ? TXT2 : TXT3);
-    ui(e.t.desc.slice(0, 38), 8, 18, e.avail ? TXT : TXT3);
-    if (!e.avail) ui(!e.ready ? '(compañero no listo)' : '(sin MP)', W - 8 - (e.ready ? 8 : 20) * 8, 18, C('rojo'));
-  }
-  if (!isTech && L[sel]) { win(0, 4, W, 14); ui(L[sel].it.desc, 8, 7, TXT); }
-}
-function hilite(x0, y, x1, w, col, a = .3) { // banda de pincelada translúcida (pstroke acumula alpha al solapar cuadrados)
-  g.globalAlpha = a; g.fillStyle = col; const len = x1 - x0;
-  for (let i = 0; i <= len; i++) { const t = i / len, ww = Math.max(1, Math.round(w * (0.55 + 0.45 * Math.sin(Math.PI * t)))); g.fillRect(x0 + i, Math.round(y - ww / 2), 1, ww); }
-  g.globalAlpha = 1;
-}
-function smudgeIcon(x, y) { g.fillStyle = '#0b0912'; g.fillRect(x, y, 6, 3); g.fillRect(x + 1, y - 1, 4, 1); g.fillRect(x + 1, y + 3, 3, 1); g.fillStyle = '#7d7899'; g.fillRect(x + 1, y, 1, 1); }
-

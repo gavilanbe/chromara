@@ -482,17 +482,6 @@ function txt(s, x, y, col = '#f4f0ea', shadowCol = '#14121c') {
   g.fillStyle = col; g.fillText(s, x, y);
 }
 function txtC(s, cx, y, col, sh) { g.font = FONT; const w = g.measureText(s).width; txt(s, Math.round(cx - w / 2), y, col, sh); }
-function win(x, y, w, h, opt = {}) { // ventana estilo Chrono Trigger: tinta con degradado, marco biselado y un hilo prismático arriba
-  g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(x + 2, y + 2, w, h);
-  if (opt.solid) { g.fillStyle = opt.solid; g.fillRect(x, y, w, h); }
-  else { const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, '#13123a'); gr.addColorStop(1, '#2b2a6e'); g.fillStyle = gr; g.fillRect(x, y, w, h); }
-  if (opt.tint) { g.globalAlpha = .13; g.fillStyle = opt.tint; g.fillRect(x + 2, y + 2, w - 4, h - 4); g.globalAlpha = 1; }
-  const box = (X, Y, Wd, Hh, col) => { g.fillStyle = col; g.fillRect(X, Y, Wd, 1); g.fillRect(X, Y + Hh - 1, Wd, 1); g.fillRect(X, Y, 1, Hh); g.fillRect(X + Wd - 1, Y, 1, Hh); };
-  box(x, y, w, h, '#0b0912'); box(x + 1, y + 1, w - 2, h - 2, '#e8e4f4');
-  g.fillStyle = '#8b86c0'; g.fillRect(x + 2, y + 2, w - 4, 1); g.fillRect(x + 2, y + 2, 1, h - 4); g.fillStyle = '#403d70'; g.fillRect(x + 2, y + h - 3, w - 4, 1); g.fillRect(x + w - 3, y + 2, 1, h - 4);
-  const pg = g.createLinearGradient(x, 0, x + w, 0); ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].forEach((c, i) => pg.addColorStop(i / 5, C(c)));
-  g.fillStyle = pg; g.globalAlpha = .7; g.fillRect(x + 3, y + 3, w - 6, 1); g.globalAlpha = 1;
-}
 function bar(x, y, w, h, t, col, bg = '#0b0912') { g.fillStyle = bg; g.fillRect(x, y, w, h); g.fillStyle = col; g.fillRect(x + 1, y + 1, Math.round((w - 2) * clamp(t, 0, 1)), h - 2); }
 function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 5); g.fillRect(x + 1, y + 1, 1, 3); g.fillRect(x + 2, y + 2, 1, 1); g.fillStyle = '#14121c'; g.fillRect(x, y + 5, 3, 1); }
 
