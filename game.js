@@ -431,7 +431,7 @@ function groundTile(tx, ty, pal, frame = 0) {
   else if (cls === 'p') { const wm = nbMask(tx, ty, 'w', pal) & 15, pm = nbMask(tx, ty, 'p', pal) | wm, vr = v & 7; key = `p|${pm}|${wm}|${vr}`; draw = x => drawRoadTile(x, p, pm, wm, vr); }
   else if (cls === 'i') { const m = nbMask(tx, ty, 'i', pal), vr = v & 7; key = `i|${m}|${vr}|${ch === 'x' ? 1 : 0}`; draw = x => drawInkTile(x, p, m, vr, ch === 'x'); }
   else { const kind = ch === 'T' ? 'T' : ch === 'r' ? 'r' : (ch === 'x' && pal === 'gris') ? 'x' : '.', vr = (v >>> 8) & 15; key = `g|${kind}|${vr}`; draw = x => drawGrassTile(x, p, pal, kind, vr); }
-  return cached(`tile|${pal}|${key}`, () => { const c = document.createElement('canvas'); c.width = c.height = TILE; draw(c.getContext('2d')); return c; });
+  return cached(`tile|${pal}|${key}`, () => { const c = document.createElement('canvas'); c.width = c.height = TILE; draw(c.getContext('2d')); c.__key = `${pal}|${key}`; return c; });
 }
 // Árbol 16×24: copa redonda con bultos de hojas, fusionada con los árboles vecinos para formar setos/muros de bosque
 function treeSprite(pal, mL, mR, vr) {
@@ -661,11 +661,12 @@ function unitFromEnemy(id, i, n, group) {
 function initBattle(foe) {
   Object.assign(B, { foe, party: [], enemies: [], queue: [], menu: null, actions: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'intro', t: 0, msg: null, msgT: 0, result: null, rainbow: 0 });
   B.party = Party.map(unitFromParty);
-  const posP = [[236, 86], [258, 108], [240, 126]];
-  B.party.forEach((u, i) => { u.hx = u.x = posP[i][0]; u.hy = u.y = posP[i][1]; if (!u.alive) u.pose = 'ko'; });
-  const n = foe.enemies.length, posE = n === 1 ? [[84, 112]] : n === 2 ? [[70, 94], [98, 122]] : [[62, 86], [92, 110], [66, 126]];
+  B.arena = buildArena(foe, Game.palette); const taken = new Set();
+  const n = foe.enemies.length, prefE = n === 1 ? [[2, 4]] : n === 2 ? [[2, 3], [2, 5]] : [[2, 3], [1, 5], [3, 5]];
   B.enemies = foe.enemies.map((id, i) => unitFromEnemy(id, i, n, foe.enemies));
-  B.enemies.forEach((u, i) => { u.hx = u.x = posE[i][0] + (u.boss ? 10 : 0); u.hy = u.y = posE[i][1]; });
+  B.enemies.forEach((u, i) => { const [x, y] = arenaSpot(B.arena, prefE[i][0], prefE[i][1], taken); u.hx = u.x = x; u.hy = u.y = y; });
+  const prefP = [[8, 2], [9, 4], [7, 4]];
+  B.party.forEach((u, i) => { const [x, y] = arenaSpot(B.arena, prefP[i][0], prefP[i][1], taken); u.hx = x; u.hy = y; u.x = x + 70; u.y = y + 24; if (!u.alive) u.pose = 'ko'; else u.pose = 'hop'; });
   B.units = [...B.enemies, ...B.party];
   Audio.play(foe.boss ? 'boss' : 'battle');
 }
@@ -878,7 +879,7 @@ function* actTech(users, tech, targets, col) {
   Audio.sfx('banner');
   const atk = users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length;
   const hitAll = function* (stagger = 0) { for (const t of targets) { if (!t.alive) continue; burst(t.x, t.y - 12, C(col), 14, 2.2, 26); damage(t, baseDmg(atk, t.dfn, tech.power), col, null); if (tech.status && t.alive) { t.status[tech.status] = 3; num(t.x, t.y - 36, tech.status.toUpperCase(), C(col)); Audio.sfx('slow_drip', { when: .3 }); } if (stagger) yield* wait(stagger); } };
-  const enemyCx = alive(B.enemies).reduce((s, e) => s + e.x, 0) / Math.max(1, alive(B.enemies).length);
+  const enemyCx = alive(B.enemies).reduce((s, e) => s + e.x, 0) / Math.max(1, alive(B.enemies).length), enemyCy = alive(B.enemies).reduce((s, e) => s + e.y, 0) / Math.max(1, alive(B.enemies).length);
   if (id === 'brochazo') { // la brocha, enorme, pinta una Z roja sobre el enemigo
     const u = users[0], t = targets[0], fac = facing(u); yield* tween(u, lerp(u.hx, t.x, .3), u.hy, 5);
     const X = t.x, yt = t.y - t.def.h - 12, yb = t.y + 2, pts = [[X - fac * 22, yt], [X + fac * 18, yt - 2], [X - fac * 18, yb - 4], [X + fac * 22, yb]];
@@ -903,15 +904,15 @@ function* actTech(users, tech, targets, col) {
     yield* wait(8); f.dur = 0; for (const t of targets) if (t.alive) { mark({ kind: 'blob', x0: t.x, y0: t.y - t.def.h * .5, w: 10, col: C(col), seed: B.t + t.idx }); goop(t, C(col)); }
     yield* hitAll(6); u.pose = 'idle'; yield* wait(10);
   } else if (id === 'llamarada') { // carga → el orbe naranja cae al suelo → lenguas de fuego bajo cada enemigo
-    const { of, orb } = yield* chargeAndFuse(users, enemyCx, 62, col, 26);
-    Audio.sfx('drop_fall'); for (let i = 1; i <= 8; i++) { orb.y = lerp(62, 122, (i / 8) ** 2); yield; } of.dur = 0; B.shake = 4; Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .15 });
+    const { of, orb } = yield* chargeAndFuse(users, enemyCx, enemyCy - 60, col, 26);
+    Audio.sfx('drop_fall'); for (let i = 1; i <= 8; i++) { orb.y = lerp(enemyCy - 60, enemyCy, (i / 8) ** 2); yield; } of.dur = 0; B.shake = 4; Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .15 });
     const fire = fx(44, () => { const t = fire.t, a = t < 32 ? 1 : (44 - t) / 12; g.globalAlpha = a; for (const e of targets) { if (!e.alive && e.dead > 1.2) continue; const h = e.def.h + 26 + Math.sin(t * .5 + e.idx) * 6, w = Math.max(12, e.def.w * .8); [[C('rojo'), 1, 1], [C('naranja'), .82, .8], [C('amarillo'), .6, .58], ['#fff3c0', .32, .3]].forEach(([c, hw, hh], L) => { const wob = L ? Math.sin(t * .7 + L * 2 + e.idx) * 2 : 0; g.fillStyle = c; g.beginPath(); g.ellipse(e.x + wob, e.y - h * hh * .5, w * hw, h * hh * .5, 0, 0, 6.29); g.fill(); for (let f = 0; f < 3; f++) { const fy = e.y - h * hh - 2 - ((t * 1.3 + f * 7 + L * 3) % 12); g.fillRect(Math.round(e.x + wob + (f - 1) * w * hw * .5 + Math.sin(t * .9 + f) * 2), Math.round(fy), 2 + (L < 2 ? 1 : 0), 3); } }); } g.globalAlpha = 1; }, true);
     for (const e of targets) if (e.alive) flames(e.x, e.y, 30, e.def.w * .5);
     yield* wait(10); B.flash = { col: C(col), a: .4 }; yield* hitAll(5); yield* wait(22);
   } else if (id === 'brote') { // carga → el orbe verde se hunde → onda por el suelo, zarcillos que trepan y brotes con flor bajo el grupo
-    const { of, orb } = yield* chargeAndFuse(users, enemyCx, 98, col, 24);
-    for (let i = 1; i <= 6; i++) { orb.y = lerp(98, 128, i / 6); orb.r = 10 - i; yield; } of.dur = 0; Audio.sfx('grow'); Audio.sfx('leaves', { when: .3 }); Audio.sfx('heal_bells', { when: .5 });
-    const wave = fx(22, () => { const k = wave.t / 22; g.strokeStyle = C(col); g.lineWidth = 2; g.globalAlpha = 1 - k; g.beginPath(); g.ellipse(enemyCx, 128, 10 + k * 160, 4 + k * 44, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
+    const { of, orb } = yield* chargeAndFuse(users, enemyCx, enemyCy - 30, col, 24);
+    for (let i = 1; i <= 6; i++) { orb.y = lerp(enemyCy - 30, enemyCy + 2, i / 6); orb.r = 10 - i; yield; } of.dur = 0; Audio.sfx('grow'); Audio.sfx('leaves', { when: .3 }); Audio.sfx('heal_bells', { when: .5 });
+    const wave = fx(22, () => { const k = wave.t / 22; g.strokeStyle = C(col); g.lineWidth = 2; g.globalAlpha = 1 - k; g.beginPath(); g.ellipse(enemyCx, enemyCy + 4, 10 + k * 160, 4 + k * 44, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
     const sh = ramp(C(col)).sh;
     const vines = fx(48, () => { const k = clamp(vines.t / 14, 0, 1); g.globalAlpha = vines.t > 38 ? (48 - vines.t) / 10 : 1; for (const e of targets) { if (!e.alive) continue; const pts = []; for (let i = 0; i <= 6; i++) pts.push([e.x + Math.sin(i * 1.3) * e.def.w * .45, e.y + 2 - i * e.def.h / 5]); drawPath(pts, 3, sh, k); const n = Math.floor(6 * k); g.fillStyle = C(col); for (let i = 1; i <= n; i++) { const [lx, ly] = pts[i]; g.fillRect(Math.round(lx + (i % 2 ? 3 : -5)), Math.round(ly - 1), 3, 2); } } g.globalAlpha = 1; });
     const sprout = fx(54, () => { const k = clamp(sprout.t / 16, 0, 1); g.globalAlpha = sprout.t > 44 ? (54 - sprout.t) / 10 : 1; for (const p of alive(B.party)) { const sx = p.x + 10, sy = p.y + 1, top = sy - 14 * k; pstroke(sx, sy, sx, top, 2, sh, 1, 0, false); if (k > .4) { g.fillStyle = C(col); g.fillRect(sx - 4, Math.round(top) + 4, 4, 2); g.fillRect(sx + 1, Math.round(top) + 7, 4, 2); } if (k > .8) { g.fillStyle = C(p.color); g.fillRect(sx - 2, Math.round(top) - 3, 5, 4); g.fillStyle = '#fbe28a'; g.fillRect(sx, Math.round(top) - 2, 1, 2); } } g.globalAlpha = 1; });
@@ -982,7 +983,7 @@ function* actEnemy(u) {
   }
   if (u.ai === 'boss' && u.acts % 3 === 0) { // marea negra: una ola de tinta cruza el suelo hacia el grupo
     say('La Tinta: Marea negra', '#8c8ab0'); u.pose = 'hurt'; u.poseT = 24; Audio.sfx('ink_jet'); Audio.sfx('hum_down', { vol: .6 }); yield* wait(8);
-    const wv = fx(999, () => { const k = clamp(wv.t / 20, 0, 1), x = lerp(u.x + 20, 236, k); g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(x, 116, 22 + k * 10, 26, 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4460'; g.fillRect(Math.round(x) - 14, 116 - 30 - (k * 6 | 0), 28, 2); }, true);
+    const wv = fx(999, () => { const k = clamp(wv.t / 20, 0, 1), pc = partyC(), x = lerp(u.x + 20, pc[0], k); g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(x, pc[1], 22 + k * 10, 26, 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4460'; g.fillRect(Math.round(x) - 14, pc[1] - 30 - (k * 6 | 0), 28, 2); }, true);
     for (let i = 0; i < 20; i++) { B.particles.push({ x: u.x + R(-20, 20), y: u.y - R(0, 30), vx: R(2, 4), vy: R(-1.5, .5), col: C('negro'), t: 0, life: 40, g: .08 }); yield; }
     wv.dur = 0; B.flash = { col: '#0b0912', a: .5 }; B.shake = 5;
     for (const t of alive(B.party)) { damage(t, baseDmg(u.atk, t.dfn, .8), 'negro'); mark({ kind: 'blob', x0: t.x, y0: t.y - t.def.h * .4, w: 10, col: C('negro'), seed: t.idx }); goop(t, C('negro'), 70); }
@@ -1062,7 +1063,7 @@ function updateBattle() {
   if (B.hitstop > 0) { B.hitstop--; return; }
   for (const f of B.fx) f.t++; B.fx = B.fx.filter(f => f.t <= f.dur);
   for (const m of B.marks) m.t++; B.marks = B.marks.filter(m => m.t <= m.life);
-  if (B.phase === 'intro') { if (B.t > 24) { B.phase = 'fight'; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); } return; }
+  if (B.phase === 'intro') { B.party.forEach(u => { u.x = lerp(u.x, u.hx, .18); u.y = lerp(u.y, u.hy, .18); }); if (B.t > 24) { B.party.forEach(u => { u.x = u.hx; u.y = u.hy; if (u.alive) u.pose = 'idle'; }); B.phase = 'fight'; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); } return; }
   if (B.phase === 'victory' || B.phase === 'defeat') { updateEnd(); return; }
   // acciones concurrentes: todas avanzan un frame
   if (B.actions.length) { B.actions = B.actions.filter(a => !a.next().done); B.busy = B.actions.length > 0; }
@@ -1097,27 +1098,99 @@ function resetGame() {
   Party.forEach((p, i) => { p.acc = DATA.party[i].acc; const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; });
   initOverworld(); setState('overworld'); Audio.play('map');
 }
+// =====================================================================
+// 6b. Arena isométrica: el trozo de mapa donde ocurre el encuentro, como diorama flotando sobre la tinta
+// =====================================================================
+const ARENA = { w: 11, h: 7, ox: 128, oy: 6 };
+const isoPos = (i, j) => [ARENA.ox + (i - j) * 16, ARENA.oy + (i + j) * 8 + 8]; // centro del rombo (i,j)
+function isoTile(tx, ty, pal, frame = 0) { // proyección 2:1 del tile cenital (gira 45° y aplasta): conserva orillas, bordes y chorretones
+  const src = groundTile(tx, ty, pal, frame);
+  return cached(`iso|${src.__key}`, () => {
+    const c = document.createElement('canvas'); c.width = 32; c.height = 16; const x = c.getContext('2d');
+    const sd = src.getContext('2d').getImageData(0, 0, 16, 16).data, img = x.createImageData(32, 16), d = img.data;
+    for (let y = 0; y < 16; y++) for (let X = 0; X < 32; X++) {
+      const u = (X + .5 - 16) / 2 + (y + .5), v = (y + .5) - (X + .5 - 16) / 2;
+      if (u < 0 || v < 0 || u >= 16 || v >= 16) continue;
+      const si = ((v | 0) * 16 + (u | 0)) * 4, di = (y * 32 + X) * 4;
+      d[di] = sd[si]; d[di + 1] = sd[si + 1]; d[di + 2] = sd[si + 2]; d[di + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); return c;
+  });
+}
+function bigTree(pal, vr) { // árbol de arena 34×48 (el del mapa a escala de batalla)
+  return cached(`bigtree|${pal}|${vr}`, () => {
+    const p = PAL[pal], c = document.createElement('canvas'); c.width = 34; c.height = 48; const x = c.getContext('2d');
+    const ph1 = vr * 1.3, ph2 = vr * 2.1, cx = 17, cy = 16, rx = 16, ry = 15.5;
+    const ell = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.09 * Math.sin(X * 1.1 + ph1) * Math.sin(Y * .9 + ph2); };
+    px(x, p.treeOut, 12, 28, 10, 20); px(x, p.trunk2, 13, 28, 8, 20); px(x, p.trunk, 15, 28, 3, 18); px(x, p.treeOut, 10, 46, 2, 2); px(x, p.treeOut, 22, 46, 2, 2); px(x, p.trunk2, 12, 45, 1, 2); px(x, p.trunk2, 21, 45, 1, 2);
+    for (let Y = 0; Y < 33; Y++) for (let X = 0; X < 34; X++) {
+      if (!ell(X, Y)) continue;
+      if (!ell(X - 1, Y) || !ell(X + 1, Y) || !ell(X, Y - 1) || !ell(X, Y + 1)) { px(x, p.treeOut, X, Y); continue; }
+      const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry;
+      const lam = -u * .45 - w * .7 + .32 * Math.sin(X * .95 + ph1) * Math.sin(Y * .8 + ph2) + .12 * Math.sin(X * .5 + Y * .6 + vr);
+      px(x, lam > .5 ? p.treeHi : lam > .05 ? p.tree : lam > -.42 ? p.tree2 : p.treeOut, X, Y);
+    }
+    return c;
+  });
+}
+function bigRock(pal, vr) { // roca de arena 26×18
+  return cached(`bigrock|${pal}|${vr}`, () => {
+    const p = PAL[pal], c = document.createElement('canvas'); c.width = 26; c.height = 18; const x = c.getContext('2d');
+    const cx = 13, cy = 9.5, rx = 12.5, ry = 8, ph = vr * 1.7;
+    const ins = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.12 * Math.sin(X * 1.3 + ph) * Math.sin(Y * 1.1 + ph); };
+    for (let Y = 0; Y < 18; Y++) for (let X = 0; X < 26; X++) {
+      if (!ins(X, Y)) continue;
+      if (!ins(X - 1, Y) || !ins(X + 1, Y) || !ins(X, Y - 1) || !ins(X, Y + 1)) { px(x, p.rockOut, X, Y); continue; }
+      const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry, lam = -u * .5 - w * .65 + .25 * Math.sin(X * 1.7 + ph) * Math.sin(Y * 1.9 + ph * 2);
+      px(x, lam > .45 ? p.rock3 : lam > 0 ? p.rock : lam > -.5 ? p.rock2 : p.rockOut, X, Y);
+    }
+    px(x, p.rockOut, 15, 9); px(x, p.rockOut, 16, 10); px(x, p.rockOut, 17, 11); px(x, p.rockOut, 8, 12); px(x, p.rockOut, 9, 13);
+    return c;
+  });
+}
+function buildArena(foe, pal) {
+  const ftx = foe.x / TILE | 0, fty = foe.y / TILE | 0, x0 = clamp(ftx - 5, 1, MAP.w - 1 - ARENA.w), y0 = clamp(fty - 3, 1, MAP.h - 1 - ARENA.h); // evita el anillo de árboles del borde
+  const A = { x0, y0, walk: [], objs: [], tiles: [] };
+  for (let j = 0; j < ARENA.h; j++) for (let i = 0; i < ARENA.w; i++) {
+    const tx = x0 + i, ty = y0 + j, ch = tileAt(tx, ty), [cx, cy] = isoPos(i, j);
+    A.tiles.push({ tx, ty, cx, cy, water: ch === '~' });
+    A.walk.push(!solid(ch));
+    if (ch === 'T') A.objs.push({ y: cy + 1, draw: () => { shadow(cx, cy + 1, 22); g.drawImage(bigTree(pal, hash2(tx, ty) & 7), cx - 17, cy - 46); } });
+    if (ch === 'r') A.objs.push({ y: cy, draw: () => { shadow(cx, cy + 2, 24); g.drawImage(bigRock(pal, hash2(tx, ty) & 3), cx - 13, cy - 15); } });
+  }
+  return A;
+}
+function arenaSpot(A, i, j, taken) { // casilla transitable libre más cercana a la preferida
+  let best = null, bd = 1e9;
+  for (let jj = 0; jj < ARENA.h; jj++) for (let ii = 0; ii < ARENA.w; ii++) {
+    if (!A.walk[jj * ARENA.w + ii] || taken.has(ii + ',' + jj)) continue;
+    const front = [[1, 0], [0, 1], [1, 1]].filter(([a, b]) => tileAt(A.x0 + ii + a, A.y0 + jj + b) === 'T').length; // árboles que taparían al personaje
+    const d = (ii - i) ** 2 + (jj - j) ** 2 + front * 6; if (d < bd) { bd = d; best = [ii, jj]; }
+  }
+  if (!best) best = [i, j];
+  taken.add(best.join(',')); return isoPos(best[0], best[1]);
+}
+const partyC = () => { const P = alive(B.party); return [P.reduce((s, u) => s + u.x, 0) / Math.max(1, P.length), P.reduce((s, u) => s + u.y, 0) / Math.max(1, P.length)]; };
+function isoPoly(dy, col) { const [tx, ty] = isoPos(0, 0), [rx, ry] = isoPos(ARENA.w - 1, 0), [bx, by] = isoPos(ARENA.w - 1, ARENA.h - 1), [lx, ly] = isoPos(0, ARENA.h - 1); g.fillStyle = col; g.beginPath(); g.moveTo(tx, ty - 8 + dy); g.lineTo(rx + 16, ry + dy); g.lineTo(bx, by + 8 + dy); g.lineTo(lx - 16, ly + dy); g.closePath(); g.fill(); }
 // --- Render de batalla
-function drawBattleBg() {
-  const gris = Game.palette === 'gris', sky = gris ? ['#4a4f6a', '#5f6680', '#767c96'] : ['#3a7fd0', '#62a8ec', '#9ed0f6'];
-  sky.forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * 22, W, 22); });
-  g.fillStyle = gris ? '#8b91a8' : '#bde2fa'; g.fillRect(0, 66, W, 8);
-  const hill = gris ? '#6a7a62' : '#4aa348', hill2 = gris ? '#5d6c56' : '#3d8a3c';
-  g.fillStyle = hill2; for (let x = 0; x < W; x += 40) { g.beginPath(); g.arc(x + 20, 82, 26, 3.14, 0); g.fill(); }
-  g.fillStyle = hill; for (let x = -20; x < W; x += 56) { g.beginPath(); g.arc(x + 28, 86, 30, 3.14, 0); g.fill(); }
-  const gr = gris ? PAL.gris : PAL.vivo; g.fillStyle = gr.grass; g.fillRect(0, 74, W, 70); g.fillStyle = gr.grass2;
-  const rnd = seeded(99); for (let i = 0; i < 90; i++) g.fillRect(rnd() * W | 0, 76 + rnd() * 66 | 0, 2, 1);
-  // charco de tinta bajo los enemigos
-  g.fillStyle = '#2a2438'; g.beginPath(); g.ellipse(84, 128, 62, 22, 0, 0, 6.29); g.fill(); g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(84, 130, 50, 15, 0, 0, 6.29); g.fill();
+function drawArena() {
+  const A = B.arena, pal = Game.palette, t = B.t, gris = pal === 'gris';
+  g.fillStyle = '#0b0912'; g.fillRect(0, 0, W, H);
+  for (let k = 0; k < 4; k++) { const ph = (t / 140 + k / 4) % 1; g.strokeStyle = `rgba(110,96,160,${((1 - ph) * .22).toFixed(3)})`; g.lineWidth = 1; g.beginPath(); g.ellipse(160, 84, 60 + ph * 220, 24 + ph * 90, 0, 0, 6.29); g.stroke(); }
+  isoPoly(14, 'rgba(0,0,0,.55)'); isoPoly(9, gris ? '#2c2723' : '#4e3520'); isoPoly(5, gris ? '#3d3630' : '#6b4a2c');
+  const wf = (t / 9 | 0) % 4;
+  for (const T of A.tiles) g.drawImage(isoTile(T.tx, T.ty, pal, T.water ? wf : 0), T.cx - 16, T.cy - 8);
   for (const p of B.puddles) { g.fillStyle = ramp(p.col).base; g.beginPath(); g.ellipse(p.x, p.y, p.w * .45, 3, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).hi; g.fillRect(p.x - 3, p.y - 1, 3, 1); }
 }
 function drawBattle() {
   const sx = B.shake ? RI(-B.shake, B.shake) : 0, sy = B.shake ? RI(-B.shake, B.shake) / 2 | 0 : 0;
   g.save(); g.translate(sx, sy);
-  drawBattleBg();
+  drawArena();
   for (const f of B.fx) if (f.under) f.draw();
-  const ents = [...B.units].sort((a, b) => a.y - b.y);
-  for (const u of ents) {
+  const ents = [...B.units.map(u => ({ y: u.y, u })), ...B.arena.objs.map(o => ({ y: o.y, o }))].sort((a, b) => a.y - b.y);
+  for (const e of ents) {
+    if (e.o) { e.o.draw(); continue; }
+    const u = e.u;
     if (u.dead && u.dead > 1.6) continue;
     if (u.dead) { g.globalAlpha = clamp(1.6 - u.dead, 0, 1); }
     if (u.erasing && (B.t >> 1) & 1) g.globalAlpha = .35;
