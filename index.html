@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>CHROMARA — PoC</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;background:#0b0912;overflow:hidden}
+  body{display:flex;align-items:center;justify-content:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;background:#0b0912}
+  #hint{position:fixed;bottom:6px;left:0;right:0;text-align:center;color:#6a6480;font:11px monospace;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c" width="320" height="180"></canvas>
+<div id="hint">Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás · Enter en el mapa: menú · F1 debug</div>
+<script src="data.js"></script>
+<script src="music.js"></script>
+<script src="music_samples.js"></script>
+<script src="sfx.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
