@@ -37,11 +37,18 @@ function damage(target, raw, col, src) {
   const mult = colorMult(col, target.color), dmg = Math.max(1, Math.round(raw * mult * R(.92, 1.08)));
   target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14;
   num(target, dmg, mult >= 2 ? '#f2c93a' : mult < 1 ? '#8c8ab0' : '#f4f0ea', mult >= 2);
-  burst(target.wx, target.wy, target.def.h * .5, C(col), mult >= 2 ? 14 : 7, mult >= 2 ? 2.2 : 1.4);
-  Audio.sfx(mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 9 : 5; B.shake = mult >= 2 ? 5 : 3;
+  impactFx(target, C(col), mult >= 2 ? 1.6 : mult < 1 ? .6 : 1);
+  Audio.sfx(mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 10 : 6; B.shake = mult >= 2 ? 6 : 4; if (mult >= 2) B.slowmo = Math.max(B.slowmo, 8);
   if (mult >= 2) say((src ? src + ': ' : '') + '¡Débil al ' + DATA.colors[col].name.toLowerCase() + '!', '#f2c93a');
   if (target.hp <= 0) kill(target);
   return dmg;
+}
+// Frame de impacto: estallido grande, onda que se expande por el suelo, chispas radiales y tinte breve de pantalla
+function impactFx(t, col, k = 1) {
+  burst(t.wx, t.wy, t.def.h * .5, col, Math.round(12 * k), 2 * k, 26, .08); burst(t.wx, t.wy, t.def.h * .5, ramp(col).hi, Math.round(5 * k), 1.2, 18, .04);
+  const ring = fx(16, () => { const c = project(t.wx, t.wy, 0); if (!c) return; const q = ring.t / 16; g.strokeStyle = col; g.lineWidth = 2; g.globalAlpha = (1 - q) * .8; g.beginPath(); g.ellipse(c[0], c[1], (6 + q * 36 * k) * c[2], (3 + q * 14 * k) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
+  const sp = fx(10, () => { const c = project(t.wx, t.wy, t.def.h * .5); if (!c) return; const q = sp.t / 10, L = (6 + q * 22 * k) * c[2]; g.strokeStyle = q < .4 ? '#ffffff' : ramp(col).hi; g.lineWidth = q < .5 ? 2 : 1; g.globalAlpha = 1 - q; g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * 1.047 + .3; g.moveTo(c[0] + Math.cos(a) * L * .35, c[1] + Math.sin(a) * L * .35 * .6); g.lineTo(c[0] + Math.cos(a) * L, c[1] + Math.sin(a) * L * .6); } g.stroke(); g.globalAlpha = 1; });
+  if (!B.flash || B.flash.a < .2) B.flash = { col, a: .12 * k };
 }
 function heal(target, amount, isMp) {
   if (!target.alive) return;
@@ -63,7 +70,7 @@ function kill(u) {
 // 2. Formación en el mundo, escena y arranque (la batalla ocurre donde te pillan)
 // =====================================================================
 function initBattle(foe) {
-  Object.assign(B, { foe, party: [], enemies: [], queue: [], menu: null, actions: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'trans', t: 0, msg: null, msgT: 0, result: null, rainbow: 0, tr: { overworld: true }, gen: null, exiting: false, slowmo: 0, fightStart: 0 });
+  Object.assign(B, { foe, party: [], enemies: [], queue: [], menu: null, actions: [], actQueue: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'trans', t: 0, msg: null, msgT: 0, result: null, rainbow: 0, tr: { overworld: true }, gen: null, exiting: false, slowmo: 0, fightStart: 0 });
   B.party = Party.map(unitFromParty);
   const n = foe.enemies.length; B.enemies = foe.enemies.map((id, i) => unitFromEnemy(id, i, n, foe.enemies));
   B.units = [...B.enemies, ...B.party];
@@ -327,7 +334,7 @@ function commit(targets) {
   else if (p.type === 'tech') { users = p.tech.users; users.forEach(x => { x.mp -= Math.max(1, p.tech.t.mp - (DATA.accessories[x.acc].techDiscount || 0)); }); gen = actTech(users, p.tech.t, targets, p.tech.t.color); }
   else gen = actItem(u, p.item, targets[0]);
   users.forEach(x => { x.atb = 0; B.queue = B.queue.filter(q => q !== x); });
-  B.menu = null; B.actions.push(tracked(u, gen)); B.busy = true;
+  B.menu = null; B.actQueue.push(tracked(u, gen)); B.busy = true;
 }
 function updateBattle() {
   B.t++;
@@ -342,7 +349,7 @@ function updateBattle() {
     else { if (p.t < 0) { p.t++; continue; } p.wx += p.vx; p.wy += p.vy; p.wz += p.vz; p.vz -= p.g; if (p.wz < 0) { p.wz = 0; p.vz *= -.3; p.vx *= .6; p.vy *= .6; } if (++p.t > p.life) p.dead = true; }
   }
   B.particles = B.particles.filter(p => !p.dead);
-  for (const n of B.nums) { n.t++; n.y += n.vy; n.vy += .12; if (n.vy > 0 && n.t < 20) n.vy = -0.4; } B.nums = B.nums.filter(n => n.t < 44);
+  for (const n of B.nums) { n.t++; if (n.t > 6) { n.y += n.vy; n.vy += .1; if (n.vy > 0 && n.t < 24) n.vy = -0.3; } } B.nums = B.nums.filter(n => n.t < 56);
   for (const u of B.units) { if (u.poseT > 0 && --u.poseT === 0 && u.alive) u.pose = 'idle'; if (u.dead) u.dead += .04; if (u.goop) { const G = u.goop; G.t++; for (const d of G.drips) d.len = Math.min(d.max, d.len + d.speed); if (G.t > G.life || !u.alive) u.goop = null; } }
   if (B.hitstop > 0) { B.hitstop--; return; }
   if (B.slowmo > 0) { B.slowmo--; if (B.t & 1) return; } // cámara lenta: el mundo avanza a la mitad
@@ -350,17 +357,19 @@ function updateBattle() {
   for (const m of B.marks) m.t++; B.marks = B.marks.filter(m => m.t <= m.life);
   if (B.phase === 'trans') { if (B.gen && B.gen.next().done) B.gen = null; return; }
   if (B.phase === 'victory' || B.phase === 'defeat') { updateEnd(); return; }
-  // acciones concurrentes: todas avanzan un frame
-  if (B.actions.length) { B.actions = B.actions.filter(a => !a.next().done); B.busy = B.actions.length > 0; }
-  if (!alive(B.enemies).length || !alive(B.party).length) { if (!B.actions.length) checkEnd(); return; }
+  // una acción cada vez: la siguiente de la cola arranca cuando termina la anterior; el ATB espera
+  if (!B.actions.length && B.actQueue.length) B.actions.push(B.actQueue.shift());
+  if (B.actions.length) { B.actions = B.actions.filter(a => !a.next().done); B.busy = B.actions.length > 0 || B.actQueue.length > 0; }
+  if (!alive(B.enemies).length || !alive(B.party).length) { if (!B.actions.length) { B.actQueue = []; checkEnd(); } return; }
   if (B.menu) updateBattleMenu();
   if (B.menu && (!ATB_ACTIVE || B.menu.level !== 'cmd')) return; // Wait: el ATB se detiene en los submenús (y del todo en modo Wait)
   if (B.phase === 'fight' && B.t - (B.fightStart || 0) < 40) return; // respiro al empezar: que se lea el campo
+  if (B.actions.length || B.actQueue.length) return; // mientras se anima una acción, el tiempo espera
   // tick ATB (modo Active: sigue corriendo mientras eliges)
   for (const u of alive(B.units)) { if (u.acting) continue; u.atb = Math.min(100, u.atb + u.spd * statusMult(u, 'lento') * ATB_RATE); if (u.atb >= 100 && u.kind === 'party' && !B.queue.includes(u)) { const other = B.party.some(p => p !== u && p.alive && p.atb >= 100 && !p.acting); B.queue.push(u); Audio.sfx(other ? 'combo_ready' : 'ready', semiOf(u)); }
     if (u.kind === 'enemy' && u.atb >= 82 && !u.warned) { u.warned = true; Audio.sfx('enemy_soon'); } }
   const e = alive(B.enemies).find(u => u.atb >= 100 && !u.acting);
-  if (e && B.actions.length < 2) { e.atb = 0; B.actions.push(tracked(e, actEnemy(e))); B.busy = true; }
+  if (e) { e.atb = 0; B.actQueue.push(tracked(e, actEnemy(e))); B.busy = true; }
   if (B.queue.length && !B.menu) openCmd(B.queue[0]);
 }
 // marca la unidad como "actuando" mientras dura su corrutina (no acumula ATB ni se le encola otra acción)
@@ -475,7 +484,7 @@ function drawBattle() {
   if (T) drawTransitionFx();
   if (B.flash) { g.fillStyle = B.flash.col; g.globalAlpha = B.flash.a; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
   if (B.rainbow > 0) { const cols = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta']; cols.forEach((c, i) => { g.fillStyle = C(c); g.globalAlpha = .5 * B.rainbow / 40; const off = (40 - B.rainbow) * 12 + i * 10; g.fillRect(off - 200, 0, 8, H); g.fillRect(W - off + 200 - 8, 0, 8, H); }); g.globalAlpha = 1; }
-  for (const n of B.nums) { g.font = FONT; if (n.big) { txt(n.v, Math.round(n.x) + 1, Math.round(n.y) + 1, n.col, null); } txt(n.v, Math.round(n.x), Math.round(n.y), n.col); }
+  for (const n of B.nums) { g.font = FONT; const sc = n.t < 6 ? 1.9 - n.t * .15 : 1, w = n.v.length * 8; g.save(); g.translate(Math.round(n.x) + w / 2, Math.round(n.y) + 4); g.scale(sc, sc); g.translate(-w / 2, -4); if (n.big) { txt(n.v, 1, 1, n.col, null); } txt(n.v, 0, 0, n.col); g.restore(); }
   if (B.msg && !(B.menu && B.menu.level === 'target') && B.phase === 'fight') banner(B.msg.s, B.msg.col === '#f4f0ea' ? INK : B.msg.col);
   if (B.phase !== 'trans' && !B.exiting) drawBattleUI();
   if (B.phase === 'victory' && B.showResult) { page(80, 50, 160, 50, { rings: true }); banner('¡VICTORIA!', C('amarillo'), 52); g.font = FONT; const rs = 'Pigmento +' + B.result; swatch(W / 2 - g.measureText(rs).width / 2 - 12 | 0, 77, C('amarillo')); ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 76, TXT); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 88, TXT2); }

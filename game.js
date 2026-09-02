@@ -634,15 +634,61 @@ function drawMenu() {
 // =====================================================================
 // 7. Título, bucle principal, debug
 // =====================================================================
+// ---- Título: página en blanco → cae una gota de tinta → la mancha abre un agujero por el que se ve Chromara en vuelo (Mode 7)
+// → las letras se pintan a brochazos, una a una y de su color → las tres gotas aterrizan con salpicón → cinta con "PULSA Z"
+const TITLE = { t: 0, cam: { x: 320, y: 240, yaw: 0, pitch: .52, h: 120, f: 170, hy: 64 }, balls: null, letters: 'CHROMARA', cols: ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta', 'rojo', 'amarillo'], sfxd: {} };
+function titleSfx(k, name, o) { if (!TITLE.sfxd[k]) { TITLE.sfxd[k] = 1; Audio.sfx(name, o); } }
+function updateTitle() {
+  TITLE.t++;
+  if (hit('ok')) { if (TITLE.t < 200) { TITLE.t = 200; return; } Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); }
+}
 function drawTitle() {
-  g.fillStyle = '#14121c'; g.fillRect(0, 0, W, H);
-  const word = 'CHROMARA', cols = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta', 'rojo', 'amarillo'];
-  g.font = FONT; const cw = 8 * 2;
-  word.split('').forEach((ch, i) => { const y = 50 + Math.sin(Game.t * .08 + i * .6) * 3; g.save(); g.translate(W / 2 - word.length * cw / 2 + i * cw, y); g.scale(2, 2); txt(ch, 0, 0, C(cols[(i + (Game.t / 30 | 0)) % cols.length])); g.restore(); });
-  txtC('Las gotas que devolvieron el color', W / 2, 88, '#b8b4cc');
-  DATA.party.forEach((p, i) => { const x = W / 2 - 40 + i * 40, hop = Math.abs(Math.sin(Game.t * .1 + i)) * 4; shadow(x, 132, 16); const spr = buildSprite(`${p.id}_front`, C(p.color), null, { eyes: ((Game.t + i * 50) % 160) < 6 ? 'blink' : 'happy' }); drawSprite(spr, x, 132 - hop, 1.3, false, 1); if (p.id === 'anil') drawSatellites(x, 132 - hop, Game.t, C(p.color), .9); });
-  if ((Game.t / 30 | 0) % 2) txtC('PULSA Z / ENTER', W / 2, 156, '#f4f0ea');
-  txtC('PoC · Fable 5 · 320x180', W / 2, 170, '#4a4460', null);
+  const t = TITLE.t, cam = TITLE.cam;
+  // vuelo lento sobre el mapa: la cámara orbita el lago
+  cam.yaw += .0035; cam.x = 300 + Math.cos(cam.yaw) * -150; cam.y = 200 + Math.sin(cam.yaw) * -150;
+  const pal = Game.palette; Object.assign(SCENE.cam, cam); drawSky(pal); drawFloor(pal, pal === 'gris' ? '#767c96' : '#9ed0f6', pal === 'gris' ? '#767c96' : '#9ed0f6');
+  // papel por encima, agujereado por la mancha de tinta
+  const hole = clamp((t - 34) / 70, 0, 1), R0 = hole * 300;
+  if (hole < 1) { // el papel va en una capa aparte para poder agujerearlo y ver el mundo debajo
+    if (!TITLE.layer) { TITLE.layer = document.createElement('canvas'); TITLE.layer.width = W; TITLE.layer.height = H; }
+    const L = TITLE.layer.getContext('2d'); L.globalCompositeOperation = 'source-over'; L.clearRect(0, 0, W, H);
+    L.fillStyle = PAPER; L.fillRect(0, 0, W, H); const rnd = seeded(7); L.fillStyle = PAPER2; for (let i = 0; i < 700; i++) L.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
+    L.fillStyle = PENCIL; L.globalAlpha = .5; for (let y = 22; y < H; y += 14) L.fillRect(0, y, W, 1); L.globalAlpha = 1; L.fillStyle = '#c96a6a'; L.fillRect(28, 0, 1, H); // renglones y margen
+    if (!TITLE.balls) { const r = seeded(11); TITLE.balls = []; for (let i = 0; i < 9; i++) TITLE.balls.push({ a: i / 9 * 6.28 + (r() - .5) * .5, d: .3 + r() * .7, r: .5 + r() * .5 }); TITLE.tendrils = []; for (let i = 0; i < 6; i++) TITLE.tendrils.push({ a: r() * 6.28, len: 1.2 + r(), w: .12 + r() * .2 }); }
+    const sx = 160, sy = 100;
+    if (t >= 34) { titleSfx('splash', 'splash');
+      // borde de tinta alrededor del agujero, y el agujero
+      L.fillStyle = '#0b0912'; for (const b of TITLE.balls) { const r = R0 * b.r + 3, d = R0 * b.d * .8; L.beginPath(); L.ellipse(sx + Math.cos(b.a) * d, sy + Math.sin(b.a) * d * .75, r, r * .8, 0, 0, 6.29); L.fill(); }
+      L.globalCompositeOperation = 'destination-out';
+      for (const b of TITLE.balls) { const r = R0 * b.r, d = R0 * b.d * .8; L.beginPath(); L.ellipse(sx + Math.cos(b.a) * d, sy + Math.sin(b.a) * d * .75, r, r * .8, 0, 0, 6.29); L.fill(); }
+      for (const tn of TITLE.tendrils) { const Ln = R0 * tn.len; L.save(); L.translate(sx, sy); L.rotate(tn.a); L.beginPath(); L.ellipse(Ln * .5, 0, Ln * .5, R0 * tn.w, 0, 0, 6.29); L.fill(); L.restore(); }
+      L.globalCompositeOperation = 'source-over';
+      if (hole < .3) for (let r = 0; r < 3; r++) { const kk = clamp(hole * 4 - r * .3, 0, 1); if (kk <= 0 || kk >= 1) continue; L.strokeStyle = 'rgba(42,36,56,' + (.7 * (1 - kk)) + ')'; L.lineWidth = 1; L.beginPath(); L.ellipse(sx, sy, 14 + kk * 90, 6 + kk * 36, 0, 0, 6.29); L.stroke(); }
+    }
+    g.drawImage(TITLE.layer, 0, 0);
+    if (t > 8 && t < 34) { const k = (t - 8) / 26, y = lerp(-24, 96, k * k); g.fillStyle = 'rgba(11,9,18,' + (.2 + k * .3) + ')'; g.beginPath(); g.ellipse(sx, sy, 14 - k * 6, 5 - k * 2, 0, 0, 6.29); g.fill(); drawDrop({ color: C('negro'), shape: 'tall', w: 16, h: 24 }, sx, y, 'hop', 0, { dark: true }); titleSfx('fall', 'fall'); }
+  }
+  // letras pintadas a brochazos, una a una
+  const word = TITLE.letters, cw = 22, x0 = W / 2 - word.length * cw / 2, ty = 44;
+  word.split('').forEach((ch, i) => {
+    const k = clamp((t - 100 - i * 9) / 12, 0, 1); if (k <= 0) return; if (k < 1 && k > 0) titleSfx('l' + i, 'brush_sweep', { pan: (i - 4) * .1, vol: .5 });
+    const col = C(TITLE.cols[i]), bob = t > 200 ? Math.sin(t * .06 + i * .7) * 2 : 0, y = ty + bob;
+    hilite(x0 + i * cw - 2, y + 9, x0 + i * cw + cw - 2 + 4, 20, ramp(col).sh, .9 * k); if (k >= 1) hilite(x0 + i * cw + 1, y + 7, x0 + i * cw + cw - 5, 12, ramp(col).hi, .35);
+    if (k >= 1) { g.save(); g.translate(x0 + i * cw + 3, y); g.scale(2, 2); txt(ch, 0, 0, '#f4f0ea', '#14121c'); g.restore(); }
+  });
+  if (t > 178) { const k = clamp((t - 178) / 20, 0, 1); g.globalAlpha = k; txtC('Las gotas que devolvieron el color', W / 2, 88, '#f4f0ea', '#14121c'); g.globalAlpha = 1; }
+  // las tres gotas caen y aterrizan con salpicón de su color
+  DATA.party.forEach((p, i) => {
+    const k = clamp((t - 150 - i * 14) / 18, 0, 1); if (k <= 0) return;
+    const x = W / 2 - 44 + i * 44, gy = 138, y = lerp(-30, gy, k * k), landed = k >= 1, kk = t - 150 - i * 14 - 18;
+    if (landed && kk === 0) { Audio.sfx('plop', { semi: [0, 4, 7][i] }); }
+    const sq = landed && kk < 8 ? [1.25 - kk * .03, .8 + kk * .025] : [1, 1], hop = landed && t > 200 ? Math.abs(Math.sin(t * .09 + i * 1.2)) * 4 : 0;
+    shadow(x, gy, Math.round(14 * (landed ? 1 : .5 + k * .5)));
+    if (landed && kk >= 0 && kk < 30) { const q = kk / 30; g.strokeStyle = C(p.color); g.globalAlpha = 1 - q; g.lineWidth = 2; g.beginPath(); g.ellipse(x, gy, 6 + q * 40, 2 + q * 14, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; if (kk < 10) { const rnd = seeded(kk * 3 + i); g.fillStyle = C(p.color); for (let j = 0; j < 8; j++) g.fillRect(x + (rnd() - .5) * (20 + kk * 5) | 0, gy - rnd() * (10 + kk * 3) | 0, 2, 2); } }
+    const spr = buildSprite(`${p.id}_front`, C(p.color), null, { eyes: ((t + i * 50) % 160) < 6 ? 'blink' : landed && t > 200 ? 'happy' : 'normal' });
+    drawSprite(spr, x, Math.round(y - hop), 1.3 * sq[0], false, sq[1]); if (p.id === 'anil' && landed) drawSatellites(x, y - hop, t, C(p.color), .9);
+  });
+  if (t > 200) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 154, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 157, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#7a7694', null); }
 }
 function drawDebug() {
   win(W - 124, 24, 120, 70, { solid: 'rgba(11,9,18,0.85)' }); txt('DEBUG', W - 114, 28, '#f2c93a');
@@ -670,7 +716,7 @@ function update() {
   if (Game.paused) { for (const k in pressed) pressed[k] = false; return; }
   Game.t++;
   switch (Game.state) {
-    case 'title': if (hit('ok')) { Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); } break;
+    case 'title': updateTitle(); break;
     case 'overworld': updateOverworld(); break;
     case 'transition': updateTransition(); break;
     case 'battle': updateBattle(); break;
@@ -697,6 +743,7 @@ window.__chromara = {
   kill() { if (B.enemies) B.enemies.forEach(u => u.alive && (u.hp = 1)); },
   win() { if (B.enemies) B.enemies.forEach(u => u.alive && kill(u)); checkEnd(); },
   start() { if (Game.state === 'title') { initOverworld(); setState('overworld'); } },
+  title(t) { TITLE.t = t; },
   pause(v = !Game.paused) { Game.paused = v; },
   colorize() { Game.palette = Game.palette === 'gris' ? 'vivo' : 'gris'; },
   sprite(o) { return makeDrop(o); },
