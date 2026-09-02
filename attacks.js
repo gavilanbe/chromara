@@ -181,36 +181,76 @@ function* chargeAndFuse(users, wx, wy, wz, col, frames = 26) { // anillos bajo l
   return { of, orb };
 }
 function* fuseAt(users, wx, wy, wz, col) { const r = yield* chargeAndFuse(users, wx, wy, wz, col, 34); return r; }
-function* techLlamarada(users, targets, tech, col) { // lápiz y brocha se cruzan como una cerilla, el lápiz raspa, prende, y un fuego naranja de pintura recorre el suelo hasta los enemigos
-  const mid = centroid(users), ec = enemyC(); camFocus(mid[0], mid[1], { dist: 96, turn: .25, h: 60 });
-  const { of, orb } = yield* fuseAt(users, mid[0], mid[1], 46, C(col)); yield* wait(4);
-  const bro = propSprite('brocha', C('rojo')), lap = propSprite('lapiz', C('amarillo')), st = { k: 0 };
-  const pf = fx(999, () => { const c = PJ([mid[0], mid[1], 46]); drawProp(bro, c[0] + 18 * c[2], c[1] + 14 * c[2], -.9, -1, PROP.brocha.tip[0], PROP.brocha.tip[1], 1.2 * c[2]); drawProp(lap, c[0] - 14 * c[2] + st.k * 40 * c[2], c[1] - 12 * c[2] + st.k * 22 * c[2], .6, -1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], 1.2 * c[2]); });
-  Audio.sfx('scratch_long'); for (let i = 1; i <= 14; i++) { st.k = i / 14; B.particles.push({ wx: mid[0] + R(-3, 3), wy: mid[1], wz: 40 + R(0, 8), vx: R(-.5, .5), vy: 0, vz: R(.5, 1.5), g: .06, col: i & 1 ? C('amarillo') : C('naranja'), t: 0, life: 12 }); yield; }
-  of.dur = 0; pf.dur = 0; Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .1 }); B.flash = { col: C('naranja'), a: .35 }; flames(mid[0], mid[1], 12, 8);
-  // el fuego corre por el suelo hacia los enemigos
-  B.slowmo = 8; yield* wait(6); for (let i = 1; i <= 26; i++) { const k = i / 26, x = lerp(mid[0], ec[0], k), y = lerp(mid[1], ec[1], k); flames(x, y, 4, 10); if (i % 3 === 0) mark({ kind: 'pool', p: [x, y, 0], w: 9, col: '#5a3a2a', grow: 3, life: 120, under: true }); if (i === 8) camFocus(ec[0], ec[1], { dist: 104, turn: -.2, h: 62 }); yield; }
-  B.shake = 4; for (let i = 0; i < 32; i++) { for (const t of targets) { flames(t.wx, t.wy, 3, t.def.w * .5); if (i === 8) { damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Llamarada'); goop(t, C(col), 80); } } yield; }
-  yield* wait(26); users.forEach(u => u.pose = 'idle'); camReset();
+// Llama dibujada en pantalla: capas rojo → naranja → amarillo con lengua que parpadea. (x,y) = base, w/h tamaño, t = tiempo
+function drawFlame(x, y, w, h, t, seed = 0) {
+  const f1 = Math.sin(t * .6 + seed) * .12, f2 = Math.sin(t * .9 + seed * 2) * .1, lean = Math.sin(t * .35 + seed) * w * .15;
+  const layer = (col, kw, kh, dy) => { g.fillStyle = col; g.beginPath(); g.moveTo(x - w * kw, y - dy); g.quadraticCurveTo(x - w * kw * 1.1 + lean * .3, y - h * kh * .55 - dy, x + lean, y - h * kh * (1 + f1) - dy); g.quadraticCurveTo(x + w * kw * 1.1 + lean * .3, y - h * kh * .55 - dy, x + w * kw, y - dy); g.closePath(); g.fill(); };
+  layer('#7a2a1a', 1, 1.05, 0); layer(C('rojo'), .92, .95, 0); layer(C('naranja'), .68, .72 + f2, 1); layer(C('amarillo'), .42, .45 + f2, 2); layer('#fff3c0', .2, .2, 3);
 }
-function* techBrote(users, targets, tech, col) { // el pincel pinta un tallo desde el suelo que trepa por el enemigo y florece; el polen cura al grupo
-  const mid = centroid(users), ec = enemyC(); camFocus(ec[0], ec[1], { dist: 100, turn: -.2, h: 58 });
-  const { of, orb } = yield* fuseAt(users, ec[0], ec[1], 60, C(col)); Audio.sfx('drop_fall');
-  for (let i = 1; i <= 10; i++) { orb.wz = lerp(60, 2, (i / 10) ** 2); orb.r = 12 - i * .6; yield; } of.dur = 0; B.shake = 3; yield* wait(4); Audio.sfx('grow'); Audio.sfx('leaves', { when: .3 });
-  const wave = fx(22, () => { const k = wave.t / 22, c = PJ([ec[0], ec[1], 0]); g.strokeStyle = C(col); g.lineWidth = 2; g.globalAlpha = 1 - k; g.beginPath(); g.ellipse(c[0], c[1], (10 + k * 120) * c[2], (4 + k * 40) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
-  const img = propSprite('pincel', C(col)), P = PROP.pincel;
-  for (const t of targets) { // tallo pintado con el pincel
-    const pts = []; for (let i = 0; i <= 8; i++) { const k = i / 8; pts.push([t.wx - t.def.w * .35 + Math.sin(k * 6) * 5, t.wy + 4, k * (t.def.h + 10)]); }
-    yield* toolStroke({ kind: 'pincel', color: C(col), pts, w: 3, col: '#2f9a48', frames: 14, fac: -1, life: 160, scale: 1, onTip: (k, p) => { if (Math.random() < .5) mark({ kind: 'blob', p: [p[0] + R(-3, 3), p[1], p[2]], w: 3, col: C(col), grow: 3, life: 120, seed: (k * 99) | 0 }); } });
-    damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Brote'); goop(t, C(col), 90);
-    // flor y polen
-    const top = pts[pts.length - 1], fl = fx(130, () => { const c = PJ(top), s = Math.max(1, Math.round(c[2])); const petals = [[0, -2], [2, 0], [0, 2], [-2, 0]]; petals.forEach(([a, b], i) => { g.fillStyle = i % 2 ? C('amarillo') : C('azul'); g.fillRect(c[0] + a * s - s, c[1] + b * s - s, 2 * s, 2 * s); }); g.fillStyle = '#f4f0ea'; g.fillRect(c[0] - s + 1, c[1] - s + 1, s, s); });
-    sparkle(top[0], top[1], top[2] + 4, C('amarillo')); yield* wait(6);
-  }
-  yield* wait(8);
-  Audio.sfx('heal_bells'); for (const p of alive(B.party)) { for (const t of targets) B.particles.push({ wx: t.wx, wy: t.wy, wz: t.def.h + 10, tx: p.wx, ty: p.wy, tz: p.def.h * .6, col: i2(C('amarillo'), C('verde')), t: -RI(0, 8), life: 26, dur: 26, arc: 30, stream: true }); }
-  yield* wait(30); for (const p of alive(B.party)) heal(p, Math.round(p.maxhp * tech.heal));
-  yield* wait(24); users.forEach(u => u.pose = 'idle'); yield* wait(6); camReset();
+function* techLlamarada(users, targets, tech, col) { // la cerilla: el lápiz raspa la brocha, saltan chispas, prende una bola de fuego que los dos lanzan; anillo de fuego, columnas bajo cada enemigo, humo y suelo chamuscado
+  const red = users.find(u => u.id === 'carmin') || users[0], yel = users.find(u => u.id === 'ambar') || users[1] || users[0], mid = centroid(users), ec = enemyC(), OR = C('naranja');
+  camFocus(mid[0], mid[1], { dist: 96, turn: .35, h: 52, pitch: .55, hy: 84, ease: .1 }); users.forEach(u => u.pose = 'charge');
+  const { of } = yield* fuseAt(users, mid[0], mid[1], 22, OR); yield* wait(4); of.dur = 0;
+  // la cerilla: brocha quieta cargada de rojo, el lápiz raspa a lo largo de las cerdas
+  const bro = propSprite('brocha', C('rojo')), lap = propSprite('lapiz', C('amarillo')), st = { k: 0, fire: 0, hold: 1 }, fireP = () => PJ([mid[0], mid[1], 22]);
+  const pf = fx(999, () => { const c = fireP(), s = c[2], tipX = c[0] + 10 * s, tipY = c[1] - 4 * s; if (st.hold) { drawProp(bro, c[0] - 46 * s, c[1] + 6 * s, -.18, 1, 1, 11, 1.1 * s); drawProp(lap, c[0] - 8 * s + st.k * 30 * s, c[1] - 30 * s + st.k * 14 * s, 1.05, 1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], 1.15 * s); } if (st.fire > 0) { g.globalAlpha = .35 * st.fire; g.fillStyle = OR; g.beginPath(); g.arc(tipX, tipY, (10 + st.fire * 18) * s, 0, 6.29); g.fill(); g.globalAlpha = 1; drawFlame(tipX, tipY + 6 * s, (6 + st.fire * 14) * s, (14 + st.fire * 30) * s, pf.t, 1); } }); // brocha tumbada con las cerdas a la derecha; el lápiz baja y raspa a lo largo de ellas
+  for (let r = 0; r < 3; r++) { Audio.sfx('scratch_long', { vol: .8 }); for (let i = 1; i <= 8; i++) { st.k = i / 8; B.shake = i > 5 ? 1 : 0; for (let j = 0; j < 2; j++) B.particles.push({ wx: mid[0] + 4 + R(-4, 4), wy: mid[1], wz: 22 + R(0, 8), vx: R(-.8, .8), vy: R(-.4, .4), vz: R(.6, 2.2), g: .05, col: j ? C('amarillo') : '#fff3c0', t: 0, life: 12, size: 1 }); yield; } for (let i = 1; i <= 4; i++) { st.k = 1 - i / 4; yield; } }
+  Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .1 }); B.flash = { col: OR, a: .3 }; B.slowmo = 8;
+  for (let i = 1; i <= 18; i++) { st.fire = i / 18; users.forEach(u => u.wz = Math.sin(i * .5) * 2); if (i % 2 === 0) B.particles.push({ wx: mid[0] + R(-6, 6), wy: mid[1] + R(-3, 3), wz: 28 + st.fire * 20, vx: R(-.3, .3), vy: 0, vz: R(1, 2.2), g: -.02, col: i % 4 ? OR : C('amarillo'), t: 0, life: 20, size: 2 }); yield; }
+  st.hold = 0; users.forEach(u => { u.wz = 0; u.pose = 'attack'; });
+  // lanzamiento: la bola de fuego describe un arco hasta el centro de los enemigos dejando ascuas; la cámara la sigue
+  camFocus(ec[0], ec[1], { dist: 110, turn: -.2, h: 58, pitch: .58, ease: .07 }); Audio.sfx('whip'); Audio.sfx('drop_fall', { when: .1 });
+  const ball = { wx: mid[0], wy: mid[1], wz: 22 }, bf = fx(999, () => { const c = PJ([ball.wx, ball.wy, ball.wz]); g.globalAlpha = .3; g.fillStyle = OR; g.beginPath(); g.arc(c[0], c[1], 22 * c[2], 0, 6.29); g.fill(); g.globalAlpha = 1; drawFlame(c[0], c[1] + 8 * c[2], 16 * c[2], 34 * c[2], bf.t, 2); });
+  pf.dur = 0; for (let i = 1; i <= 24; i++) { const k = i / 24; ball.wx = lerp(mid[0], ec[0], k); ball.wy = lerp(mid[1], ec[1], k); ball.wz = 22 + Math.sin(k * Math.PI) * 60 - k * 20; for (let j = 0; j < 2; j++) B.particles.push({ wx: ball.wx + R(-4, 4), wy: ball.wy + R(-2, 2), wz: ball.wz + R(-4, 4), vx: R(-.4, .4), vy: 0, vz: R(-.4, .8), g: -.01, col: j ? OR : C('amarillo'), t: 0, life: 16, size: 2 }); yield; }
+  bf.dur = 0;
+  // impacto: estallido, anillo de fuego por el suelo y columnas de fuego bajo cada enemigo
+  Audio.sfx('fwoom'); Audio.sfx('impact_sub', { vol: .8 }); Audio.sfx('crackle', { when: .2 }); B.flash = { col: '#fff3c0', a: .7 }; B.shake = 9; B.hitstop = 8; B.slowmo = 14;
+  burst(ec[0], ec[1], 6, C('amarillo'), 24, 3, 30, .1); burst(ec[0], ec[1], 6, OR, 24, 2.2, 36, .06);
+  const ring = fx(30, () => { const c = PJ([ec[0], ec[1], 0]), q = ring.t / 30; g.strokeStyle = OR; g.lineWidth = 4 * (1 - q * .6); g.globalAlpha = 1 - q; g.beginPath(); g.ellipse(c[0], c[1], (8 + q * 130) * c[2], (3 + q * 50) * c[2], 0, 0, 6.29); g.stroke(); g.strokeStyle = C('amarillo'); g.lineWidth = 2; g.beginPath(); g.ellipse(c[0], c[1], (4 + q * 110) * c[2], (2 + q * 42) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
+  const heat = overlay(70, OR, .16, 6, 30);
+  const pillars = targets.map((t, j) => ({ t, seed: j * 3 + 1, k: 0 })), pil = fx(999, () => { for (const p of pillars) { if (p.k <= 0) continue; const c = PJ([p.t.wx, p.t.wy, 0]); g.globalAlpha = Math.min(1, p.k * 2); drawFlame(c[0], c[1] + 2, (14 + p.k * 10) * c[2], (30 + p.k * 40) * c[2], pil.t, p.seed); g.globalAlpha = 1; } });
+  for (let i = 0; i < 44; i++) { pillars.forEach((p, j) => { p.k = clamp((i - j * 3) / 10, 0, 1) * (i > 30 ? (44 - i) / 14 : 1); }); for (const t of targets) { if (i % 2 === 0) B.particles.push({ wx: t.wx + R(-t.def.w * .4, t.def.w * .4), wy: t.wy + R(-4, 4), wz: R(10, 50), vx: R(-.3, .3), vy: 0, vz: R(.6, 1.6), g: -.03, col: i % 3 ? '#4a4460' : '#2a2438', t: 0, life: 30, size: 2 }); if (i === 8) { damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Llamarada'); goop(t, OR, 90); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * .9, col: '#3a2a22', grow: 8, life: 260, under: true }); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: t.def.w * .5, col: '#1e1a2c', grow: 6, life: 260, seed: 5, under: true }); } } if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-50, 50), ec[1] + R(-20, 20), 0], w: R(4, 9), col: i % 10 ? '#5a2a2a' : OR, grow: 4, life: 200, under: true }); yield; }
+  pil.dur = 0;
+  // ascuas que quedan flotando
+  for (let i = 0; i < 16; i++) { B.particles.push({ wx: ec[0] + R(-60, 60), wy: ec[1] + R(-24, 24), wz: R(0, 10), vx: R(-.2, .2), vy: 0, vz: R(.3, .8), g: -.01, col: i & 1 ? OR : C('amarillo'), t: 0, life: 40, size: 1 }); yield; }
+  yield* wait(12); users.forEach(u => u.pose = 'idle'); camReset();
+}
+function* techBrote(users, targets, tech, col) { // Ámbar alza un sol, Añil vierte agua: nace una semilla, brota un tallo con hojas, los zarcillos trepan y estrujan a los enemigos, florecen y el polen cura al grupo
+  const yel = users.find(u => u.id === 'ambar') || users[0], blu = users.find(u => u.id === 'anil') || users[1] || users[0], ec = enemyC(), GR = C('verde');
+  camFocus(ec[0], ec[1], { dist: 96, turn: -.15, h: 46, pitch: .5, ease: .1 }); users.forEach(u => u.pose = 'charge');
+  const { of } = yield* fuseAt(users, ec[0], ec[1], 50, GR); of.dur = 0;
+  // sol de Ámbar y chorro de Añil
+  const sun = { k: 0 }, sf = fx(999, () => { const c = PJ([ec[0], ec[1], 78]), r = (6 + sun.k * 10) * c[2]; g.globalAlpha = .3 * sun.k; g.fillStyle = C('amarillo'); g.beginPath(); g.arc(c[0], c[1], r * 2.4, 0, 6.29); g.fill(); g.globalAlpha = 1; for (let i = 0; i < 10; i++) { const a = i * .63 + sf.t * .04; g.strokeStyle = '#fbe28a'; g.globalAlpha = .5 * sun.k; g.beginPath(); g.moveTo(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r); g.lineTo(c[0] + Math.cos(a) * r * 1.8, c[1] + Math.sin(a) * r * 1.8); g.stroke(); } g.globalAlpha = 1; g.fillStyle = ramp(C('amarillo')).out; g.beginPath(); g.arc(c[0], c[1], r + 1, 0, 6.29); g.fill(); g.fillStyle = C('amarillo'); g.beginPath(); g.arc(c[0], c[1], r, 0, 6.29); g.fill(); g.fillStyle = '#fff3c0'; g.beginPath(); g.arc(c[0] - r * .3, c[1] - r * .3, r * .35, 0, 6.29); g.fill(); });
+  Audio.sfx('charge', { semi: 4 }); for (let i = 1; i <= 16; i++) { sun.k = i / 16; yel.wz = Math.sin(i * .5) * 3; yield; } yel.wz = 0;
+  Audio.sfx('splash_clean'); for (let i = 0; i < 20; i++) { for (let j = 0; j < 3; j++) B.particles.push({ wx: blu.wx + R(-4, 4), wy: blu.wy, wz: blu.def.h * .7, tx: ec[0] + R(-8, 8), ty: ec[1] + R(-4, 4), tz: 0, col: j ? C('azul') : ramp(C('azul')).hi, t: 0, life: 14, dur: 14, arc: 36, stream: true }); blu.wz = Math.sin(i * .7) * 2; if (i > 6 && i % 3 === 0) mark({ kind: 'pool', p: [ec[0] + R(-10, 10), ec[1] + R(-4, 4), 0], w: R(5, 9), col: ramp(C('azul')).sh, grow: 4, life: 120, under: true }); yield; } blu.wz = 0;
+  // semilla que se abre y tallo que crece con hojas que se despliegan
+  const plant = { h: 0, leaves: 0, bloom: 0 }, pl = fx(999, () => { const b = PJ([ec[0], ec[1], 0]), s = b[2]; if (plant.h <= 0) return; const H = plant.h * 64 * s;
+    g.strokeStyle = '#227a38'; g.lineWidth = 3 * s; g.beginPath(); g.moveTo(b[0], b[1]); for (let i = 1; i <= 8; i++) { const k = i / 8; g.lineTo(b[0] + Math.sin(k * 5 + pl.t * .05) * 6 * s * k, b[1] - H * k); } g.stroke(); g.strokeStyle = '#4fb84a'; g.lineWidth = 1; g.stroke();
+    for (let i = 0; i < 4; i++) { const k = .25 + i * .18, lk = clamp((plant.leaves - i * .2) / .4, 0, 1); if (lk <= 0) continue; const lx = b[0] + Math.sin(k * 5 + pl.t * .05) * 6 * s * k, ly = b[1] - H * k, dir = i % 2 ? 1 : -1; g.fillStyle = i % 2 ? '#4fb84a' : '#2f9a48'; g.beginPath(); g.ellipse(lx + dir * 9 * s * lk, ly - 2 * s, 9 * s * lk, 3.5 * s * lk, dir * -.5, 0, 6.29); g.fill(); g.fillStyle = '#7ecb60'; g.fillRect(lx + dir * 6 * s * lk - 1, ly - 3 * s, 2, 1); }
+    if (plant.bloom > 0) { const top = [b[0] + Math.sin(5 + pl.t * .05) * 6 * s, b[1] - H]; drawFlower(top[0], top[1], plant.bloom, s * 1.6, pl.t); } });
+  Audio.sfx('grow'); B.shake = 2; for (let i = 1; i <= 26; i++) { plant.h = 1 - Math.pow(1 - i / 26, 3); if (i > 8) plant.leaves = (i - 8) / 18; if (i % 4 === 0) Audio.sfx('leaves', { vol: .5 }); if (i % 3 === 0) B.particles.push({ wx: ec[0] + R(-6, 6), wy: ec[1], wz: plant.h * 60, vx: R(-.3, .3), vy: 0, vz: R(.3, .8), g: -.01, col: '#7ecb60', t: 0, life: 20 }); yield; }
+  // zarcillos por el suelo hasta cada enemigo, trepan en espiral y estrujan
+  camFocus(ec[0], ec[1], { dist: 108, turn: -.2, h: 56, pitch: .56 });
+  for (const t of targets) { const pts = []; for (let i = 0; i <= 6; i++) { const k = i / 6; pts.push([lerp(ec[0], t.wx, k) + Math.sin(k * 9) * 5, lerp(ec[1], t.wy, k) + Math.cos(k * 7) * 4, 0]); } mark({ kind: 'path', pts, w: 3, col: '#2f9a48', grow: 8, life: 200, under: true });
+    for (let i = 0; i <= 10; i++) { const a = i * 1.1, k = i / 10; pts.push([t.wx + Math.cos(a) * t.def.w * .45, t.wy + Math.sin(a) * 4, k * t.def.h * .9]); }
+    mark({ kind: 'path', pts: pts.slice(6), w: 3, col: '#2f9a48', grow: 12, life: 200 }); Audio.sfx('leaves', { vol: .6 }); yield* wait(6); }
+  yield* wait(8); Audio.sfx('rub'); B.shake = 4; B.hitstop = 5;
+  for (const t of targets) { t.pose = 'hurt'; t.poseT = 20; t.sqz = 1; damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Brote'); goop(t, GR, 100); }
+  yield* wait(10); targets.forEach(t => t.sqz = 0);
+  // floración: una flor grande en el tallo y una sobre cada enemigo; pétalos que caen; polen que va hacia el grupo y cura
+  Audio.sfx('heal_bells'); camFocus(ec[0], ec[1], { dist: 120, turn: -.1, h: 66, pitch: .58 });
+  const flowers = targets.map((t, j) => ({ t, k: 0, seed: j })), ff = fx(999, () => { for (const f of flowers) { if (f.k <= 0) continue; const c = PJ([f.t.wx, f.t.wy, f.t.def.h * .95 + 4]); drawFlower(c[0], c[1], f.k, c[2] * 1.2, ff.t + f.seed * 7); } });
+  for (let i = 1; i <= 24; i++) { plant.bloom = clamp(i / 14, 0, 1); flowers.forEach((f, j) => f.k = clamp((i - 4 - j * 3) / 12, 0, 1)); if (i % 3 === 0) for (const t of targets) B.particles.push({ wx: t.wx + R(-8, 8), wy: t.wy + R(-4, 4), wz: t.def.h + 6, vx: R(-.3, .3), vy: R(-.2, .2), vz: -R(.1, .3), g: .01, col: i % 2 ? C('amarillo') : C('azul'), t: 0, life: 40, size: 2 }); yield; }
+  for (const p of alive(B.party)) for (let j = 0; j < 14; j++) B.particles.push({ wx: ec[0] + R(-10, 10), wy: ec[1] + R(-6, 6), wz: 60 + R(0, 10), tx: p.wx + R(-4, 4), ty: p.wy + R(-2, 2), tz: p.def.h * .5, col: j % 3 ? '#fbe28a' : '#7ecb60', t: -RI(0, 12), life: 34, dur: 34, arc: 26, stream: true, size: 2 });
+  Audio.sfx('tinkle', { semi: 4 }); yield* wait(34);
+  for (const p of alive(B.party)) { heal(p, Math.round(p.maxhp * tech.heal)); p.uiHeal = 20; sparkle(p.wx, p.wy, p.def.h + 6, '#fbe28a'); }
+  for (let i = 0; i < 20; i++) { plant.bloom = 1; if (i % 2 === 0) B.particles.push({ wx: ec[0] + R(-14, 14), wy: ec[1] + R(-6, 6), wz: 70, vx: R(-.3, .3), vy: 0, vz: -R(.2, .5), g: .01, col: i % 2 ? '#fff3c0' : C('azul'), t: 0, life: 40, size: 2 }); yield; }
+  sf.dur = 0; pl.dur = 0; ff.dur = 0; mark({ kind: 'pool', p: [ec[0], ec[1] + 2, 0], w: 16, col: '#2f9a48', grow: 6, life: 220, under: true });
+  users.forEach(u => u.pose = 'idle'); yield* wait(8); camReset();
+}
+function drawFlower(x, y, k, s, t) { // flor de pétalos amarillos y azules alternos que se abre (k 0..1)
+  const n = 6, r = (5 + Math.sin(t * .15) * .4) * s * k; for (let i = 0; i < n; i++) { const a = i / n * 6.28 + t * .01; g.fillStyle = i % 2 ? C('amarillo') : C('azul'); g.beginPath(); g.ellipse(x + Math.cos(a) * r, y + Math.sin(a) * r * .8, r * .7, r * .42, a, 0, 6.29); g.fill(); }
+  g.fillStyle = '#2a2438'; g.beginPath(); g.arc(x, y, r * .5 + 1, 0, 6.29); g.fill(); g.fillStyle = '#fff3c0'; g.beginPath(); g.arc(x, y, r * .5, 0, 6.29); g.fill(); g.fillStyle = C('naranja'); g.fillRect(x - 1, y - 1, 2, 2);
 }
 const i2 = (a, b) => Math.random() < .5 ? a : b;
 function* techEclipse(users, t, tech, col) { // Carmín levanta un sol rojo y Añil una luna azul; la luna cruza el cielo, tapa al sol, la sombra barre el campo y en la totalidad el disco violeta cae como un tampón

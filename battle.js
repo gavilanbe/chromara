@@ -491,7 +491,7 @@ function drawUnit(u) {
   const G = u.goop, ga = G ? (G.t > G.life - 20 ? (G.life - G.t) / 20 : 1) : 0;
   const info = unitSpriteInfo(u, frame); let spr = info.spr; if (u.kind === 'party') spr = desatSprite(spr, pigmentFade(u.mp, u.maxmp)); if (G) spr = tintSprite(spr, G.col, .55 * ga); if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
-  drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx, flip, info.sy);
+  const sqz = u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1; drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx * sqz, flip, info.sy * (u.sqz ? 1.1 : 1));
   if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
   if (clip) g.restore();
