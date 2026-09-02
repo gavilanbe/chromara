@@ -123,7 +123,9 @@ function drawBattleUI() {
   if (!isTech && L[sel]) { tape(0, 3, W, 14); ui(L[sel].it.desc, 8, 6, TXT); }
 }
 // Etiqueta del objetivo: cinta de carrocero con nombre y HP
-function targetLabel(t) { const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 22, x0 = clamp(t.x - w / 2, 2, W - w - 2) | 0; tape(x0, 4, w, 14); swatch(x0 + 5, 7, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 15, 7, TXT); }
+// Etiqueta del objetivo: cinta pegada justo encima del cursor; si no cabe arriba, bajo los pies del objetivo. Nunca tapa el cursor.
+function targetLabel(t, cursorY, top) { const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 22, x0 = clamp(t.x - w / 2, 2, W - w - 2) | 0;
+  let y = Math.round(cursorY - 16); if (y < 2) y = Math.min(112, Math.round(t.y + 6)); tape(x0, y, w, 14); swatch(x0 + 5, y + 3, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 15, y + 3, TXT); }
 
 // =====================================================================
 // Menú de estado/equipo: el cuaderno del pintor. Se abre con rebote, fichas a la izquierda, retrato y equipo a la derecha.
@@ -206,4 +208,33 @@ function drawMenu() {
   ui(m.level === 'equip' ? '◄► cambiar · X volver' : 'Z equipo · X cerrar', 10, 161, TXT3);
   for (const q of m.spl) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += .12; g.fillStyle = q.t < 8 ? ramp(q.col).hi : ramp(q.col).base; g.fillRect(Math.round(q.x - 140), Math.round(q.y), 2, 2); } m.spl = m.spl.filter(q => q.t < 24);
   g.restore(); g.restore();
+}
+
+// =====================================================================
+// Paso de hoja: la página se dobla por la esquina inferior derecha hacia la superior izquierda. La parte doblada muestra
+// el reverso del papel (con lo de delante traslucido, como tinta que traspasa) y proyecta sombra sobre la parte plana.
+// =====================================================================
+function clipHalf(P, n, keepPositive) { // polígono del rectángulo de pantalla recortado por la recta que pasa por P con normal n
+  const pts = [[0, 0], [W, 0], [W, H], [0, H]], out = [], side = q => (q[0] - P[0]) * n[0] + (q[1] - P[1]) * n[1];
+  for (let i = 0; i < 4; i++) { const a = pts[i], b = pts[(i + 1) % 4], sa = side(a), sb = side(b), ina = keepPositive ? sa >= 0 : sa <= 0, inb = keepPositive ? sb >= 0 : sb <= 0;
+    if (ina) out.push(a); if (ina !== inb) { const t = sa / (sa - sb); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]); } }
+  return out;
+}
+function pathPoly(poly) { g.beginPath(); poly.forEach((q, i) => i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1])); g.closePath(); }
+function pageCurl(snap, k, back = PAPER, back2 = PAPER2) {
+  if (k <= 0) { g.drawImage(snap, 0, 0); return; } if (k >= 1) return;
+  const L = Math.hypot(W, H), u = [-W / L, -H / L], P = [W + u[0] * L * k * 1.02, H + u[1] * L * k * 1.02]; // el pliegue avanza por la diagonal desde la esquina inferior derecha
+  const flat = clipHalf(P, u, true), peeled = clipHalf(P, u, false); // plana = lejos de la esquina; levantada = hacia la esquina (deja ver lo de debajo)
+  const a = 1 - 2 * u[0] * u[0], b = -2 * u[0] * u[1], c = -2 * u[0] * u[1], d = 1 - 2 * u[1] * u[1], e = P[0] - (a * P[0] + c * P[1]), f = P[1] - (b * P[0] + d * P[1]);
+  const refl = q => [a * q[0] + c * q[1] + e, b * q[0] + d * q[1] + f], flap = peeled.map(refl); // el reverso de lo levantado cae reflejado sobre la parte plana
+  g.save(); pathPoly(flat); g.clip(); g.drawImage(snap, 0, 0);
+  const sh = g.createLinearGradient(P[0], P[1], P[0] + u[0] * 30, P[1] + u[1] * 30); sh.addColorStop(0, 'rgba(11,9,18,.5)'); sh.addColorStop(1, 'rgba(11,9,18,0)'); g.fillStyle = sh; g.fillRect(0, 0, W, H); g.restore();
+  if (flap.length < 3) return;
+  g.save(); pathPoly(flap); g.clip();
+  g.fillStyle = back; g.fillRect(0, 0, W, H); const rnd = seeded(31); g.fillStyle = back2; for (let i = 0; i < 500; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
+  g.save(); g.transform(a, b, c, d, e, f); g.globalAlpha = .14; g.drawImage(snap, 0, 0); g.restore();
+  const g2 = g.createLinearGradient(P[0], P[1], P[0] + u[0] * 40, P[1] + u[1] * 40); g2.addColorStop(0, 'rgba(255,255,255,.5)'); g2.addColorStop(.35, 'rgba(11,9,18,.1)'); g2.addColorStop(1, 'rgba(11,9,18,0)'); g.fillStyle = g2; g.fillRect(0, 0, W, H);
+  g.restore();
+  // canto de la hoja sobre el pliegue
+  const edge = flat.filter(q => Math.abs((q[0] - P[0]) * u[0] + (q[1] - P[1]) * u[1]) < .5); if (edge.length >= 2) { g.strokeStyle = '#c9bd9c'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(edge[0][0], edge[0][1]); g.lineTo(edge[1][0], edge[1][1]); g.stroke(); }
 }

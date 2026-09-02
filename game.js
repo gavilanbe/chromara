@@ -688,31 +688,30 @@ function drawLogo(t, x0, y0) {
 const COVER = { t: 0, open: 0 };
 function updateCover() {
   COVER.t++;
-  if (COVER.open) { if (COVER.t - COVER.open === 1) { Audio.sfx('book_open'); } if (COVER.t - COVER.open >= 22) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; Audio.play((typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES.title) ? 'title' : 'map'); } return; }
+  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; COVER.snap = null; Audio.play((typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES.title) ? 'title' : 'map'); } return; }
   if (Object.keys(pressed).some(k => pressed[k])) { COVER.open = COVER.t; Audio.sfx('page'); for (const k in pressed) pressed[k] = false; }
 }
-function drawCover() {
-  const t = COVER.t, k = COVER.open ? clamp((t - COVER.open) / 20, 0, 1) : 0, e = k * k * (3 - 2 * k);
-  if (k > 0) { TITLE.t = 0; drawTitle(); TITLE.t = 0; } // debajo, la primera página del título
-  const wdt = Math.max(1, Math.round(W * (1 - e)));
-  g.save(); g.beginPath(); g.rect(0, 0, wdt, H); g.clip();
-  // tapa de cartón con grano, anillas y etiqueta
+function drawCoverArt(t) { // tapa de cartón con grano, anillas y una etiqueta de papel: "nahuelgabe presenta"
   g.fillStyle = '#7a5a3a'; g.fillRect(0, 0, W, H); const rnd = seeded(21); g.fillStyle = '#8a6a48'; for (let i = 0; i < 1800; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1); g.fillStyle = '#5e4229'; for (let i = 0; i < 500; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
   g.fillStyle = '#5e4229'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.fillRect(W - 2, 0, 2, H);
   for (let y = 10; y < H - 6; y += 12) { g.fillStyle = '#2a1a10'; g.fillRect(6, y, 5, 4); g.fillStyle = '#8c8ab0'; g.fillRect(2, y - 2, 9, 2); g.fillRect(2, y - 2, 2, 6); g.fillStyle = '#e8e6f0'; g.fillRect(3, y - 2, 5, 1); }
-  // etiqueta de papel pegada con cinta, con el logo y los tres
-  page(66, 46, 190, 92); tape(60, 42, 40, 9); tape(222, 42, 40, 9);
-  const lw = 8 * 23; let x0 = W / 2 - lw / 2 + 2; TITLE.letters.split('').forEach((ch, i) => { const spr = logoLetter(ch, C(TITLE.cols[i])); g.globalAlpha = .35; g.drawImage(spr, x0 + i * 23 + 2, 60 + 3); g.globalAlpha = 1; g.drawImage(spr, x0 + i * 23, 60); });
-  ui('cuaderno de pintor', W / 2 - 72, 92, TXT2);
-  DATA.party.forEach((p, i) => { const x = W / 2 - 40 + i * 40, hop = Math.abs(Math.sin(t * .08 + i * 1.2)) * 2; shadow(x, 128, 10); drawSprite(buildSprite(`${p.id}_front_mini`, C(p.color), null, { eyes: ((t + i * 50) % 160) < 6 ? 'blink' : 'normal' }), x, 128 - hop, 1.5, false, 1); });
-  if ((t / 30 | 0) % 2 && !COVER.open) { tape(W / 2 - 66, 150, 132, 14); ui('PULSA UNA TECLA', W / 2 - 60, 153, TXT); }
+  page(70, 52, 180, 80); tape(64, 48, 40, 9); tape(216, 48, 40, 9);
+  g.save(); g.translate(W / 2 - 80, 62); g.scale(2, 2); txt('NAHUELGABE', 0, 0, INK, '#c9bd9c'); g.restore();
+  ui('presenta', W / 2 - 32, 84, TXT2);
+  DATA.party.forEach((p, i) => { const x = W / 2 - 36 + i * 36, hop = Math.abs(Math.sin(t * .08 + i * 1.2)) * 2; shadow(x, 122, 10); drawSprite(buildSprite(`${p.id}_front_mini`, C(p.color), null, { eyes: ((t + i * 50) % 160) < 6 ? 'blink' : 'normal' }), x, 122 - hop, 1.5, false, 1); });
+  if ((t / 30 | 0) % 2 && !COVER.open) { tape(W / 2 - 66, 146, 132, 14); ui('PULSA UNA TECLA', W / 2 - 60, 149, TXT); }
   txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#c9a878', null);
-  g.restore();
-  if (k > 0) { const gr = g.createLinearGradient(wdt, 0, Math.min(W, wdt + 30), 0); gr.addColorStop(0, 'rgba(11,9,18,.55)'); gr.addColorStop(1, 'rgba(11,9,18,0)'); g.fillStyle = gr; g.fillRect(wdt, 0, 30, H); g.fillStyle = '#5e4229'; g.fillRect(wdt - 2, 0, 3, H); }
+}
+function drawCover() {
+  const t = COVER.t;
+  if (!COVER.open) { drawCoverArt(t); return; }
+  if (!COVER.snap) { COVER.snap = document.createElement('canvas'); COVER.snap.width = W; COVER.snap.height = H; COVER.snap.getContext('2d').drawImage(buf, 0, 0); }
+  TITLE.t = 0; drawTitle(); TITLE.t = 0; // debajo, la primera página del título
+  const k = clamp((t - COVER.open) / 38, 0, 1); pageCurl(COVER.snap, k * k * (3 - 2 * k), '#b8905e', '#a57f50');
 }
 function updateTitle() {
   TITLE.t++;
-  if (TITLE.exit) { const ex = TITLE.t - TITLE.exit; if (ex === 20) Audio.sfx('slow_drip', { vol: .5 }); if (ex >= 62) { TITLE.exit = 0; TITLE.snap = null; OW.landT = 48; OW.msgHold = false; setState('overworld'); } return; }
+  if (TITLE.exit) { const ex = TITLE.t - TITLE.exit; if (ex === 20) Audio.sfx('slow_drip', { vol: .5 }); if (ex >= 76) { TITLE.exit = 0; TITLE.snap = null; OW.landT = 48; OW.msgHold = false; setState('overworld'); } return; }
   if (hit('ok')) { if (TITLE.t < 350) { TITLE.t = 350; Audio.sfx('page'); return; } TITLE.exit = TITLE.t; Audio.sfx('confirm', { semi: 0 }); Audio.sfx('confirm', { semi: 4, when: .08 }); Audio.sfx('confirm', { semi: 7, when: .16 }); }
 }
 function drawTitle() {
@@ -723,10 +722,7 @@ function drawTitle() {
   if (ex >= 34) {
     if (!TITLE.snap) { TITLE.snap = document.createElement('canvas'); TITLE.snap.width = W; TITLE.snap.height = H; TITLE.snap.getContext('2d').drawImage(buf, 0, 0); initOverworld(); OW.landT = 999; OW.msgHold = true; Audio.sfx('page'); }
     drawOverworld();
-    const q = clamp((ex - 34) / 26, 0, 1), e2 = q * q * (3 - 2 * q), k = 1 - e2, wdt = Math.max(1, Math.round(W * k));
-    g.save(); g.globalAlpha = 1; g.drawImage(TITLE.snap, 0, 0, W, H, 0, 0, wdt, H); g.fillStyle = 'rgba(11,9,18,' + (.45 * e2).toFixed(2) + ')'; g.fillRect(0, 0, wdt, H); g.restore();
-    const gr = g.createLinearGradient(wdt, 0, Math.min(W, wdt + 26), 0); gr.addColorStop(0, 'rgba(11,9,18,.5)'); gr.addColorStop(1, 'rgba(11,9,18,0)'); g.fillStyle = gr; g.fillRect(wdt, 0, 26, H);
-    g.fillStyle = '#c9bd9c'; g.fillRect(wdt - 1, 0, 2, H); // canto de la hoja
+    const q = clamp((ex - 34) / 40, 0, 1); pageCurl(TITLE.snap, q * q * (3 - 2 * q));
     return;
   }
   cam.yaw += .0035; cam.x = 300 + Math.cos(cam.yaw) * -150; cam.y = 200 + Math.sin(cam.yaw) * -150; Object.assign(SCENE.cam, cam);

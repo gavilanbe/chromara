@@ -479,8 +479,8 @@ function drawBattle() {
   for (const p of B.particles) { if (p.t < 0) continue; const c = project(p.wx, p.wy, p.wz); if (!c) continue; g.fillStyle = p.pal ? p.pal[Math.min(p.pal.length - 1, Math.floor(p.t / p.life * p.pal.length))] : p.col; const s = Math.max(1, Math.round((p.stream ? 2 : (p.t > p.life * .7 ? 1 : (p.size || 2))) * c[2])); g.fillRect(Math.round(c[0]), Math.round(c[1]), s, s); }
   // cursor de objetivo
   if (B.menu && B.menu.level === 'target') {
-    const TT = B.menu.targets, ucol = C(B.menu.unit.color); TT.forEach((t, i) => { if (i !== B.menu.tidx) return; const bob = Math.abs(Math.sin(B.t * .2)) * 3 | 0; g.drawImage(iconSprite('drop', ucol), Math.round(t.x - 6), Math.round(t.y - t.def.h * t.sc - 16 - bob));
-      targetLabel(t); });
+    const TT = B.menu.targets, ucol = C(B.menu.unit.color); TT.forEach((t, i) => { if (i !== B.menu.tidx) return; const bob = Math.abs(Math.sin(B.t * .2)) * 3 | 0, sc = t.sc * B.unitScale * (t.kind === 'enemy' ? (t.boss ? 1.35 : 1.6) : 1), top = t.y - t.def.h * sc, cy = Math.round(top - 16 - bob);
+      targetLabel(t, cy - 4, top); g.drawImage(iconSprite('drop', ucol), Math.round(t.x - 6), cy); });
   }
   g.restore();
   if (T) drawTransitionFx();
