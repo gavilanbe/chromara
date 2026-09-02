@@ -419,7 +419,7 @@ function* victoryGen() {
   }
   rf.dur = 0;
   if (B.foe.boss) { Game.bossDown = true; Game.palette = 'vivo'; Audio.sfx('saturate'); Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); OW.msg = { lines: DATA.texts.ending, t: 0 }; }
-  OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; setState('overworld'); Audio.play('map');
+  OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; if (Party.some(q => q.cur.hp < effStats(q).hp * .6 || q.cur.mp < effStats(q).mp * .3)) OW.hint = 150; setState('overworld'); Audio.play('map');
 }
 function resetGame() {
   Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false;

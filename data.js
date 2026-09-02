@@ -83,7 +83,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -102,12 +102,12 @@ const DATA = {
     'T...1......=...~~~~....r...............T',
     'T..........=====~~~~======.....x.......T',
     'T........T.....~~~~.....=..............T',
-    'T.......TT......~~~~....=...T.....6....T',
+    'T...S...TT......~~~~....=...T.....6....T',
     'T......TT........~~~~...=..TT..........T',
     'T.....TT..........~~~~..=..T...........T',
     'T.....T.V..........~~~~.=..............T',
     'T..P..T.............~~~~=.....r........T',
-    'T.....T..............~~~=~.............T',
+    'T.....T.S............~~~=~.............T',
     'T.....T...............~~=~~............T',
     'T.....TT...............~=~~~...........T',
     'T......TT..............~=~~~~..........T',
@@ -117,6 +117,7 @@ const DATA = {
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
   ],
 
+  signs: { '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
   texts: {
     intro: ['Chromara pierde sus colores.', 'Las Gotas Negras beben el pigmento', 'de todo lo que tocan.', '', 'Tres gotas primarias salen a', 'devolver el color al mundo.'],
     ending: ['La Tinta se disuelve.', '', 'Chromara recupera su color.', '', 'Gracias por jugar la PoC.'],

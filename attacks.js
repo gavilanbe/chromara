@@ -257,7 +257,7 @@ function* techEclipse(users, t, tech, col) { // Carmín levanta un sol rojo y A�
   users.forEach(u => u.pose = 'idle'); yield* wait(10); camReset();
 }
 function* techArcoiris(users, targets, tech, col) { // los tres suben en triángulo y vierten su color en un orbe blanco; nace un prisma que recibe la luz y la abre en seis haces hasta cada enemigo; un arco cruza el cielo y llueve color
-  const ec = enemyC(), pc = partyC(), mid = [(ec[0] + pc[0]) / 2, (ec[1] + pc[1]) / 2]; camFocus(mid[0], mid[1], { dist: 150, turn: 0, h: 100, pitch: .7, f: 170 });
+  const ec = enemyC(), pc = partyC(), mid = [(ec[0] + pc[0]) / 2, (ec[1] + pc[1]) / 2]; camFocus(mid[0], mid[1], { dist: 120, turn: 0, h: 60, pitch: .42, f: 170, hy: 104 }); // cámara baja mirando al cielo: la órbita y el prisma quedan en plano
   const RB = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].map(C);
   users.forEach(u => u.pose = 'charge'); Audio.sfx('charge', { semi: 0 }); Audio.sfx('charge', { semi: 4, when: .1 }); Audio.sfx('charge', { semi: 7, when: .2 });
   const home = users.map(u => [u.wx, u.wy]), orb = { wz: 72, r: 0, white: 0 };
@@ -265,6 +265,7 @@ function* techArcoiris(users, targets, tech, col) { // los tres suben en triáng
   // 1) suben en triángulo girando cada vez más rápido y vierten su color
   for (let i = 0; i < 56; i++) { const k = i / 56; users.forEach((u, j) => { const a = k * k * 18 + j * 2.09, r = lerp(34, 16, k); u.wx = lerp(home[j][0], mid[0] + Math.cos(a) * r, Math.min(1, k * 3)); u.wy = lerp(home[j][1], mid[1] + Math.sin(a) * r * .6, Math.min(1, k * 3)); u.wz = 18 + k * 48 + Math.sin(a) * 4; if (i > 14 && i % 2 === 0) B.particles.push({ wx: u.wx, wy: u.wy, wz: u.wz + u.def.h * .5, tx: mid[0], ty: mid[1], tz: orb.wz, col: C(u.color), t: 0, life: 12, dur: 12, arc: 0, stream: true }); }); if (i > 14) orb.r = Math.min(14, orb.r + .5); yield; }
   Audio.sfx('mix'); B.slowmo = 10; for (let i = 1; i <= 10; i++) { orb.white = i / 10; orb.r = 14 + i; yield; }
+  camFocus(ec[0], ec[1], { dist: 130, turn: -.15, h: 64, pitch: .5, hy: 96, f: 165 }); // giro suave hacia los enemigos con el prisma aún alto en plano
   // 2) papel: la pantalla se vuelve hoja en blanco y el orbe cristaliza en un prisma
   const paper = overlay(999, '#f1e9d6', .82, 12, 18); B.flash = { col: '#ffffff', a: .9 }; Audio.sfx('glass'); Audio.sfx('rainbow');
   orbFx.dur = 0; const pr = { spin: 0, k: 0, beams: 0 }, prismP = () => PJ([mid[0], mid[1], orb.wz]);
@@ -280,7 +281,7 @@ function* techArcoiris(users, targets, tech, col) { // los tres suben en triáng
   // 3) los enemigos se pintan de arriba abajo con todos los colores y estallan
   B.slowmo = 12; for (let i = 0; i < 30; i++) { for (const t of targets) { t.goop = null; goop(t, RB[i % 6], 30); if (i === 12) { B.shake = 6; damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Arcoíris'); } if (i % 3 === 0) burst(t.wx, t.wy, t.def.h * .6, RB[i % 6], 6, 1.6, 22, .05); } pr.spin += .2; yield; }
   // 4) el arco cruza el cielo y llueve color; charcos de seis colores
-  prism.dur = 0; paper.dur = Math.min(paper.dur, paper.t + 30); B.rainbow = 40; Audio.sfx('rainbow'); Audio.sfx('heal_bells', { when: .4 });
+  prism.dur = 0; paper.dur = Math.min(paper.dur, paper.t + 30); B.rainbow = 40; Audio.sfx('rainbow'); Audio.sfx('heal_bells', { when: .4 }); camFocus(mid[0], mid[1], { dist: 170, turn: 0, h: 80, pitch: .5, hy: 100, f: 160 }); // plano abierto para el arco
   const arc = fx(90, () => { const k = clamp(arc.t / 30, 0, 1), fade = arc.t > 70 ? (90 - arc.t) / 20 : 1; g.globalAlpha = fade * .9; RB.forEach((cc, j) => { g.strokeStyle = cc; g.lineWidth = 4; g.beginPath(); g.ellipse(W / 2, 128, 150 - j * 4, 104 - j * 4, 0, Math.PI, Math.PI + Math.PI * k); g.stroke(); }); const rnd = seeded(arc.t >> 2); g.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) { const a = Math.PI + rnd() * Math.PI * k, r = 150 - rnd() * 24; const x = W / 2 + Math.cos(a) * r, y = 128 + Math.sin(a) * r * .69; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; });
   for (let i = 0; i < 40; i++) { for (let j = 0; j < 3; j++) B.particles.push({ wx: ec[0] + R(-70, 70), wy: ec[1] + R(-30, 30), wz: 80 + R(0, 20), vx: 0, vy: 0, vz: -R(1.5, 2.5), g: .05, col: RB[RI(0, 5)], t: 0, life: 40, size: 2 }); if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-60, 60), ec[1] + R(-24, 24), 0], w: R(6, 12), col: RB[i / 5 % 6 | 0], grow: 8, life: 200, under: true }); yield; }
   users.forEach((u, j) => { u.pose = 'happy'; }); for (let i = 1; i <= 14; i++) { users.forEach((u, j) => { const k = i / 14; u.wx = lerp(u.wx, u.hx, .2); u.wy = lerp(u.wy, u.hy, .2); u.wz = Math.max(0, (1 - k) * 30 * (1 - k)); }); yield; }

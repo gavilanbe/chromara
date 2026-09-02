@@ -458,6 +458,7 @@ DATA.map.forEach((row, y) => {
     let ch = row[x];
     if (ch === 'P') { MAP.spawn = [x, y]; ch = '.'; }
     else if (ch === 'V') { MAP.jar = { x, y }; ch = '.'; }
+    else if (ch === 'S') { (MAP.signs = MAP.signs || []).push({ x, y, lines: DATA.signs[x + ',' + y] || ['Post-it'] }); ch = '.'; }
     else if (DATA.encounters[ch]) { MAP.spots.push({ key: ch, x, y }); ch = ch === 'B' ? ',' : (ch === '5' ? ',' : '.'); }
     out += ch;
   }
@@ -519,6 +520,8 @@ function updateOverworld() {
   const J = OW.jar; for (const b of J.bubbles) { b.y += b.vy; b.t++; } J.bubbles = J.bubbles.filter(b => b.t < 40 && b.y > MAP.jar.y * TILE + 12); if (OW.t % 40 === 0 && !OW.heal) J.bubbles.push({ x: MAP.jar.x * TILE + 16 + R(-6, 6), y: MAP.jar.y * TILE + 28, vy: -.35, r: 1, t: 0 });
   for (const f of OW.floats || []) f.t++; OW.floats = (OW.floats || []).filter(f => f.t < 50);
   if (OW.heal) { if (OW.heal.next().done) OW.heal = null; for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life); return; }
+  for (const sg of MAP.signs || []) { const d = Math.hypot(OW.x - sg.x * TILE - 8, OW.y - sg.y * TILE - 8); if (d < 14 && !sg.read) { sg.read = true; OW.msg = { lines: sg.lines, t: 0 }; Audio.sfx('page'); return; } if (d > 24) sg.read = false; }
+  if (OW.hint > 0) OW.hint--;
   if (MAP.jar) { const jx = MAP.jar.x * TILE + 16, jy = MAP.jar.y * TILE + 34, d = Math.hypot(OW.x - jx, OW.y - jy); if (d > 40) J.cd = 0; if (d < 16 && !J.cd) { J.pos = Party.map((p, i) => { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; return i === 0 ? [OW.x, OW.y] : (h ? [h[0], h[1]] : [OW.x - i * 12, OW.y]); }); OW.vx = OW.vy = 0; OW.moving = false; OW.heal = healGen(); return; } }
   if (OW.menu) { updateMenu(); return; }
   if (hit('ok')) { openMenu(); return; }
@@ -571,6 +574,12 @@ function jarSprite(pal) {
     return c;
   });
 }
+function signSprite() { // post-it amarillo con chincheta y garabato
+  return cached('sign', () => { const c = document.createElement('canvas'); c.width = 14; c.height = 16; const x = c.getContext('2d');
+    px(x, '#2a2438', 2, 4, 11, 11); px(x, '#f2d96a', 1, 3, 11, 11); px(x, '#fbe98a', 1, 3, 11, 1); px(x, '#d9b93a', 1, 13, 11, 1); px(x, '#d9b93a', 11, 4, 1, 10);
+    px(x, '#6a6480', 3, 6, 6, 1); px(x, '#6a6480', 3, 8, 7, 1); px(x, '#6a6480', 3, 10, 5, 1); px(x, '#e23c3c', 5, 1, 3, 3); px(x, '#ffffff', 5, 1, 1, 1); px(x, '#6a6480', 6, 4, 1, 2);
+    return c; });
+}
 function* healGen() { // el grupo salta dentro del vaso, el agua se tiñe de sus colores, burbujea, y salen aclarados con HP y MP al máximo
   const J = OW.jar, cx = MAP.jar.x * TILE + 16, top = MAP.jar.y * TILE + 4, bottom = MAP.jar.y * TILE + 32;
   J.tint = []; J.hidden = [false, false, false]; J.wob = 0; OW.floats = OW.floats || [];
@@ -608,12 +617,14 @@ function drawOverworld() {
   }
   for (const p of OW.puddles || []) { const x = p.x - cx, y = p.y - cy; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue; g.fillStyle = ramp(p.col).sh; g.beginPath(); g.ellipse(x, y + 2, p.w, p.w * .45, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).base; g.beginPath(); g.ellipse(x - 1, y + 1, p.w - 2, p.w * .4 - 1, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).hi; g.fillRect(x - p.w * .5 | 0, y - 1, 3, 1); }
   // grupo: líder y seguidores por la estela (estilo CT), cada uno mirando hacia donde avanza
+  for (const sg of MAP.signs || []) ents.push({ y: sg.y * TILE + 14, draw: () => { shadow(sg.x * TILE + 8 - cx, sg.y * TILE + 14 - cy, 8); g.drawImage(signSprite(), sg.x * TILE + 1 - cx, sg.y * TILE - 2 - cy); } });
   if (MAP.jar) { const J = OW.jar, jx = MAP.jar.x * TILE, jy = MAP.jar.y * TILE; ents.push({ y: jy + 32, draw: () => {
     const x = jx - cx, y = jy - cy, wob = J.wob > 0 ? Math.sin(OW.t * .8) * J.wob * .08 : 0; g.save(); g.translate(x + 16, y + 34); g.scale(1 + wob, 1 - wob); g.translate(-16, -34);
     shadow(16, 34, 24); g.drawImage(jarSprite(pal), 0, 0);
     if (J.tint.length) { J.tint.forEach((c, i) => { g.globalAlpha = .55; g.fillStyle = c; g.beginPath(); g.ellipse(16 + Math.cos(OW.t * .07 + i * 2.1) * 5, 23 + Math.sin(OW.t * .11 + i * 2.1) * 4, 7, 4, OW.t * .02 + i, 0, 6.29); g.fill(); }); g.globalAlpha = 1; g.save(); g.globalCompositeOperation = 'destination-over'; g.restore(); }
     for (const b of J.bubbles) { g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(Math.round(b.x - jx), Math.round(b.y - jy), b.r, b.r); }
     if (J.glow) { g.strokeStyle = '#f4f0ea'; g.globalAlpha = .5 + Math.sin(OW.t * .3) * .3; g.lineWidth = 1; g.strokeRect(5.5, 4.5, 21, 29); g.globalAlpha = 1; }
+    const hurt = Party.some(q => q.cur.hp < effStats(q).hp * .5 || q.cur.mp < effStats(q).mp * .25), gl = (OW.t % (hurt ? 50 : 140)); if (gl < 12) { const r = gl < 6 ? gl : 12 - gl; g.fillStyle = '#ffffff'; g.fillRect(9 - r, 8, r * 2 + 1, 1); g.fillRect(9, 8 - r, 1, r * 2 + 1); } // destello del cristal, más frecuente si alguien va tocado
     g.restore(); } }); }
   if (!(OW.landT > 900)) Party.forEach((p, i) => {
     let x = OW.x, y = OW.y, dir = OW.dir || 'down';
@@ -630,8 +641,13 @@ function drawOverworld() {
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }
   for (const f of OW.floats || []) { if (f.t < 0) continue; txt(f.s, Math.round(f.x - cx - f.s.length * 4), Math.round(f.y - cy - f.t * .4), f.col); }
+  // bocadillo del líder tras una batalla dura: piensa en el vaso
+  if (OW.hint > 0 && MAP.jar && !OW.msg) { const lx = OW.x - cx, ly = OW.y - cy - 22, k = clamp(OW.hint / 10, 0, 1) * clamp((150 - OW.hint) / 8, 0, 1); g.globalAlpha = k; page(lx - 12, ly - 14, 26, 18); g.drawImage(jarSprite(pal), lx - 6, ly - 12, 12, 13); g.fillStyle = PAPER; g.fillRect(lx - 3, ly + 5, 2, 2); g.fillRect(lx - 1, ly + 8, 1, 1); g.globalAlpha = 1; }
   // HUD
   win(4, 4, 124, 16); swatch(8, 8, C('amarillo')); ui('PIGMENTO ' + Game.pigmento, 18, 8, TXT);
+  // brújula al vaso cuando alguien va tocado y no está cerca
+  if (MAP.jar) { const jx = MAP.jar.x * TILE + 16, jy = MAP.jar.y * TILE + 34, d = Math.hypot(jx - OW.x, jy - OW.y), hurt = Party.some(q => q.cur.hp < effStats(q).hp * .5 || q.cur.mp < effStats(q).mp * .25);
+    if (hurt && d > 48 && !OW.heal) { win(W - 44, 4, 40, 18); g.drawImage(jarSprite(pal), W - 40, 6, 11, 13); const a = Math.atan2(jy - OW.y, jx - OW.x), ax = W - 18, ay = 13, bl = (OW.t / 20 | 0) % 2; g.fillStyle = bl ? '#e23c3c' : '#2a2438'; g.beginPath(); g.moveTo(ax + Math.cos(a) * 6, ay + Math.sin(a) * 6); g.lineTo(ax + Math.cos(a + 2.5) * 5, ay + Math.sin(a + 2.5) * 5); g.lineTo(ax + Math.cos(a - 2.5) * 5, ay + Math.sin(a - 2.5) * 5); g.closePath(); g.fill(); } }
   if (OW.msg && !(OW.landT > 0)) drawMessage(OW.msg.lines);
   if (OW.menu) drawMenu();
 }
