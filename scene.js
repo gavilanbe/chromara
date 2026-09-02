@@ -14,35 +14,38 @@ function sceneTexture(pal) {
   const d = x.getImageData(0, 0, tw, th);
   return SCENE.texCache[pal] = { data: d.data, w: tw, h: th };
 }
-// Árbol y roca a escala de batalla (siluetas del mapa en la escena)
-function bigTree(pal, vr) { // árbol de arena 34×48 (el del mapa a escala de batalla)
+// Utensilios a escala de batalla: pincel o lápiz clavado (34×48) y goma de borrar (26×18)
+function bigTree(pal, vr) {
   return cached(`bigtree|${pal}|${vr}`, () => {
     const p = PAL[pal], c = document.createElement('canvas'); c.width = 34; c.height = 48; const x = c.getContext('2d');
-    const ph1 = vr * 1.3, ph2 = vr * 2.1, cx = 17, cy = 16, rx = 16, ry = 15.5;
-    const ell = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.09 * Math.sin(X * 1.1 + ph1) * Math.sin(Y * .9 + ph2); };
-    px(x, p.treeOut, 12, 28, 10, 20); px(x, p.trunk2, 13, 28, 8, 20); px(x, p.trunk, 15, 28, 3, 18); px(x, p.treeOut, 10, 46, 2, 2); px(x, p.treeOut, 22, 46, 2, 2); px(x, p.trunk2, 12, 45, 1, 2); px(x, p.trunk2, 21, 45, 1, 2);
-    for (let Y = 0; Y < 33; Y++) for (let X = 0; X < 34; X++) {
-      if (!ell(X, Y)) continue;
-      if (!ell(X - 1, Y) || !ell(X + 1, Y) || !ell(X, Y - 1) || !ell(X, Y + 1)) { px(x, p.treeOut, X, Y); continue; }
-      const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry;
-      const lam = -u * .45 - w * .7 + .32 * Math.sin(X * .95 + ph1) * Math.sin(Y * .8 + ph2) + .12 * Math.sin(X * .5 + Y * .6 + vr);
-      px(x, lam > .5 ? p.treeHi : lam > .05 ? p.tree : lam > -.42 ? p.tree2 : p.treeOut, X, Y);
+    const tint = pal === 'vivo' ? ramp(C(TREE_COLS[vr % 6])) : null, pencil = vr % 3 === 2;
+    if (pencil) {
+      const body = tint ? tint.base : p.rock2, bodyHi = tint ? tint.hi : p.rock3, bodyDk = tint ? tint.sh : p.rockOut;
+      px(x, '#14121c', 15, 0, 4, 4); px(x, p.wood2, 13, 4, 8, 2); px(x, p.wood, 11, 6, 12, 4); px(x, p.wood3, 12, 6, 4, 2); px(x, p.wood2, 11, 9, 2, 1); px(x, p.wood2, 21, 9, 2, 1);
+      px(x, '#2a2438', 9, 10, 16, 34); px(x, body, 10, 10, 14, 32); px(x, bodyHi, 10, 10, 4, 32); px(x, bodyDk, 20, 10, 4, 32); px(x, bodyHi, 12, 12, 1, 28); px(x, bodyDk, 19, 11, 1, 30);
+      px(x, p.ferrule, 10, 38, 14, 4); px(x, p.ferruleHi, 10, 38, 14, 1); px(x, p.ferrule2, 10, 41, 14, 1); px(x, '#2a2438', 9, 42, 16, 6); px(x, '#e89aa8', 10, 42, 14, 5); px(x, '#f4c0c8', 10, 42, 14, 1); px(x, '#b86a7c', 10, 46, 14, 1);
+      return c;
     }
+    const brush = tint ? tint : { base: p.bristle, hi: p.bristleHi, sh: p.bristle2, dk: p.tip, out: '#2a2438' };
+    px(x, '#2a2438', 12, 26, 10, 22); px(x, p.wood2, 13, 26, 8, 22); px(x, p.wood, 13, 26, 5, 20); px(x, p.wood3, 14, 28, 2, 16); px(x, p.wood2, 12, 47, 10, 1);
+    px(x, p.ferrule2, 10, 22, 14, 5); px(x, p.ferrule, 11, 22, 12, 4); px(x, p.ferruleHi, 11, 22, 12, 1); px(x, p.ferrule2, 14, 23, 1, 3); px(x, p.ferrule2, 19, 23, 1, 3);
+    const ph1 = vr * 1.3, ph2 = vr * 2.1, cx = 17, cy = 12, rx = 15, ry = 11.5;
+    const ell = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.08 * Math.sin(X * 1.1 + ph1) * Math.sin(Y * .9 + ph2); };
+    for (let Y = 0; Y < 25; Y++) for (let X = 0; X < 34; X++) {
+      if (!ell(X, Y)) continue;
+      if (!ell(X - 1, Y) || !ell(X + 1, Y) || !ell(X, Y - 1) || !ell(X, Y + 1)) { px(x, brush.out, X, Y); continue; }
+      const streak = (X + vr) % 4 === 0 || (X + vr) % 4 === 1;
+      px(x, Y < 5 ? brush.hi : Y > 19 ? brush.dk : streak ? brush.sh : brush.base, X, Y);
+    }
+    px(x, '#ffffff', 12, 4, 4, 1); px(x, brush.hi, 11, 5, 1, 2);
     return c;
   });
 }
-function bigRock(pal, vr) { // roca de arena 26×18
+function bigRock(pal, vr) { // goma de borrar bicolor con funda
   return cached(`bigrock|${pal}|${vr}`, () => {
     const p = PAL[pal], c = document.createElement('canvas'); c.width = 26; c.height = 18; const x = c.getContext('2d');
-    const cx = 13, cy = 9.5, rx = 12.5, ry = 8, ph = vr * 1.7;
-    const ins = (X, Y) => { const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry; return u * u + w * w <= 1 + 0.12 * Math.sin(X * 1.3 + ph) * Math.sin(Y * 1.1 + ph); };
-    for (let Y = 0; Y < 18; Y++) for (let X = 0; X < 26; X++) {
-      if (!ins(X, Y)) continue;
-      if (!ins(X - 1, Y) || !ins(X + 1, Y) || !ins(X, Y - 1) || !ins(X, Y + 1)) { px(x, p.rockOut, X, Y); continue; }
-      const u = (X + .5 - cx) / rx, w = (Y + .5 - cy) / ry, lam = -u * .5 - w * .65 + .25 * Math.sin(X * 1.7 + ph) * Math.sin(Y * 1.9 + ph * 2);
-      px(x, lam > .45 ? p.rock3 : lam > 0 ? p.rock : lam > -.5 ? p.rock2 : p.rockOut, X, Y);
-    }
-    px(x, p.rockOut, 15, 9); px(x, p.rockOut, 16, 10); px(x, p.rockOut, 17, 11); px(x, p.rockOut, 8, 12); px(x, p.rockOut, 9, 13);
+    px(x, p.rockOut, 1, 3, 24, 14); px(x, p.eraser, 2, 4, 14, 12); px(x, p.eraserHi, 2, 4, 14, 2); px(x, p.eraserHi, 2, 4, 2, 10); px(x, p.eraser2, 2, 14, 14, 2); px(x, p.eraser2, 14, 6, 2, 10);
+    px(x, p.ferrule, 16, 4, 8, 12); px(x, p.ferruleHi, 16, 4, 8, 2); px(x, p.ferrule2, 16, 14, 8, 2); px(x, p.ferrule2, 22, 6, 2, 8); px(x, p.rockOut, 15, 4, 1, 12); px(x, p.rulerInk, 18, 8, 4, 1); px(x, p.rulerInk, 18, 10, 3, 1);
     return c;
   });
 }

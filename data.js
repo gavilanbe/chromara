@@ -83,7 +83,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T árbol  r roca  x mancha decorativa  P inicio  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -105,7 +105,7 @@ const DATA = {
     'T.......TT......~~~~....=...T.....6....T',
     'T......TT........~~~~...=..TT..........T',
     'T.....TT..........~~~~..=..T...........T',
-    'T.....T............~~~~.=..............T',
+    'T.....T.V..........~~~~.=..............T',
     'T..P..T.............~~~~=.....r........T',
     'T.....T..............~~~=~.............T',
     'T.....T...............~~=~~............T',
