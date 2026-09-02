@@ -318,6 +318,218 @@ const SPRITES = {
     '..........O......O........OO....O.............',
   ], eyes: [[14, 12], [30, 12]], eyeKind: 'ink', big: true },
 };
+
+// ---- Versiones mini para el mapa (dibujadas a mano, coherentes con las grandes)
+Object.assign(SPRITES, {
+  carmin_back_mini: { mini: true, pal: { b: '#3a2440', c: '#5a3a62', d: '#241428' }, rows: [
+    '.....dddd....',
+    '...dbccccbd..',
+    '..dbbbbbbbbd.',
+    '...ddddddddd.',
+    '...OOHHBBOO..',
+    '..OHHBBBBBSO.',
+    '.OHBBBBBBBSSO',
+    '.OBBBBBBBSSDO',
+    '.OBBBBBBBSSDO',
+    '.OSBBBBBSSDDO',
+    '..OSBBBSSDDO.',
+    '...OODDDDOO..',
+    '.....OOOO....',
+  ], eyes: [[2, 8]], eyeKind: 'side' },
+  carmin_side_mini: { mini: true, pal: { b: '#3a2440', c: '#5a3a62', d: '#241428' }, rows: [
+    '...dddd......',
+    '.dbcccbbd....',
+    'dbbbbbbbbbd..',
+    'dddddddddd...',
+    '.OOHHBBBOO...',
+    'OHHBBBBBBSO..',
+    'OHBBBBBBBSSO.',
+    'OBBBBBBBBSSO.',
+    'OBBBBBBBSSDO.',
+    'OSBBBBBSSDDO.',
+    '.OSBBBSSDDO..',
+    '..OODDDDOO...',
+    '....OOOO.....',
+  ], eyes: [[2, 7], [5, 7]], eyeKind: 'front', brow: 'angry' },
+  carmin_front_mini: { mini: true, pal: { b: '#3a2440', c: '#5a3a62', d: '#241428' }, rows: [
+    '....dddd.....',
+    '..dbbccccbd..',
+    '.dbbbbbbbbbd.',
+    '.ddddddddddd.',
+    '...OOHHBBOO..',
+    '..OHHBBBBBSO.',
+    '.OHBBBBBBBSSO',
+    '.OBBBBBBBSSDO',
+    '.OBBBBBBBSSDO',
+    '.OSBBBBBSSDDO',
+    '..OSBBBSSDDO.',
+    '...OODDDDOO..',
+    '.....OOOO....',
+  ], eyes: [[4, 7], [8, 7]], eyeKind: 'front', brow: 'angry' },
+  ambar_back_mini: { mini: true, pal: { m: '#2a2438', o: '#e8cf9a' }, rows: [
+    '....m...',
+    '....mo..',
+    '...Ooo..',
+    '...OHHO.',
+    '..OHHBBO',
+    '..OHBBSO',
+    '.OHBBBSO',
+    '.OBBBBSO',
+    '.OBBBSDO',
+    '.OBBBSDO',
+    '.OSBBSDO',
+    '..OSSDO.',
+    '...OOO..',
+  ], eyes: [[2, 8]], eyeKind: 'side' },
+  ambar_side_mini: { mini: true, pal: { m: '#2a2438', o: '#e8cf9a' }, rows: [
+    '...m....',
+    '..mo....',
+    '..Ooo...',
+    '..OHHO..',
+    '.OHHBBO.',
+    '.OHBBSO.',
+    'OHBBBSO.',
+    'OBBBBSO.',
+    'OBBBSDO.',
+    'OBBBSDO.',
+    'OSBBSDO.',
+    '.OSSDO..',
+    '..OOO...',
+  ], eyes: [[1, 8], [4, 8]], eyeKind: 'front', brow: 'sharp' },
+  ambar_front_mini: { mini: true, pal: { m: '#2a2438', o: '#e8cf9a' }, rows: [
+    '...m....',
+    '...mo...',
+    '..Ooo...',
+    '..OHHO..',
+    '.OHHBBO.',
+    '.OHBBSO.',
+    'OHBBBSO.',
+    'OBBBBSO.',
+    'OBBBSDO.',
+    'OBBBSDO.',
+    'OSBBSDO.',
+    '.OSSDO..',
+    '..OOO...',
+  ], eyes: [[1, 8], [4, 8]], eyeKind: 'front', brow: 'sharp' },
+  anil_back_mini: { mini: true, pal: {}, rows: [
+    '...OO....OO.....',
+    '..OHHO..OHHO....',
+    '.OHBBBOOHBBSO...',
+    'OHBBBBBBBBBSSO..',
+    'OBBBBBBBBBBSSDO.',
+    'OSBBBBBBBBSSDDO.',
+    '.OSSBBBBBSSDDO..',
+    '..OOSSSSSDDOO...',
+    '....OOOOOOO.....',
+  ], eyes: [[2, 5]], eyeKind: 'side' },
+  anil_side_mini: { mini: true, pal: {}, rows: [
+    '..OO....OO......',
+    '.OHHO..OHHO.....',
+    'OHBBBOOHBBSO....',
+    'OHBBBBBBBBSSO...',
+    'OBBBBBBBBBSSDO..',
+    'OSBBBBBBBSSDDO..',
+    '.OSSBBBBSSDDO...',
+    '..OOSSSSDDOO....',
+    '....OOOOOO......',
+  ], eyes: [[2, 5], [6, 5]], eyeKind: 'front', brow: 'calm' },
+  anil_front_mini: { mini: true, pal: {}, rows: [
+    '...OO....OO.....',
+    '..OHHO..OHHO....',
+    '.OHBBBOOHBBSO...',
+    'OHBBBBBBBBBSSO..',
+    'OBBBBBBBBBBSSDO.',
+    'OSBBBBBBBBSSDDO.',
+    '.OSSBBBBBSSDDO..',
+    '..OOSSSSSDDOO...',
+    '....OOOOOOO.....',
+  ], eyes: [[4, 5], [9, 5]], eyeKind: 'front', brow: 'calm' },
+  gota_negra_mini: { mini: true, pal: {}, rows: [
+    '...OOOO...',
+    '..OHHSSO..',
+    '.OHBBBSSO.',
+    '.OBBBBSSSO',
+    '.OBBBBSSSO',
+    '.OSBBBSSSO',
+    '..OSSSSSO.',
+    '...OOOOO..',
+  ], eyes: [[3, 4], [6, 4]], eyeKind: 'ink' },
+  mancha_mini: { mini: true, pal: {}, rows: [
+    '..OO....OO....',
+    '.OHBO..OHSO...',
+    'OHBBBOOBBSSO..',
+    'OBBBBcccBBSSO.',
+    'OBBBBcCcBBSSSO',
+    'OSBBBBcBBSSSSO',
+    '.OSSBBBBSSSSO.',
+    '..OOOOOOOOOO..',
+  ], eyes: [[3, 3], [9, 3]], eyeKind: 'ink' },
+  borron_mini: { mini: true, pal: {}, rows: [
+    '..OO..',
+    '.OHSO.',
+    '.OHSO.',
+    'OHBSSO',
+    'OBcCSO',
+    'OBccSO',
+    'OBBSSO',
+    'OSBSSO',
+    'OSSSSO',
+    'OSSSSO',
+    '.OOOO.',
+  ], eyes: [[1, 3], [4, 3]], eyeKind: 'ink' },
+  charco_mini: { mini: true, pal: {}, rows: [
+    '.....OOOOOO.......',
+    '..OOOHHBBccBOO....',
+    '.OHBBBBBBcCcBSSO..',
+    'OHBBBBBBBcccBSSSO.',
+    'OSBBBBBBBBBBSSSSSO',
+    '.OOSSSSSSSSSSSSOO.',
+  ], eyes: [[4, 2], [13, 2]], eyeKind: 'ink' },
+  grumo_mini: { mini: true, pal: {}, rows: [
+    '...OO..OO...',
+    '..OHSOOHSO..',
+    '.OHBBBBBSSO.',
+    '.OBBBcccBSSO',
+    'OHBBBcCcBSSO',
+    'OBBBBcccBSSO',
+    'OBBBBBBBSSSO',
+    '.OSBBBBSSSSO',
+    '..OSSSSSSSO.',
+    '...OOOOOO...',
+  ], eyes: [[3, 4], [8, 4]], eyeKind: 'ink' },
+  tinta_mini: { mini: true, big: true, pal: {}, rows: [
+    '........OOOOOO........',
+    '.....OOOHHHSSSOOO.....',
+    '...OOHHBBBBBSSSSSOO...',
+    '..OHHBBBBBBBBSSSSSSO..',
+    '.OHBBBBBBBBBBSSSSSSSO.',
+    '.OHBBBBBBBBBBSSSSSSSO.',
+    'OHBBBBBBBBBBBSSSSSSSSO',
+    'OBBBBBBBBBBBSSSSSSSSSO',
+    'OBBBBBBBBBBSSSSSSSSSSO',
+    'OSBBBBBBBBSSSSSSSSSSSO',
+    '.OSBBBBBBSSSSSSSSSSSO.',
+    '.OSSSSSSSSSSSSSSSSSSO.',
+    '..OOSSSSSSSSSSSSSSOO..',
+    '....OOOOOOOOOOOOOO....',
+    '.....OO....OO..OO.....',
+    '.....O.....O...O......',
+  ], eyes: [[6, 7], [14, 7]], eyeKind: 'ink' },
+});
+// Ojos mini: 1×2 píxeles (con brillo), tinta en claro; herido/KO = dos píxeles en diagonal; feliz = ^ ; parpadeo = raya
+function drawEyesMini(x, def, mode, kind, rp) {
+  const F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+  const ink = kind === 'ink', eyeCol = ink ? '#f4f0ea' : '#14121c';
+  def.eyes.forEach(([ex, ey], i) => {
+    if (mode === 'ko' || mode === 'hurt') { F(eyeCol, ex - 1, ey - 1); F(eyeCol, ex, ey); F(eyeCol, ex + 1, ey - 1); F(eyeCol, ex + 1, ey + 1); F(eyeCol, ex - 1, ey + 1); return; }
+    if (mode === 'happy') { F(eyeCol, ex - 1, ey); F(eyeCol, ex, ey - 1); F(eyeCol, ex + 1, ey); return; }
+    if (mode === 'blink') { F(eyeCol, ex, ey, 2, 1); return; }
+    if (ink) { F(eyeCol, ex, ey - 1, def.big ? 2 : 1, def.big ? 3 : 2); if (def.big) F('#14121c', ex + 1, ey); return; }
+    F(eyeCol, ex, ey - 1, 1, 2); F('#ffffff', ex, ey - 1);
+    if (def.brow === 'angry') F('#14121c', ex + (i ? 1 : -1), ey - 2);
+    if (def.brow === 'sharp') F('#14121c', ex, ey - 3, 2, 1);
+  });
+}
 // Construye un sprite: rampa del color + paleta fija. core = color del núcleo (enemigos), dark = cuerpo de tinta
 function buildSprite(name, color, core, opt = {}) {
   const key = `spr|${name}|${color}|${core || ''}|${opt.eyes || 'normal'}`;
@@ -328,9 +540,9 @@ function buildSprite(name, color, core, opt = {}) {
     const P = Object.assign({ O: rp.out, D: rp.dk, S: rp.sh, B: rp.base, H: rp.hi, W: rp.spec, c: cr ? cr.base : rp.base, C: cr ? cr.hi : rp.hi }, def.pal);
     for (let y = 0; y < h; y++) for (let X = 0; X < rows[y].length; X++) { const ch = rows[y][X]; if (ch === '.') continue; const col = P[ch]; if (!col) continue; x.fillStyle = col; x.fillRect(X, y, 1, 1); }
     // especular: un brillo húmedo arriba a la izquierda del cuerpo
-    const spec = def.big ? [[11, 6, 5, 2], [9, 8, 2, 3]] : def.eyeKind === 'ink' ? [[Math.round(w * .28), 2, 3, 1], [Math.round(w * .24), 3, 1, 2]] : [[Math.round(w * .3), Math.round(h * .3), 3, 1], [Math.round(w * .28), Math.round(h * .3) + 1, 1, 2]];
+    const spec = def.mini ? [[Math.round(w * .3), Math.round(h * .3), 1, 1]] : def.big ? [[11, 6, 5, 2], [9, 8, 2, 3]] : def.eyeKind === 'ink' ? [[Math.round(w * .28), 2, 3, 1], [Math.round(w * .24), 3, 1, 2]] : [[Math.round(w * .3), Math.round(h * .3), 3, 1], [Math.round(w * .28), Math.round(h * .3) + 1, 1, 2]];
     for (const [sx, sy, sw, sh] of spec) { if (rows[sy] && rows[sy][sx] && rows[sy][sx] !== '.' && 'HB'.includes(rows[sy][sx])) { x.fillStyle = rp.spec; x.fillRect(sx, sy, sw, sh); } }
-    drawEyes(x, def, opt.eyes || 'normal', def.eyeKind, rp);
+    (def.mini ? drawEyesMini : drawEyes)(x, def, opt.eyes || 'normal', def.eyeKind, rp);
     c.__key = key; return c;
   });
 }
@@ -363,26 +575,4 @@ function unitSpriteInfo(u, frame) {
   const spr = buildSprite(name, party ? C(u.color) : C('negro'), party ? null : u.def.core, { eyes: blink ? 'blink' : (party ? EYES[pose] : (pose === 'hurt' ? 'hurt' : pose === 'ko' ? 'ko' : 'normal')) });
   const sq = (SQ[pose] || SQ.idle), [sx, sy] = sq[frame % sq.length];
   return { spr, sx, sy };
-}
-// Versión mini (2:1) de un sprite para el mapa: por cada bloque 2×2 se queda el color más frecuente; si el bloque toca el
-// borde del sprite gana el contorno. Así conserva silueta y ojos sin el emborronado de un escalado normal.
-function miniSprite(name, color, core, opt = {}) {
-  const key = `mini|${name}|${color}|${core || ''}|${opt.eyes || 'normal'}`;
-  return cached(key, () => {
-    const src = buildSprite(name, color, core, opt), sw = src.width, sh = src.height, d = src.getContext('2d').getImageData(0, 0, sw, sh).data;
-    const w = Math.ceil(sw / 2), h = Math.ceil(sh / 2), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
-    const out = ramp(color).out, [orr, og, ob] = hexRgb(out);
-    const at = (px, py) => (px < 0 || py < 0 || px >= sw || py >= sh) ? null : (d[(py * sw + px) * 4 + 3] ? [d[(py * sw + px) * 4], d[(py * sw + px) * 4 + 1], d[(py * sw + px) * 4 + 2]] : null);
-    for (let y = 0; y < h; y++) for (let X = 0; X < w; X++) {
-      const cols = {}, list = []; let edge = false;
-      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) { const px = X * 2 + dx, py = y * 2 + dy, p = at(px, py); if (!p) { edge = true; continue; } const k = p.join(','); cols[k] = (cols[k] || 0) + 1; list.push(k); if (!at(px - 1, py) || !at(px + 1, py) || !at(px, py - 1) || !at(px, py + 1)) edge = true; }
-      if (list.length < 2) continue;
-      let best = null, bn = 0; for (const k in cols) if (cols[k] > bn) { bn = cols[k]; best = k; }
-      const isOut = `${orr},${og},${ob}`; if (edge && cols[isOut]) best = isOut;
-      // ojos: si hay píxel de ojo (blanco o negro puro) en el bloque, conservarlo
-      for (const k of list) if (k === '244,240,234' || k === '20,18,28' || k === '255,255,255') { best = k; break; }
-      x.fillStyle = `rgb(${best})`; x.fillRect(X, y, 1, 1);
-    }
-    c.__key = key; return c;
-  });
 }
