@@ -638,60 +638,76 @@ function drawMenu() {
 // → las letras se pintan a brochazos, una a una y de su color → las tres gotas aterrizan con salpicón → cinta con "PULSA Z"
 const TITLE = { t: 0, cam: { x: 320, y: 240, yaw: 0, pitch: .52, h: 120, f: 170, hy: 64 }, balls: null, letters: 'CHROMARA', cols: ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta', 'rojo', 'amarillo'], sfxd: {} };
 function titleSfx(k, name, o) { if (!TITLE.sfxd[k]) { TITLE.sfxd[k] = 1; Audio.sfx(name, o); } }
-// ---- Logo: cada letra es un brochazo de pintura de su color (trazo grueso redondeado → máscara → contorno de tinta, luz, sombra, vetas de cerdas)
-const LOGO_W = 18, LOGO_H = 24;
+// ---- Logo gooey: cada letra es un brochazo de pintura de su color con la base abultada (la pintura se acumula abajo),
+// se menea como gelatina por franjas, hace pop al pintarse, salpica, forma un charquito bajo la letra y suelta goterones.
+const LOGO_W = 20, LOGO_H = 26, POOLS = { C: [[14, 19]], H: [[4, 21], [15, 21]], R: [[4, 21], [15, 21]], O: [[10, 20]], M: [[3, 21], [16, 21]], A: [[3, 21], [16, 21]] };
 function logoPath(x, ch) {
-  x.lineWidth = 6; x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath();
+  x.lineWidth = 7; x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath();
   switch (ch) {
-    case 'C': x.arc(10, 12, 6.5, 0.85, 5.45); break;
-    case 'H': x.moveTo(4, 3); x.lineTo(4, 21); x.moveTo(14, 3); x.lineTo(14, 21); x.moveTo(4, 12); x.lineTo(14, 12); break;
-    case 'R': x.moveTo(4, 21); x.lineTo(4, 3); x.lineTo(10, 3); x.arc(10, 7.5, 4.5, -Math.PI / 2, Math.PI / 2); x.lineTo(4, 12); x.moveTo(8, 12); x.lineTo(14, 21); break;
-    case 'O': x.ellipse(9, 12, 5.5, 8.5, 0, 0, 6.29); break;
-    case 'M': x.moveTo(3, 21); x.lineTo(3, 3); x.lineTo(9, 13); x.lineTo(15, 3); x.lineTo(15, 21); break;
-    case 'A': x.moveTo(3, 21); x.lineTo(9, 3); x.lineTo(15, 21); x.moveTo(5.5, 14.5); x.lineTo(12.5, 14.5); break;
+    case 'C': x.arc(11, 13, 7, 0.8, 5.5); break;
+    case 'H': x.moveTo(4, 4); x.lineTo(4, 21); x.moveTo(15, 4); x.lineTo(15, 21); x.moveTo(4, 12.5); x.lineTo(15, 12.5); break;
+    case 'R': x.moveTo(4, 21); x.lineTo(4, 4); x.lineTo(11, 4); x.arc(11, 8.5, 4.5, -Math.PI / 2, Math.PI / 2); x.lineTo(4, 13); x.moveTo(9, 13); x.lineTo(15, 21); break;
+    case 'O': x.ellipse(10, 12.5, 6, 8.5, 0, 0, 6.29); break;
+    case 'M': x.moveTo(3, 21); x.lineTo(3, 4); x.lineTo(9.5, 14); x.lineTo(16, 4); x.lineTo(16, 21); break;
+    case 'A': x.moveTo(3, 21); x.lineTo(9.5, 4); x.lineTo(16, 21); x.moveTo(6, 15.5); x.lineTo(13, 15.5); break;
   }
   x.stroke();
+  for (const [px, py] of POOLS[ch] || []) { x.beginPath(); x.arc(px, py, 4.6, 0, 6.29); x.fill(); } // pintura acumulada en la base
 }
 function logoLetter(ch, col) {
   return cached(`logo|${ch}|${col}`, () => {
-    const m = document.createElement('canvas'); m.width = LOGO_W; m.height = LOGO_H; const mx = m.getContext('2d'); mx.strokeStyle = '#fff'; logoPath(mx, ch);
+    const m = document.createElement('canvas'); m.width = LOGO_W; m.height = LOGO_H; const mx = m.getContext('2d'); mx.strokeStyle = mx.fillStyle = '#fff'; logoPath(mx, ch);
     const md = mx.getImageData(0, 0, LOGO_W, LOGO_H).data, inside = (X, Y) => X >= 0 && Y >= 0 && X < LOGO_W && Y < LOGO_H && md[(Y * LOGO_W + X) * 4 + 3] > 110;
-    const c = document.createElement('canvas'); c.width = LOGO_W + 2; c.height = LOGO_H + 6; const x = c.getContext('2d'), rp = ramp(col), rnd = seeded(ch.charCodeAt(0) * 7);
+    const c = document.createElement('canvas'); c.width = LOGO_W + 2; c.height = LOGO_H + 2; const x = c.getContext('2d'), rp = ramp(col), rnd = seeded(ch.charCodeAt(0) * 7);
     for (let Y = 0; Y < LOGO_H; Y++) for (let X = 0; X < LOGO_W; X++) {
       if (!inside(X, Y)) continue;
       const edge = !inside(X - 1, Y) || !inside(X + 1, Y) || !inside(X, Y - 1) || !inside(X, Y + 1);
-      let tone; if (edge) tone = rp.out; else { const up = inside(X - 1, Y - 1) && inside(X, Y - 2), dn = inside(X + 1, Y + 1) && inside(X, Y + 2); const v = (Y / LOGO_H) + (rnd() - .5) * .25 + ((Y * 3 + X) % 5 === 0 ? .12 : 0); tone = !inside(X, Y - 2) ? rp.hi : !inside(X, Y + 2) ? rp.dk : v < .3 ? rp.hi : v < .62 ? rp.base : v < .85 ? rp.sh : rp.dk; if (!up && !dn) tone = rp.base; }
+      let tone; if (edge) tone = rp.out; else { const v = (Y / LOGO_H) + (rnd() - .5) * .22 + ((Y * 3 + X) % 5 === 0 ? .12 : 0); tone = !inside(X, Y - 2) || !inside(X - 1, Y - 1) ? rp.hi : !inside(X, Y + 2) || !inside(X + 1, Y + 1) ? rp.dk : v < .32 ? rp.hi : v < .64 ? rp.base : v < .86 ? rp.sh : rp.dk; }
       x.fillStyle = tone; x.fillRect(X + 1, Y + 1, 1, 1);
     }
-    // brillo húmedo y goterón
-    x.fillStyle = rp.spec; for (let Y = 2; Y < LOGO_H; Y++) for (let X = 1; X < LOGO_W; X++) if (inside(X, Y) && !inside(X - 1, Y - 1) && inside(X + 1, Y + 1) && rnd() < .5) x.fillRect(X + 1, Y + 1, 1, 1);
-    let bx = -1, by = -1; for (let Y = LOGO_H - 1; Y >= 0 && bx < 0; Y--) for (let X = 4; X < LOGO_W - 4; X++) if (inside(X, Y) && !inside(X, Y + 1)) { bx = X; by = Y; break; }
-    if (bx >= 0) { const L = 3 + (rnd() * 3 | 0); x.fillStyle = rp.out; x.fillRect(bx, by + 1, 3, L + 1); x.fillStyle = rp.base; x.fillRect(bx + 1, by + 1, 1, L); x.fillStyle = rp.sh; x.fillRect(bx + 2, by + 2, 1, L - 1); x.fillStyle = rp.out; x.fillRect(bx, by + L + 1, 3, 1); x.fillRect(bx + 1, by + L + 2, 1, 1); }
+    x.fillStyle = rp.spec; for (let Y = 2; Y < LOGO_H; Y++) for (let X = 1; X < LOGO_W; X++) if (inside(X, Y) && !inside(X - 1, Y - 1) && inside(X + 1, Y + 1) && inside(X + 2, Y + 2) && rnd() < .6) x.fillRect(X + 1, Y + 1, 1, 1);
     return c;
   });
 }
+// dibuja un sprite meneándose como gelatina: franjas horizontales con desfase horizontal y estirado vertical
+function drawGooey(spr, x, y, wob, sy = 1, phase = 0) {
+  const h = spr.height, hh = Math.round(h * sy);
+  for (let r = 0; r < hh; r += 2) { const srcY = Math.min(h - 1, Math.round(r / sy)), rows = Math.min(2, h - srcY); const off = Math.round(Math.sin(phase + r * .28) * wob * (r / hh)); g.drawImage(spr, 0, srcY, spr.width, rows, Math.round(x + off), Math.round(y + h - hh + r), spr.width, Math.round(rows * sy)); }
+}
 function drawLogo(t, x0, y0) {
-  const word = TITLE.letters, cw = 21;
+  const word = TITLE.letters, cw = 23; TITLE.L = TITLE.L || word.split('').map(() => ({ painted: -1, drips: [], spl: [] }));
+  const baseY = y0 + LOGO_H;
+  // charquitos de pintura bajo las letras (se juntan entre sí)
+  word.split('').forEach((ch, i) => { const S = TITLE.L[i]; if (S.painted < 0) return; const q = clamp((t - S.painted) / 40, 0, 1), col = C(TITLE.cols[i]), x = x0 + i * cw + LOGO_W / 2 + 1; g.fillStyle = ramp(col).sh; g.beginPath(); g.ellipse(x, baseY + 2, (6 + q * 10) * 1.1, 2 + q * 2.2, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(col).base; g.beginPath(); g.ellipse(x - 1, baseY + 1.5, 5 + q * 9, 1.5 + q * 1.6, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(col).hi; g.fillRect(x - 5, baseY + 1, 3, 1); });
   word.split('').forEach((ch, i) => {
-    const k = clamp((t - 100 - i * 9) / 12, 0, 1); if (k <= 0) return; if (k < 1) titleSfx('l' + i, 'brush_sweep', { pan: (i - 4) * .1, vol: .5 });
-    const col = C(TITLE.cols[i]), spr = logoLetter(ch, col), bob = t > 200 ? Math.sin(t * .06 + i * .7) * 1.5 : 0, x = x0 + i * cw, y = Math.round(y0 + bob) + (k < 1 ? (1 - k) * 6 | 0 : 0);
-    g.save(); g.beginPath(); g.rect(x - 2, y - 2, Math.round((spr.width + 4) * k), spr.height + 4); g.clip();
-    g.globalAlpha = .45; g.drawImage(spr, x + 2, y + 3); g.globalAlpha = 1; // sombra de tinta
-    g.drawImage(spr, x, y);
+    const S = TITLE.L[i], k = clamp((t - 100 - i * 9) / 12, 0, 1); if (k <= 0) return;
+    const col = C(TITLE.cols[i]), rp = ramp(col), spr = logoLetter(ch, col), x = x0 + i * cw;
+    if (k < 1) titleSfx('l' + i, 'brush_sweep', { pan: (i - 4) * .1, vol: .5 });
+    if (k >= 1 && S.painted < 0) { S.painted = t; Audio.sfx('plop', { semi: i * 2 - 6 }); for (let j = 0; j < 10; j++) S.spl.push({ x: x + LOGO_W / 2 + R(-6, 6), y: y0 + LOGO_H / 2 + R(-8, 8), vx: R(-1.6, 1.6), vy: -R(.5, 2.4), t: 0 }); S.drips = [{ x: (POOLS[ch] || [[10, 20]])[0][0] + R(-1, 1), len: 0, max: R(5, 11), speed: R(.08, .16) }]; if (POOLS[ch] && POOLS[ch][1] && Math.random() < .6) S.drips.push({ x: POOLS[ch][1][0], len: 0, max: R(3, 8), speed: R(.06, .12) }); }
+    const since = S.painted < 0 ? 0 : t - S.painted, pop = S.painted < 0 ? 0 : Math.max(0, 1 - since / 26), popS = 1 + Math.sin(since * .5) * .28 * pop;
+    // onda de gelatina que recorre la palabra cada pocos segundos: cada letra hace boing al pasar, con un chispazo en su luz
+    const wv = t > 320 ? ((t - 320) % 260) / 260 : -1, wk = wv < 0 ? 0 : clamp(1 - Math.abs(wv * (word.length + 3) - 1.5 - i), 0, 1), boing = Math.sin(wk * Math.PI);
+    const wob = .8 + pop * 4 + boing * 3.5 + (t > 200 ? Math.sin(t * .05 + i) * .3 + .3 : 0), sy = popS * (1 + Math.sin(t * .11 + i * .9) * .025 + boing * .14), phase = t * .18 + i * 1.3;
+    if (boing > .85 && S.drips[0] && S.drips[0].len < S.drips[0].max) S.drips[0].len += .5;
+    const bob = t > 200 ? Math.sin(t * .06 + i * .7) * 1.5 : 0, y = Math.round(y0 + bob) + (k < 1 ? (1 - k) * 6 | 0 : 0);
+    g.save(); g.beginPath(); g.rect(x - 3, y - 6, Math.round((spr.width + 6) * k), spr.height + 10); g.clip();
+    g.globalAlpha = .4; g.drawImage(spr, x + 2, y + 3); g.globalAlpha = 1; // sombra de tinta
+    drawGooey(spr, x, y, wob, sy, phase);
     g.restore();
-    if (k < 1) { const img = propSprite('brocha', col), P = PROP.brocha; drawProp(img, x + spr.width * k + 6, y + 6 + k * 12, P.a - 1.4, 1, P.tip[0], P.tip[1], .8); }
+    if (boing > .6) { const q = (boing - .6) / .4, r = Math.round(1 + q * 3), cx2 = x + 5, cy2 = y + 5 - Math.round(boing * 3); g.fillStyle = '#ffffff'; g.fillRect(cx2 - r, cy2, r * 2 + 1, 1); g.fillRect(cx2, cy2 - r, 1, r * 2 + 1); g.fillStyle = rp.hi; g.fillRect(cx2 - 1, cy2 - 1, 3, 3); g.fillStyle = '#ffffff'; g.fillRect(cx2, cy2, 1, 1); }
+    // goterones que crecen y se desprenden
+    for (const d of S.drips) { d.len = Math.min(d.max, d.len + d.speed); const dx = x + d.x + 1, dy = baseY + Math.round(bob), L = Math.round(d.len); g.fillStyle = rp.out; g.fillRect(dx - 1, dy - 2, 3, L + 3); g.fillStyle = rp.base; g.fillRect(dx, dy - 2, 1, L + 1); g.fillStyle = rp.sh; g.fillRect(dx + 1, dy - 1, 1, L); g.fillStyle = rp.out; g.fillRect(dx - 1, dy + L + 1, 3, 1); g.fillRect(dx, dy + L + 2, 1, 1); g.fillStyle = rp.hi; g.fillRect(dx, dy, 1, 1);
+      if (d.len >= d.max && Math.random() < .012) { (TITLE.drips = TITLE.drips || []).push({ x: dx, y: dy + L, vy: .3, col, t: 0 }); d.len = d.max * .35; d.max = R(4, 10); } }
+    // salpicaduras del pop
+    for (const p of S.spl) { p.t++; p.x += p.vx; p.y += p.vy; p.vy += .12; g.fillStyle = p.t < 10 ? rp.hi : rp.base; g.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); } S.spl = S.spl.filter(p => p.t < 22);
+    if (k < 1) { const img = propSprite('brocha', col), P = PROP.brocha; hilite(x - 4, y + LOGO_H / 2, x + Math.round(spr.width * k) + 4, LOGO_H + 6, rp.base, .35); drawProp(img, x + spr.width * k + 6, y + 8 + k * 14, P.a - 1.4 + Math.sin(t * .8) * .15, 1, P.tip[0], P.tip[1], .85); }
   });
-  // brillo húmedo que recorre la palabra de vez en cuando
-  if (t > 200) { const q = ((t - 200) % 240) / 240; if (q < .25) { const sx = x0 - 20 + q * 4 * (word.length * cw + 40); g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = .28; g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(sx, y0 - 4); g.lineTo(sx + 8, y0 - 4); g.lineTo(sx - 6, y0 + LOGO_H + 6); g.lineTo(sx - 14, y0 + LOGO_H + 6); g.closePath(); g.fill(); g.restore(); }
-    // gotitas de pintura que caen de las letras de tanto en tanto
-    if (t % 45 === 0) { const i = (t / 45 | 0) % word.length; TITLE.drips = TITLE.drips || []; TITLE.drips.push({ x: x0 + i * cw + 8 + R(-4, 4), y: y0 + LOGO_H, vy: 0, col: C(TITLE.cols[i]), t: 0 }); }
-    for (const d of TITLE.drips || []) { d.t++; d.vy += .05; d.y += d.vy; g.fillStyle = ramp(d.col).base; g.fillRect(Math.round(d.x), Math.round(d.y), 2, 3); g.fillStyle = ramp(d.col).hi; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
-    TITLE.drips = (TITLE.drips || []).filter(d => d.y < 118);
-  }
+  for (const d of TITLE.drips || []) { d.t++; d.vy += .05; d.y += d.vy; g.fillStyle = ramp(d.col).out; g.fillRect(Math.round(d.x) - 1, Math.round(d.y), 3, 3); g.fillStyle = ramp(d.col).base; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 2); g.fillStyle = ramp(d.col).hi; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
+  TITLE.drips = (TITLE.drips || []).filter(d => d.y < 118);
 }
 function updateTitle() {
   TITLE.t++;
-  if (hit('ok')) { if (TITLE.t < 200) { TITLE.t = 200; return; } Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); }
+  if (hit('ok')) { if (TITLE.t < 310) { TITLE.t = 310; return; } Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); }
 }
 function drawTitle() {
   const t = TITLE.t, cam = TITLE.cam;
@@ -719,20 +735,33 @@ function drawTitle() {
     g.drawImage(TITLE.layer, 0, 0);
     if (t > 8 && t < 34) { const k = (t - 8) / 26, y = lerp(-24, 96, k * k); g.fillStyle = 'rgba(11,9,18,' + (.2 + k * .3) + ')'; g.beginPath(); g.ellipse(sx, sy, 14 - k * 6, 5 - k * 2, 0, 0, 6.29); g.fill(); drawDrop({ color: C('negro'), shape: 'tall', w: 16, h: 24 }, sx, y, 'hop', 0, { dark: true }); titleSfx('fall', 'fall'); }
   }
-  drawLogo(t, W / 2 - 8 * 21 / 2 + 2, 30);
+  drawLogo(t, W / 2 - 8 * 23 / 2 + 2, 28);
   if (t > 178) { const k = clamp((t - 178) / 20, 0, 1); g.globalAlpha = k; txtC('Las gotas que devolvieron el color', W / 2, 88, '#f4f0ea', '#14121c'); g.globalAlpha = 1; }
-  // las tres gotas caen y aterrizan con salpicón de su color
+  // las tres gotas nacen de los goterones de sus letras: C (rojo) → Carmín, R (amarillo) → Ámbar, M (azul) → Añil
+  const LX = [0, 2, 4], lcw = 23, lx0 = W / 2 - 8 * lcw / 2 + 2, lbase = 28 + LOGO_H;
   DATA.party.forEach((p, i) => {
-    const k = clamp((t - 150 - i * 14) / 18, 0, 1); if (k <= 0) return;
-    const x = W / 2 - 44 + i * 44, gy = 138, y = lerp(-30, gy, k * k), landed = k >= 1, kk = t - 150 - i * 14 - 18;
-    if (landed && kk === 0) { Audio.sfx('plop', { semi: [0, 4, 7][i] }); }
-    const sq = landed && kk < 8 ? [1.25 - kk * .03, .8 + kk * .025] : [1, 1], hop = landed && t > 200 ? Math.abs(Math.sin(t * .09 + i * 1.2)) * 4 : 0;
-    shadow(x, gy, Math.round(14 * (landed ? 1 : .5 + k * .5)));
-    if (landed && kk >= 0 && kk < 30) { const q = kk / 30; g.strokeStyle = C(p.color); g.globalAlpha = 1 - q; g.lineWidth = 2; g.beginPath(); g.ellipse(x, gy, 6 + q * 40, 2 + q * 14, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; if (kk < 10) { const rnd = seeded(kk * 3 + i); g.fillStyle = C(p.color); for (let j = 0; j < 8; j++) g.fillRect(x + (rnd() - .5) * (20 + kk * 5) | 0, gy - rnd() * (10 + kk * 3) | 0, 2, 2); } }
-    const spr = buildSprite(`${p.id}_front`, C(p.color), null, { eyes: ((t + i * 50) % 160) < 6 ? 'blink' : landed && t > 200 ? 'happy' : 'normal' });
-    drawSprite(spr, x, Math.round(y - hop), 1.3 * sq[0], false, sq[1]); if (p.id === 'anil' && landed) drawSatellites(x, y - hop, t, C(p.color), .9);
+    const li = LX[i], x = lx0 + li * lcw + POOLS[TITLE.letters[li]][0][0] + 1, gy = 138, col = C(p.color), rp = ramp(col), t0 = 175 + i * 28, u = t - t0;
+    if (u < 0) return;
+    if (u < 18) { // 1) el goterón engorda
+      const q = u / 18, L = 4 + q * 9, r = 2 + q * 3.5; g.fillStyle = rp.out; g.fillRect(x - 1, lbase - 2, 3, L + 2); g.fillStyle = rp.base; g.fillRect(x, lbase - 2, 1, L);
+      g.fillStyle = rp.out; g.beginPath(); g.ellipse(x + .5, lbase + L, r + 1, r + 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(x + .5, lbase + L, r, r + .5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(x - 1, lbase + L - 2, 1, 1); return; }
+    if (u < 32) { // 2) se desprende y cae
+      const q = (u - 18) / 14, y = lerp(lbase + 14, gy, q * q); if (u === 18) Audio.sfx('slow_drip', { semi: [0, 4, 7][i] }); shadow(x, gy, Math.round(4 + q * 10)); drawDrop({ color: col, shape: 'tall', w: 12, h: 18 }, x, y, 'hop', 0); return; }
+    const s = u - 32; // 3) salpicón y charco · 4) el charco se levanta y toma forma · 5) vive
+    if (s === 0) { Audio.sfx('plop', { semi: [0, 4, 7][i] }); TITLE.spl = TITLE.spl || []; for (let j = 0; j < 12; j++) TITLE.spl.push({ x: x + R(-4, 4), y: gy - 2, vx: R(-2, 2), vy: -R(.8, 2.6), col, t: 0 }); }
+    if (s < 30) { const q = s / 30; g.strokeStyle = col; g.globalAlpha = 1 - q; g.lineWidth = 2; g.beginPath(); g.ellipse(x, gy, 6 + q * 44, 2 + q * 16, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }
+    shadow(x, gy, 14);
+    if (s < 12) { const q = s / 12; g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 8 + q * 8, 3 + q * 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(x - 1, gy - 1, 7 + q * 7, 2.5 + q, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(x - 6, gy - 2, 3, 1); return; }
+    const rise = clamp((s - 12) / 24, 0, 1), e = 1 - Math.pow(1 - rise, 3), over = rise < 1 ? Math.sin(rise * Math.PI) * .22 : 0, born = rise >= 1;
+    if (s === 12) Audio.sfx('grow', { semi: [0, 4, 7][i], vol: .6 }); if (rise >= 1 && s === 36) Audio.sfx('tinkle', { semi: [0, 4, 7][i] });
+    const hop = born && t > t0 + 100 ? Math.abs(Math.sin(t * .09 + i * 1.2)) * 4 : 0;
+    const eyes = !born ? 'blink' : ((t + i * 50) % 160) < 6 ? 'blink' : t > t0 + 130 ? 'happy' : 'normal';
+    const spr = buildSprite(`${p.id}_front`, col, null, { eyes }), sx = 1.3 * (1.7 - .7 * e + over * .6), sy = Math.max(.08, e * (1 + over));
+    if (!born) { g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 15 * (1 - e) + 3, 4 * (1 - e) + 1, 0, 0, 6.29); g.fill(); }
+    drawSprite(spr, x, Math.round(gy - hop), sx, false, sy); if (p.id === 'anil' && born) drawSatellites(x, gy - hop, t, col, .9 * clamp((t - t0 - 70) / 20, 0, 1));
   });
-  if (t > 200) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 154, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 157, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#7a7694', null); }
+  for (const q of TITLE.spl || []) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += .14; if (q.y > 140) { q.y = 140; q.vy *= -.3; q.vx *= .6; } g.fillStyle = q.t < 8 ? ramp(q.col).hi : ramp(q.col).base; g.fillRect(Math.round(q.x), Math.round(q.y), 2, 2); } TITLE.spl = (TITLE.spl || []).filter(q => q.t < 30);
+  if (t > 310) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 154, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 157, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#7a7694', null); }
 }
 function drawDebug() {
   win(W - 124, 24, 120, 70, { solid: 'rgba(11,9,18,0.85)' }); txt('DEBUG', W - 114, 28, '#f2c93a');
