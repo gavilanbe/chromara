@@ -504,7 +504,7 @@ function setState(s) { Game.state = s; Game.t = 0; }
 // =====================================================================
 const OW = { x: 0, y: 0, cam: { x: 0, y: 0 }, hist: [], moving: false, t: 0, msg: null, menu: null, foes: [] };
 function initOverworld() {
-  OW.x = MAP.spawn[0] * TILE + 8; OW.y = MAP.spawn[1] * TILE + 12; OW.hist = []; OW.puddles = [];
+  OW.x = MAP.spawn[0] * TILE + 8; OW.y = MAP.spawn[1] * TILE + 12; OW.hist = []; OW.puddles = []; OW.dust = []; OW.vx = OW.vy = 0; OW.bob = 0; OW.dir = 'down'; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
   OW.foes = MAP.spots.map(s => ({ key: s.key, hx: s.x * TILE + 8, hy: s.y * TILE + 12, x: s.x * TILE + 8, y: s.y * TILE + 12, tx: 0, ty: 0, t: RI(0, 60), enemies: DATA.encounters[s.key], boss: s.key === 'B', seed: s.x * 7 + s.y }));
   if (Game.intro) OW.msg = { lines: DATA.texts.intro, t: 0 };
 }
@@ -517,48 +517,74 @@ function updateOverworld() {
   if (OW.msg) { OW.msg.t++; if (OW.msg.t > 20 && (hit('ok') || hit('back'))) { OW.msg = null; Audio.sfx('page'); Game.intro = false; if (OW.msg === null && Game.bossDown && !Game.ended) Game.ended = true; } return; }
   if (OW.menu) { updateMenu(); return; }
   if (hit('ok')) { openMenu(); return; }
+  // movimiento con aceleración y frenada; el líder bota al andar (es una gota)
   let dx = 0, dy = 0; if (keys.left) dx--; if (keys.right) dx++; if (keys.up) dy--; if (keys.down) dy++;
-  OW.moving = !!(dx || dy);
+  if (dx && dy) { dx *= .707; dy *= .707; }
+  const sp = 1.35; OW.vx = lerp(OW.vx || 0, dx * sp, dx ? .3 : .45); OW.vy = lerp(OW.vy || 0, dy * sp, dy ? .3 : .45);
+  if (Math.abs(OW.vx) < .04) OW.vx = 0; if (Math.abs(OW.vy) < .04) OW.vy = 0;
+  const speed = Math.hypot(OW.vx, OW.vy); OW.moving = speed > .1;
+  if (dx || dy) OW.dir = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
   if (OW.moving) {
-    const sp = 1.25, nx = OW.x + dx * sp, ny = OW.y + dy * sp;
-    if (walkable(nx, OW.y)) OW.x = nx; if (walkable(OW.x, ny)) OW.y = ny;
+    const nx = OW.x + OW.vx, ny = OW.y + OW.vy;
+    if (walkable(nx, OW.y)) OW.x = nx; else OW.vx = 0; if (walkable(OW.x, ny)) OW.y = ny; else OW.vy = 0;
     OW.hist.unshift([OW.x, OW.y]); if (OW.hist.length > 40) OW.hist.pop();
-    if (OW.t % 14 === 0) { const tx = OW.x / TILE | 0, ty = (OW.y + 3) / TILE | 0, ch = tileAt(tx, ty); const wood = ch === '=' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tileAt(tx + a, ty + b) === '~'); Audio.sfx(wood ? 'step_wood' : ch === '=' ? 'step_path' : 'step_grass', { pan: (OW.t / 14 & 1) ? .15 : -.15 }); }
-  }
-  // enemigos del mapa: deambulan, persiguen si estás cerca
+    const prev = OW.bob || 0; OW.bob = prev + speed * .11;
+    if (Math.floor(OW.bob) > Math.floor(prev)) { // aterrizaje: gotitas del color del líder y paso según el terreno
+      const tx = OW.x / TILE | 0, ty = (OW.y + 3) / TILE | 0, ch = tileAt(tx, ty); const wood = ch === '=' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tileAt(tx + a, ty + b) === '~');
+      Audio.sfx(wood ? 'step_wood' : ch === '=' ? 'step_path' : 'step_grass', { pan: (Math.floor(OW.bob) & 1) ? .15 : -.15 });
+      for (let i = 0; i < 2; i++) OW.dust.push({ x: OW.x + R(-3, 3), y: OW.y + 1, vx: R(-.5, .5), vy: -R(.4, .9), col: C(Party[0].color), t: 0, life: RI(10, 16) });
+    }
+  } else { OW.bob = 0; }
+  for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life);
+  // enemigos del mapa: deambulan, te ven (¡) y persiguen
   for (const f of OW.foes) {
     if (Game.defeated.has(f.key)) continue;
     const d = Math.hypot(OW.x - f.x, OW.y - f.y);
-    if (d < 56 && !f.seen) { f.seen = true; Audio.sfx('detect'); } else if (d > 96) f.seen = false;
+    if (d < 56 && !f.seen) { f.seen = true; f.alert = 30; Audio.sfx('detect'); } else if (d > 96) f.seen = false;
+    if (f.alert > 0) f.alert--;
     if (f.boss) { f.x = f.hx; f.y = f.hy; }
-    else if (d < 56) { const a = Math.atan2(OW.y - f.y, OW.x - f.x); const nx = f.x + Math.cos(a) * .7, ny = f.y + Math.sin(a) * .7; if (walkable(nx, ny)) { f.x = nx; f.y = ny; } }
+    else if (d < 56) { if (f.alert > 12) { /* se queda quieto un instante al verte */ } else { const a = Math.atan2(OW.y - f.y, OW.x - f.x); const nx = f.x + Math.cos(a) * .85, ny = f.y + Math.sin(a) * .85; if (walkable(nx, ny)) { f.x = nx; f.y = ny; } } }
     else { if (--f.t <= 0) { f.t = RI(60, 150); f.tx = f.hx + R(-24, 24); f.ty = f.hy + R(-16, 16); } const a = Math.atan2(f.ty - f.y, f.tx - f.x); if (Math.hypot(f.tx - f.x, f.ty - f.y) > 2) { const nx = f.x + Math.cos(a) * .4, ny = f.y + Math.sin(a) * .4; if (walkable(nx, ny)) { f.x = nx; f.y = ny; } } }
+    f.dirLeft = (d < 56 ? OW.x < f.x : f.tx < f.x);
     if (d < 11) { startTransition(f); return; }
   }
-  OW.cam.x = clamp(Math.round(OW.x - W / 2), 0, MAP.w * TILE - W); OW.cam.y = clamp(Math.round(OW.y - H / 2), 0, MAP.h * TILE - H);
+  // cámara suave con un poco de anticipación hacia donde vas
+  const gx = clamp(OW.x - W / 2 + (OW.vx || 0) * 16, 0, MAP.w * TILE - W), gy = clamp(OW.y - H / 2 + (OW.vy || 0) * 10, 0, MAP.h * TILE - H);
+  OW.cam.x = lerp(OW.cam.x, gx, .12); OW.cam.y = lerp(OW.cam.y, gy, .12);
 }
-function mapDef(p, size = 1) { return { color: C(p.color), shape: p.shape, w: Math.round(p.w * .5 * size), h: Math.round(p.h * .5 * size), seed: 3 }; }
+// Sprite de un miembro del grupo en el mapa: vista según dirección (espaldas al subir, frente al bajar, perfil a los lados)
+const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
+function mapDrop(p, x, y, dir, bob, moving, t, idx) {
+  const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : DIRVIEW[dir] || 'back';
+  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = buildSprite(`${p.id}_${view}`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' });
+  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 4, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
+  shadow(x, y, Math.round((p.w * .5) * (1 - hop * .3)));
+  if (dead) { drawSprite(spr, x, y, 1, false, .45); return; }
+  drawSprite(spr, x, Math.round(y - wz), sq[0], dir === 'right', sq[1]);
+  if (p.id === 'anil') drawSatellites(x, y - wz, t + idx * 10, col, .6);
+}
 function drawOverworld() {
-  const cx = OW.cam.x, cy = OW.cam.y, wf = (OW.t / 9 | 0) % 4, pal = Game.palette;
+  const cx = Math.round(OW.cam.x), cy = Math.round(OW.cam.y), wf = (OW.t / 9 | 0) % 4, pal = Game.palette;
   const ents = [];
   for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
     const ch = tileAt(tx, ty); g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
     if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => g.drawImage(treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7), tx * TILE - cx, ty * TILE - 8 - cy) });
   }
   for (const p of OW.puddles || []) { const x = p.x - cx, y = p.y - cy; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue; g.fillStyle = ramp(p.col).sh; g.beginPath(); g.ellipse(x, y + 2, p.w, p.w * .45, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).base; g.beginPath(); g.ellipse(x - 1, y + 1, p.w - 2, p.w * .4 - 1, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).hi; g.fillRect(x - p.w * .5 | 0, y - 1, 3, 1); }
-  // seguidores (Ámbar y Añil detrás del líder, estilo CT)
+  // grupo: líder y seguidores por la estela (estilo CT), cada uno mirando hacia donde avanza
   Party.forEach((p, i) => {
-    let x = OW.x, y = OW.y; if (i > 0) { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; if (h) { x = h[0]; y = h[1]; } else { x = OW.x - i * 12; } }
-    const frame = OW.moving ? (OW.t / 6 | 0) % 4 : (OW.t / 14 | 0) % 4;
-    ents.push({ y, draw: () => { shadow(x - cx, y - cy, 8); drawDrop(mapDef(p), x - cx, y - cy, p.cur.hp <= 0 ? 'ko' : (OW.moving ? (frame % 2 ? 'hop' : 'hurt') : 'idle'), frame); } });
+    let x = OW.x, y = OW.y, dir = OW.dir || 'down';
+    if (i > 0) { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)], h2 = OW.hist[Math.min(OW.hist.length - 1, i * 12 + 4)]; if (h) { x = h[0]; y = h[1]; if (h2) { const ddx = h[0] - h2[0], ddy = h[1] - h2[1]; if (Math.abs(ddx) + Math.abs(ddy) > .5) dir = Math.abs(ddx) >= Math.abs(ddy) ? (ddx < 0 ? 'left' : 'right') : (ddy < 0 ? 'up' : 'down'); else dir = OW.dir || 'down'; } } else { x = OW.x - i * 12; } }
+    const moving = OW.moving && (i === 0 || OW.hist.length > i * 12);
+    ents.push({ y, draw: () => mapDrop(p, x - cx, y - cy, dir, (OW.bob || 0) + i * .33, moving, OW.t, i) });
   });
   for (const f of OW.foes) {
     if (Game.defeated.has(f.key)) continue;
     const e = DATA.enemies[f.enemies[0]], core = e.color === 'negro' ? null : C(e.color);
-    const def = { color: C('negro'), core, shape: e.shape, w: f.boss ? 24 : 12, h: f.boss ? 20 : 12, seed: f.seed };
-    ents.push({ y: f.y, draw: () => { shadow(f.x - cx, f.y - cy, f.boss ? 16 : 8); drawDrop(def, f.x - cx, f.y - cy, 'idle', (OW.t / 10 + f.seed | 0) % 4, { dark: true }); } });
+    ents.push({ y: f.y, draw: () => { const hop = Math.abs(Math.sin((OW.t + f.seed * 7) * (f.seen ? .25 : .12))) * (f.seen ? 4 : 2), x = f.x - cx, y = f.y - cy; shadow(x, y, f.boss ? 20 : 10); const spr = buildSprite(f.enemies[0], C('negro'), core, { eyes: 'normal' }); drawSprite(spr, x, Math.round(y - hop), f.boss ? 1.3 : 1, f.dirLeft); if (f.alert > 0) { const by = y - spr.height - 10 + (f.alert > 24 ? (30 - f.alert) : 0); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, by, 2, 6); g.fillRect(x - 1, by + 8, 2, 2); } } });
   }
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
+  for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }
   // HUD
   win(4, 4, 124, 16); swatch(8, 8, C('amarillo')); ui('PIGMENTO ' + Game.pigmento, 18, 8, TXT);
   if (OW.msg) drawMessage(OW.msg.lines);
@@ -614,7 +640,7 @@ function drawTitle() {
   g.font = FONT; const cw = 8 * 2;
   word.split('').forEach((ch, i) => { const y = 50 + Math.sin(Game.t * .08 + i * .6) * 3; g.save(); g.translate(W / 2 - word.length * cw / 2 + i * cw, y); g.scale(2, 2); txt(ch, 0, 0, C(cols[(i + (Game.t / 30 | 0)) % cols.length])); g.restore(); });
   txtC('Las gotas que devolvieron el color', W / 2, 88, '#b8b4cc');
-  DATA.party.forEach((p, i) => { const x = W / 2 - 40 + i * 40; shadow(x, 132, 16); drawDrop({ color: C(p.color), shape: p.shape, w: p.w, h: p.h, seed: 3 }, x, 132 - Math.abs(Math.sin(Game.t * .1 + i)) * 4, 'idle', (Game.t / 10 + i | 0) % 4); });
+  DATA.party.forEach((p, i) => { const x = W / 2 - 40 + i * 40, hop = Math.abs(Math.sin(Game.t * .1 + i)) * 4; shadow(x, 132, 16); const spr = buildSprite(`${p.id}_front`, C(p.color), null, { eyes: ((Game.t + i * 50) % 160) < 6 ? 'blink' : 'happy' }); drawSprite(spr, x, 132 - hop, 1.3, false, 1); if (p.id === 'anil') drawSatellites(x, 132 - hop, Game.t, C(p.color), .9); });
   if ((Game.t / 30 | 0) % 2) txtC('PULSA Z / ENTER', W / 2, 156, '#f4f0ea');
   txtC('PoC · Fable 5 · 320x180', W / 2, 170, '#4a4460', null);
 }

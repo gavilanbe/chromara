@@ -42,6 +42,7 @@ Las herramientas son props (`propSprite`) que entran en escena y actúan sobre e
 - Mapa: HUD de pigmento, aviso a página completa y menú de estado/equipo con el mismo papel.
 
 ## Overworld (`game.js`)
+Los mismos sprites a mano que en batalla: espaldas al subir, frente al bajar, perfil a los lados (los seguidores miran hacia donde avanzan por la estela). Movimiento con aceleración y frenada, bote de gota al andar con gotitas del color del líder al aterrizar y pasos según el terreno, parpadeo en reposo, cámara suave con anticipación. Los enemigos usan sus sprites, botan, avisan con `!` al verte y persiguen; los vencidos dejan un charco con el color robado.
 Autotiling por vecindad (`groundTile`, cacheado por forma): agua con banco de tierra y espuma animada, camino con borde irregular, puentes y embarcaderos de tablones, zona de tinta con borde líquido y chorretones, 16 variantes de hierba (flores muertas en gris, rosas y blancas en vivo), rocas. Árboles como sprites 16×24 ordenados por profundidad; los contiguos fusionan sus copas en setos.
 
 ## Sonido
@@ -57,5 +58,4 @@ Autotiling por vecindad (`groundTile`, cacheado por forma): agua con banco de ti
 ## Decisiones de PoC (a revisar si pasa a vertical slice)
 - La batalla ocurre sobre el propio trozo de mapa (misma textura, misma posición), pero con cámara propia y sin enemigos "de campo" durante el combate.
 - Sin niveles ni subida de stats: el "Pigmento" solo se acumula. Sin guardado. Un mapa. Sin huir.
-- Los sprites del mapa siguen siendo las gotas procedurales pequeñas; los sprites a mano se usan en batalla y en las pegatinas.
 - Texto con Press Start 2P (Google Fonts, cae a monospace sin red).

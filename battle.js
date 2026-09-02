@@ -93,7 +93,7 @@ function initBattle(foe) {
   B.props = B.props.filter(o => { if (o.kind !== 'T') return true; const p = project(o.wx, o.wy, 0, SCENE.rest); if (!p) return true; return !U.some(q => p[3] < q[3] && Math.abs(p[0] - q[0]) < 34 && p[1] > q[1] - 12 && p[1] < q[1] + 70); });
   const ec = homeC(B.enemies); B.puddle = { wx: ec[0], wy: ec[1], rx: n === 1 ? 26 : 46, ry: n === 1 ? 12 : 20, k: 0 };
   B.gen = transitionGen(foe);
-  B.unitScale = .5;
+  B.unitScale = 1; B.propScale = .5;
 }
 function startTransition(foe) { initBattle(foe); setState('transition'); }
 
@@ -115,11 +115,11 @@ function* transitionGen(foe) {
   T.stage = 'blot'; T.overworld = false; T.k = 0;
   T.balls = []; for (let i = 0; i < 9; i++) T.balls.push({ a: i / 9 * 6.28 + R(-.3, .3), d: R(.3, 1), r: R(.5, 1), ph: R(0, 6.28) });
   T.tendrils = []; for (let i = 0; i < 7; i++) T.tendrils.push({ a: R(0, 6.28), len: R(1.2, 2.2), w: R(.12, .3), sp: R(.6, 1.4) });
-  const top = { x: OW.cam.x + W / 2, y: OW.cam.y + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 150, f: 150, hy: 90 };
+  const top = { x: Math.round(OW.cam.x) + W / 2, y: Math.round(OW.cam.y) + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 110, f: 110, hy: 90 };
   camSet(top);
-  for (let i = 0; i < 40; i++) { T.k = i / 40; const k = clamp((i - 8) / 30, 0, 1), e = k * k * (3 - 2 * k); B.unitScale = lerp(.5, 1, e);
+  for (let i = 0; i < 40; i++) { T.k = i / 40; const k = clamp((i - 8) / 30, 0, 1), e = k * k * (3 - 2 * k); B.propScale = lerp(.5, 1, e);
     const c = SCENE.cam, r = SCENE.rest; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(top[key], r[key], e); c.yaw = lerp(top.yaw, r.yaw, e); yield; }
-  camSet(SCENE.rest); B.unitScale = 1;
+  camSet(SCENE.rest); B.propScale = 1;
   // 5) la tinta se escurre hacia los enemigos y se vuelve su charco; los enemigos emergen, el grupo rebota a su formación
   T.stage = 'drain'; T.k = 0; Audio.sfx('slow_drip'); Audio.sfx('ink_jet', { when: .2 });
   const from = B.party.map(u => [u.wx, u.wy]);
@@ -394,7 +394,7 @@ function* victoryGen() {
   B.party.forEach(u => { u.data.cur.hp = u.hp; u.data.cur.mp = u.mp; }); Game.defeated.add(B.foe.key);
   for (const e of B.enemies) if (e.def.core) OW.puddles.push({ x: e.hx, y: e.hy, col: e.def.core, w: e.data.w * .5 }); // el color robado se queda en el mapa
   const camX = clamp(Math.round(OW.x - W / 2), 0, MAP.w * TILE - W), camY = clamp(Math.round(OW.y - H / 2), 0, MAP.h * TILE - H);
-  const top = { x: camX + W / 2, y: camY + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 150, f: 150, hy: 90 }, from = Object.assign({}, SCENE.cam), start = B.party.map(u => [u.wx, u.wy]);
+  const top = { x: camX + W / 2, y: camY + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 110, f: 110, hy: 90 }, from = Object.assign({}, SCENE.cam), start = B.party.map(u => [u.wx, u.wy]);
   const dest = B.party.map((u, i) => { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; return i === 0 ? [OW.x, OW.y] : (h ? [h[0], h[1]] : [OW.x - i * 12, OW.y]); });
   Audio.sfx('saturate', { vol: .5 });
   const rings = B.party.filter(u => u.alive).map((u, j) => ({ u, t: -j * 6 }));
@@ -402,14 +402,14 @@ function* victoryGen() {
   SCENE.goal = null;
   for (let i = 0; i < 56; i++) {
     const k = i / 56, e = k * k * (3 - 2 * k); rings.forEach(r => r.t++);
-    if (i > 10) { const kk = clamp((i - 10) / 40, 0, 1), ee = kk * kk * (3 - 2 * kk); const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(from[key], top[key], ee); let d = top.yaw - from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = from.yaw + d * ee; B.unitScale = lerp(1, .5, ee); }
+    if (i > 10) { const kk = clamp((i - 10) / 40, 0, 1), ee = kk * kk * (3 - 2 * kk); const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(from[key], top[key], ee); let d = top.yaw - from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = from.yaw + d * ee; B.propScale = lerp(1, .5, ee); }
     B.party.forEach((u, j) => { const kk = clamp((i - 6 - j * 4) / 30, 0, 1); u.wx = lerp(start[j][0], dest[j][0], kk); u.wy = lerp(start[j][1], dest[j][1], kk); u.wz = kk > 0 && kk < 1 ? Math.abs(Math.sin(kk * Math.PI * 3)) * 10 : 0; u.pose = kk < 1 ? 'hop' : 'idle'; });
     B.puddle.k = Math.max(0, B.puddle.k - .04);
     yield;
   }
   rf.dur = 0;
   if (B.foe.boss) { Game.bossDown = true; Game.palette = 'vivo'; Audio.sfx('saturate'); Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); OW.msg = { lines: DATA.texts.ending, t: 0 }; }
-  setState('overworld'); Audio.play('map');
+  OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; setState('overworld'); Audio.play('map');
 }
 function resetGame() {
   Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false;
@@ -461,7 +461,7 @@ function drawBattle() {
   for (const u of B.units) { if (u.z) ents.push({ z: u.z, d: () => drawUnit(u) }); }
   for (const o of B.props) { const p = project(o.wx, o.wy, 0); if (!p || p[1] < -60 || p[0] < -60 || p[0] > W + 60) continue;
     // si un árbol queda delante de alguien, se vuelve translúcido
-    const s = p[2] * B.unitScale, cover = o.kind === 'T' && B.units.some(u => u.z && p[3] < u.z && Math.abs(p[0] - u.x) < 17 * s + 14 && p[1] > u.y - 30 && p[1] < u.y + 50 * s);
+    const s = p[2] * B.propScale, cover = o.kind === 'T' && B.units.some(u => u.z && p[3] < u.z && Math.abs(p[0] - u.x) < 17 * s + 14 && p[1] > u.y - 30 && p[1] < u.y + 50 * s);
     ents.push({ z: p[3], d: () => { if (cover) g.globalAlpha = .38; if (o.kind === 'T') { shadow(p[0], p[1], Math.round(22 * s)); drawSprite(bigTree(pal, o.vr), p[0], p[1] + 2, s); } else { shadow(p[0], p[1] + 1, Math.round(24 * s)); drawSprite(bigRock(pal, o.vr & 3), p[0], p[1] + 2, s); } g.globalAlpha = 1; } }); }
   ents.sort((a, b) => b.z - a.z).forEach(e => e.d());
   drawMarks(false); for (const f of B.fx) if (!f.under) f.draw();
