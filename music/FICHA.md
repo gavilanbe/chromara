@@ -232,3 +232,38 @@ interno de la reverb no es periódico. En el mapa el empalme es prácticamente p
 - Los `.opus.ogg` que había en la carpeta eran de la v1; los he **regenerado desde el audio
   nuevo** con `libopus 112k`. Si los habías creado tú con otros ajustes, rehazlos.
 - La v1 sigue documentada en `FICHA_v1_chiptune.md`, pero sus audios han sido sustituidos.
+
+---
+
+## 8. TITLE — «El cuaderno se abre» · Re mayor (add9, mezcla modal) · 90 bpm · 138,67 s
+Añadido después de la v2. Fuente `~/composer/pieces/chromara2_title.yaml`; ficha completa en
+`~/composer/pieces/chromara2_title/FICHA.md`; informe `report_title.md`. Empaquetado como
+`MUSIC_SAMPLES.title` con los mismos campos que las demás (`tools/pack_music.py`, que ahora incluye `title`).
+
+`intro(4) + [A(8) B(8) C(8)] ×2` — intro **10,667 s**, loop de 24 c. = **64,000 s** · loop [74,6667 → 138,6667]
+(90 es divisor de 10 584 000: compás = 117 600 muestras; `loopEndSample 6 115 200 == longitud`).
+
+**Identidad — tres pinceladas de la misma célula.** En B el oboe dice la Célula del Prisma tres veces en
+tres colores: Si menor (`Si Re Do# Fa#`, la sombra), Re menor sobre Sibmaj7/Gm6 (la célula del mapa sobre
+el acorde de la Tinta) y Re mayor (`Re Fa# Mi La`, encendida): las tres gotas que nacen de la misma mancha.
+La celesta marca la 3ª que cambia (Fa#6 / Fa6 / Fa#6). Cada sección acaba con un glissando de arpa que
+pasa la página.
+
+| sección | armonía | qué pasa |
+|---|---|---|
+| intro | Dadd9 ‖ Dadd9 ‖ Gmaj7/D ‖ Dadd9 | celesta sola con la célula aumentada (`Re:2 Fa#:4 Mi:4 La:1`), gotas de pizzicato muy espaciadas; colchón ppp desde c.3; arpa sube en c.4 |
+| A | Dadd9 ‖ Gmaj7 ‖ Em7 ‖ Asus4 A7 ‖ Dadd9 ‖ Bm7 ‖ Gmaj7 ‖ Asus4 A7 | flauta con el gancho (`Re:4. Fa#:8 Mi:4 La:4`, cima Re6 en c.3 y Mi6 en c.6); oboe contesta en las respiraciones; cuerdas desde c.5; dos golpes pp de timbal |
+| B | Bm7 ‖ Gmaj7 ‖ Sibmaj7 ‖ Gm6 ‖ Dmaj7 ‖ Bm7 ‖ Gmaj7 ‖ A7 | las tres pinceladas del oboe; redoble ppp de timbal en c.8 |
+| C | Dadd9 ‖ A/C# ‖ Gmaj7 ‖ Bm7 ‖ Em7 ‖ F#m7 ‖ Gm6 ‖ Asus4 A7 | clímax: celesta al unísono con la flauta, cima Mi6 en c.6 con cuerdas a la octava y oboe a la 3ª; c.7 la sombra (Gm6) sin celesta; c.8 glissando hasta Do#6 + redoble → vuelve a A |
+
+Curva de RMS: intro **−33,8** · A −21,5 · B −19,6 · C **−17,0**. Polifonía máxima 8 (spc.py).
+
+Orquestación: flute CT 73 (eco) · oboe CT 69 (eco) · **celesta snes 0:8** en bus propio (eco + `pitch 19`:
+la muestra está 19 cents baja respecto al sf2 de CT, medido por FFT; latencia de sox compensada con
+trim/pad) · pizz CT 45 (gotas) · harp CT 46 (eco) · pad CT 48 (díadas) · strings CT 48 (línea lenta,
+doblaje en la cima) · bass CT 33 · timp CT 47.
+
+Empalme del loop: correlación 1,0000 · ΔRMS 0,0 dB · salto 0,0027 (RMS local 0,084). Avisos que quedan:
+37 «choques» (9ª/11ª/13ª y la 2ª de la célula en el tiempo 3, incluido el #11 Mi sobre Sibmaj7), cruces
+arpa/celesta sobre oboe (orquestación normal) y «corno inglés» para el preset `oboe` 69 (mismo caso que el mapa).
+Limitación: no escuchado; verificación instrumental (informe, piano roll, RMS, FFT, empalme).

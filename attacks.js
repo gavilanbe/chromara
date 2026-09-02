@@ -213,34 +213,78 @@ function* techBrote(users, targets, tech, col) { // el pincel pinta un tallo des
   yield* wait(24); users.forEach(u => u.pose = 'idle'); yield* wait(6); camReset();
 }
 const i2 = (a, b) => Math.random() < .5 ? a : b;
-function* techEclipse(users, t, tech, col) { // la pantalla se oscurece, un disco rojo y otro azul se superponen, y el violeta cae como un tampón de tinta que deja la silueta del enemigo estampada
-  camFocus(t.wx, t.wy, { dist: 90, turn: -.25, h: 50 }); const dark = overlay(80, '#0b0912', .65, 12, 14); Audio.sfx('hum_down');
-  users.forEach(u => u.pose = 'charge'); const discs = users.map(u => ({ u, wx: u.wx, wy: u.wy, wz: u.def.h + 10, col: C(u.color), r: 6 }));
-  const goal = above(t, 1, 0, 0); goal[2] += 40;
-  const df = fx(999, () => { discs.forEach((d, i) => { const c = PJ([d.wx, d.wy, d.wz]); g.fillStyle = d.col; g.beginPath(); g.arc(c[0], c[1], d.r * c[2], 0, 6.29); g.fill(); }); if (discs.length === 2) { const a = PJ([discs[0].wx, discs[0].wy, discs[0].wz]), b = PJ([discs[1].wx, discs[1].wy, discs[1].wz]); const dx = b[0] - a[0], dy = b[1] - a[1], dd = Math.hypot(dx, dy), rr = discs[0].r * a[2]; if (dd < rr * 2) { g.fillStyle = C('violeta'); g.beginPath(); g.arc((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, Math.max(1, rr - dd / 2), 0, 6.29); g.fill(); } } });
-  for (let i = 1; i <= 34; i++) { const k = i / 34; discs.forEach((d, j) => { d.wx = lerp(d.u.wx, goal[0] + (j ? 1 : -1) * 18 * (1 - k), k); d.wy = lerp(d.u.wy, goal[1], k); d.wz = lerp(d.u.def.h + 10, goal[2], k); d.r = 6 + k * 10; }); yield; }
-  Audio.sfx('mix'); B.flash = { col: C('violeta'), a: .4 }; discs.length = 1; discs[0].col = C('violeta'); discs[0].r = 17; discs[0].wx = goal[0]; discs[0].wy = goal[1];
-  const sh = shadowFx(t.wx, t.wy, 6, 999); yield* wait(10);
-  for (let i = 1; i <= 10; i++) { const k = i / 10; discs[0].wz = lerp(goal[2], 2, k * k * k); sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((6 + k * 22) * c[2])); }; yield; }
-  df.dur = 0; sh.dur = 0; Audio.sfx('impact_sub'); Audio.sfx('glass', { when: .1 }); B.hitstop = 10; B.shake = 8; B.slowmo = 16;
-  damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Eclipse'); if (tech.status) t.status[tech.status] = 3; goop(t, C(col), 100);
-  mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * .9, col: ramp(C(col)).dk, grow: 3, life: 200, under: true }); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: t.def.w * .5, col: C(col), grow: 3, life: 200, seed: 3, under: true });
-  burst(t.wx, t.wy, 6, C(col), 16, 2.2, 26, .1); yield* wait(36); users.forEach(u => u.pose = 'idle'); dark.dur = Math.min(dark.dur, dark.t + 14); camReset();
+function* techEclipse(users, t, tech, col) { // Carmín levanta un sol rojo y Añil una luna azul; la luna cruza el cielo, tapa al sol, la sombra barre el campo y en la totalidad el disco violeta cae como un tampón
+  const VI = C('violeta'), red = users.find(u => u.id === 'carmin') || users[0], blue = users.find(u => u.id === 'anil') || users[1] || users[0];
+  camFocus(t.wx, t.wy, { dist: 100, turn: -.25, h: 62, pitch: .58, f: 160 }); users.forEach(u => u.pose = 'charge');
+  const dark = overlay(999, '#0b0912', .72, 40, 14), stars = fx(999, () => { const k = clamp(stars.t / 40, 0, 1), rnd = seeded(77); g.fillStyle = '#f4f0ea'; for (let i = 0; i < 26; i++) { const sx = rnd() * W, sy = rnd() * 60, tw = (Math.sin(stars.t * .2 + i) + 1) * .5; if (rnd() < k) { g.globalAlpha = k * (.4 + tw * .6); g.fillRect(sx | 0, sy | 0, 1, 1); } } g.globalAlpha = 1; });
+  // discos en pantalla: nacen sobre la cabeza de cada uno y suben al cielo
+  const sun = { x: 0, y: 0, r: 4 }, moon = { x: 0, y: 0, r: 4 }, st = { tot: 0, corona: 0 };
+  const rs = PJ(above(red, 1)), bs = PJ(above(blue, 1)); sun.x = rs[0]; sun.y = rs[1] - 6; moon.x = bs[0]; moon.y = bs[1] - 6;
+  const SUNX = W * .38, MOONX = W * .68, SKYY = 34;
+  const discs = fx(999, () => {
+    // sol: disco rojo con rayos
+    const rp = ramp(C('rojo')), bp = ramp(C('azul'));
+    for (let i = 0; i < 12; i++) { const a = i * .52 + discs.t * .03, L = sun.r * (1.5 + .25 * Math.sin(discs.t * .3 + i)); g.strokeStyle = rp.hi; g.globalAlpha = .5; g.lineWidth = 1; g.beginPath(); g.moveTo(sun.x + Math.cos(a) * sun.r, sun.y + Math.sin(a) * sun.r); g.lineTo(sun.x + Math.cos(a) * L, sun.y + Math.sin(a) * L); g.stroke(); } g.globalAlpha = 1;
+    g.fillStyle = rp.out; g.beginPath(); g.arc(sun.x, sun.y, sun.r + 1, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.arc(sun.x, sun.y, sun.r, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.beginPath(); g.arc(sun.x - sun.r * .3, sun.y - sun.r * .3, sun.r * .45, 0, 6.29); g.fill();
+    // corona violeta en la totalidad
+    if (st.corona > 0) { for (let i = 0; i < 16; i++) { const a = i * .39 + discs.t * .05, L = sun.r * (1.6 + st.corona * 1.2 + .3 * Math.sin(discs.t * .4 + i * 2)); g.strokeStyle = i % 2 ? VI : '#f4f0ea'; g.globalAlpha = st.corona * .8; g.lineWidth = 2; g.beginPath(); g.moveTo(sun.x + Math.cos(a) * (sun.r + 1), sun.y + Math.sin(a) * (sun.r + 1)); g.lineTo(sun.x + Math.cos(a) * L, sun.y + Math.sin(a) * L); g.stroke(); } g.globalAlpha = 1; }
+    // luna: disco azul con cráteres; donde se solapa con el sol, violeta
+    g.fillStyle = bp.out; g.beginPath(); g.arc(moon.x, moon.y, moon.r + 1, 0, 6.29); g.fill(); g.fillStyle = bp.base; g.beginPath(); g.arc(moon.x, moon.y, moon.r, 0, 6.29); g.fill(); g.fillStyle = bp.sh; g.beginPath(); g.arc(moon.x + moon.r * .3, moon.y + moon.r * .2, moon.r * .25, 0, 6.29); g.fill(); g.beginPath(); g.arc(moon.x - moon.r * .2, moon.y - moon.r * .4, moon.r * .18, 0, 6.29); g.fill(); g.fillStyle = bp.hi; g.beginPath(); g.arc(moon.x - moon.r * .35, moon.y - moon.r * .3, moon.r * .3, 0, 6.29); g.fill();
+    const d = Math.hypot(sun.x - moon.x, sun.y - moon.y); if (d < sun.r + moon.r) { g.save(); g.beginPath(); g.arc(sun.x, sun.y, sun.r, 0, 6.29); g.clip(); g.fillStyle = VI; g.beginPath(); g.arc(moon.x, moon.y, moon.r, 0, 6.29); g.fill(); g.fillStyle = ramp(VI).hi; g.globalAlpha = .6; g.beginPath(); g.arc(moon.x - moon.r * .3, moon.y - moon.r * .3, moon.r * .3, 0, 6.29); g.fill(); g.globalAlpha = 1; g.restore(); }
+  });
+  Audio.sfx('charge', { semi: 0 }); Audio.sfx('charge', { semi: 7, when: .1 });
+  for (let i = 1; i <= 30; i++) { const k = i / 30, e = k * k * (3 - 2 * k); sun.x = lerp(rs[0], SUNX, e); sun.y = lerp(rs[1] - 6, SKYY, e); sun.r = 4 + e * 12; moon.x = lerp(bs[0], MOONX, e); moon.y = lerp(bs[1] - 6, SKYY, e); moon.r = 4 + e * 12; users.forEach(u => u.wz = Math.sin(i * .5) * 2);
+    if (i % 3 === 0) { B.particles.push({ wx: red.wx + R(-6, 6), wy: red.wy, wz: red.def.h, vx: 0, vy: 0, vz: R(1, 2), g: -.02, col: C('rojo'), t: 0, life: 16 }); B.particles.push({ wx: blue.wx + R(-6, 6), wy: blue.wy, wz: blue.def.h, vx: 0, vy: 0, vz: R(1, 2), g: -.02, col: C('azul'), t: 0, life: 16 }); } yield; }
+  users.forEach(u => u.wz = 0); yield* wait(8);
+  // la luna cruza y tapa al sol; la sombra del eclipse barre el suelo hacia el objetivo
+  Audio.sfx('hum_down'); const pc = partyC(), shade = fx(999, () => { const k = clamp(shade.t / 40, 0, 1), c = PJ([lerp(pc[0], t.wx, k), lerp(pc[1], t.wy, k), 0]); g.fillStyle = 'rgba(11,9,18,.55)'; g.beginPath(); g.ellipse(c[0], c[1], 70 * c[2], 26 * c[2], 0, 0, 6.29); g.fill(); }, true);
+  for (let i = 1; i <= 40; i++) { const k = i / 40, e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; moon.x = lerp(MOONX, SUNX, e); st.tot = clamp((k - .75) / .25, 0, 1); if (i === 34) { Audio.sfx('glass'); B.hitstop = 6; } yield; }
+  shade.dur = 0; st.corona = 1; Audio.sfx('mix'); B.flash = { col: VI, a: .5 }; B.slowmo = 14; B.shake = 3;
+  for (let i = 0; i < 18; i++) { st.corona = 1 + Math.sin(i * .5) * .3; yield; }
+  // totalidad: el disco cae sobre el objetivo como un tampón
+  const drop = { k: 0 }, sh = shadowFx(t.wx, t.wy, 6, 999), goal = PJ(above(t, .5));
+  const fall = fx(999, () => { const k = drop.k, x = lerp(SUNX, goal[0], k), y = lerp(SKYY, goal[1], k * k), r = lerp(16, 24, k); for (let j = 1; j <= 4; j++) { g.globalAlpha = .18 * (5 - j) / 4; g.fillStyle = VI; g.beginPath(); g.arc(lerp(SUNX, goal[0], Math.max(0, k - j * .06)), lerp(SKYY, goal[1], Math.pow(Math.max(0, k - j * .06), 2)), r, 0, 6.29); g.fill(); } g.globalAlpha = 1; g.fillStyle = ramp(VI).out; g.beginPath(); g.arc(x, y, r + 1, 0, 6.29); g.fill(); g.fillStyle = VI; g.beginPath(); g.arc(x, y, r, 0, 6.29); g.fill(); g.fillStyle = ramp(VI).hi; g.beginPath(); g.arc(x - r * .3, y - r * .3, r * .3, 0, 6.29); g.fill(); });
+  discs.dur = 0; Audio.sfx('drop_fall'); for (let i = 1; i <= 12; i++) { drop.k = i / 12; sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((6 + drop.k * 30) * c[2])); }; yield; }
+  fall.dur = 0; sh.dur = 0; Audio.sfx('impact_sub'); Audio.sfx('glass', { when: .1 }); B.hitstop = 12; B.shake = 9; B.slowmo = 16; B.flash = { col: '#f4f0ea', a: .6 };
+  damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Eclipse'); if (tech.status) t.status[tech.status] = 3; num(t, 'LENTO', VI); goop(t, VI, 120);
+  const ring = fx(24, () => { const c = project(t.wx, t.wy, 0); if (!c) return; const q = ring.t / 24; g.strokeStyle = VI; g.lineWidth = 3; g.globalAlpha = 1 - q; g.beginPath(); g.ellipse(c[0], c[1], (8 + q * 90) * c[2], (3 + q * 34) * c[2], 0, 0, 6.29); g.stroke(); g.strokeStyle = '#f4f0ea'; g.lineWidth = 1; g.beginPath(); g.ellipse(c[0], c[1], (4 + q * 70) * c[2], (2 + q * 26) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
+  mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * 1.1, col: ramp(VI).dk, grow: 3, life: 220, under: true }); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: t.def.w * .6, col: VI, grow: 3, life: 220, seed: 3, under: true });
+  burst(t.wx, t.wy, 6, VI, 24, 2.6, 30, .1); burst(t.wx, t.wy, t.def.h, '#f4f0ea', 8, 1.5, 20, .05); drips(t.wx, t.wy, t.def.h * .9, VI, 10);
+  yield* wait(30);
+  // el cielo vuelve: el sol y la luna se deshacen en partículas que regresan a cada uno
+  dark.dur = Math.min(dark.dur, dark.t + 16); stars.dur = Math.min(stars.dur, stars.t + 12);
+  for (let i = 0; i < 14; i++) { B.particles.push({ wx: red.wx + R(-10, 10), wy: red.wy, wz: red.def.h + 30 - i * 2, vx: 0, vy: 0, vz: -R(.6, 1.4), g: .02, col: C('rojo'), t: 0, life: 18 }); B.particles.push({ wx: blue.wx + R(-10, 10), wy: blue.wy, wz: blue.def.h + 30 - i * 2, vx: 0, vy: 0, vz: -R(.6, 1.4), g: .02, col: C('azul'), t: 0, life: 18 }); yield; }
+  users.forEach(u => u.pose = 'idle'); yield* wait(10); camReset();
 }
-function* techArcoiris(users, targets, tech, col) { // los tres orbitan, la pantalla se vuelve papel blanco, un prisma dibuja una cinta de arcoíris que barre el campo y colorea a los enemigos hasta borrarlos
-  const ec = enemyC(), pc = partyC(), mid = [(ec[0] + pc[0]) / 2, (ec[1] + pc[1]) / 2]; camFocus(mid[0], mid[1], { dist: 150, turn: 0, h: 96, pitch: .7, f: 170 });
+function* techArcoiris(users, targets, tech, col) { // los tres suben en triángulo y vierten su color en un orbe blanco; nace un prisma que recibe la luz y la abre en seis haces hasta cada enemigo; un arco cruza el cielo y llueve color
+  const ec = enemyC(), pc = partyC(), mid = [(ec[0] + pc[0]) / 2, (ec[1] + pc[1]) / 2]; camFocus(mid[0], mid[1], { dist: 150, turn: 0, h: 100, pitch: .7, f: 170 });
+  const RB = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].map(C);
   users.forEach(u => u.pose = 'charge'); Audio.sfx('charge', { semi: 0 }); Audio.sfx('charge', { semi: 4, when: .1 }); Audio.sfx('charge', { semi: 7, when: .2 });
-  const home = users.map(u => [u.wx, u.wy]);
-  for (let i = 0; i < 60; i++) { const k = i / 60; users.forEach((u, j) => { const a = k * k * 16 + j * 2.09, r = lerp(30, 12, k); u.wx = lerp(home[j][0], mid[0] + Math.cos(a) * r, Math.min(1, k * 3)); u.wy = lerp(home[j][1], mid[1] + Math.sin(a) * r * .6, Math.min(1, k * 3)); u.wz = 20 + Math.sin(a) * 6; if (i % 2 === 0) B.particles.push({ wx: u.wx, wy: u.wy, wz: u.wz + 8, vx: 0, vy: 0, vz: .6, g: -.01, col: C(u.color), t: 0, life: 14 }); }); yield; }
-  const paper = overlay(90, '#f1e9d6', .85, 10, 16); Audio.sfx('rainbow'); B.rainbow = 40;
-  const RB = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].map(C), pr = { k: 0 };
-  const prism = fx(999, () => { const c = PJ([mid[0], mid[1], 26]); g.fillStyle = '#f4f0ea'; g.beginPath(); g.moveTo(c[0], c[1] - 12); g.lineTo(c[0] + 11, c[1] + 8); g.lineTo(c[0] - 11, c[1] + 8); g.closePath(); g.fill(); g.strokeStyle = '#2a2438'; g.lineWidth = 1; g.stroke();
-    for (const t of targets) { const e = PJ(above(t, .5)); const n = Math.round(60 * pr.k); for (let i = 0; i < n; i++) { const k = i / 60, x = lerp(c[0], e[0], k), y = lerp(c[1], e[1], k) - Math.sin(k * Math.PI) * 40; RB.forEach((cc, j) => { g.fillStyle = cc; g.fillRect(Math.round(x), Math.round(y) + j * 2 - 6, 2, 2); }); } } });
-  yield* wait(8); for (let i = 1; i <= 34; i++) { pr.k = i / 34; yield; } yield* wait(6);
-  B.flash = { col: '#ffffff', a: .8 }; B.shake = 4; Audio.sfx('mix'); B.slowmo = 12;
-  for (let i = 0; i < 30; i++) { for (const t of targets) { t.goop = null; goop(t, RB[i % 6], 30); if (i === 10) { damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Arcoíris'); } if (i % 3 === 0) burst(t.wx, t.wy, t.def.h * .5, RB[i % 6], 6, 1.5, 20, .05); } yield; }
-  prism.dur = 0; paper.dur = Math.min(paper.dur, paper.t + 16); yield* wait(24);
-  users.forEach((u, j) => { u.wz = 0; u.pose = 'idle'; }); for (const u of users) yield* whop(u, u.hx, u.hy, 8, 6); camReset();
+  const home = users.map(u => [u.wx, u.wy]), orb = { wz: 72, r: 0, white: 0 };
+  const orbFx = fx(999, () => { if (orb.r <= 0) return; const c = PJ([mid[0], mid[1], orb.wz]), r = orb.r * c[2]; g.fillStyle = orb.white > 0 ? `rgba(244,240,234,${orb.white})` : 'rgba(244,240,234,.5)'; g.beginPath(); g.arc(c[0], c[1], r, 0, 6.29); g.fill(); users.forEach((u, j) => { g.globalAlpha = .7 * (1 - orb.white); g.fillStyle = C(u.color); g.beginPath(); g.arc(c[0] + Math.cos(orbFx.t * .2 + j * 2.09) * r * .4, c[1] + Math.sin(orbFx.t * .2 + j * 2.09) * r * .4, r * .45, 0, 6.29); g.fill(); }); g.globalAlpha = 1; g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.arc(c[0], c[1], r + 1, 0, 6.29); g.stroke(); });
+  // 1) suben en triángulo girando cada vez más rápido y vierten su color
+  for (let i = 0; i < 56; i++) { const k = i / 56; users.forEach((u, j) => { const a = k * k * 18 + j * 2.09, r = lerp(34, 16, k); u.wx = lerp(home[j][0], mid[0] + Math.cos(a) * r, Math.min(1, k * 3)); u.wy = lerp(home[j][1], mid[1] + Math.sin(a) * r * .6, Math.min(1, k * 3)); u.wz = 18 + k * 48 + Math.sin(a) * 4; if (i > 14 && i % 2 === 0) B.particles.push({ wx: u.wx, wy: u.wy, wz: u.wz + u.def.h * .5, tx: mid[0], ty: mid[1], tz: orb.wz, col: C(u.color), t: 0, life: 12, dur: 12, arc: 0, stream: true }); }); if (i > 14) orb.r = Math.min(14, orb.r + .5); yield; }
+  Audio.sfx('mix'); B.slowmo = 10; for (let i = 1; i <= 10; i++) { orb.white = i / 10; orb.r = 14 + i; yield; }
+  // 2) papel: la pantalla se vuelve hoja en blanco y el orbe cristaliza en un prisma
+  const paper = overlay(999, '#f1e9d6', .82, 12, 18); B.flash = { col: '#ffffff', a: .9 }; Audio.sfx('glass'); Audio.sfx('rainbow');
+  orbFx.dur = 0; const pr = { spin: 0, k: 0, beams: 0 }, prismP = () => PJ([mid[0], mid[1], orb.wz]);
+  const prism = fx(999, () => { const c = prismP(), s = c[2] * 18, a = pr.spin, pts = [[0, -1.1], [1, .7], [-1, .7]].map(([x, y]) => [c[0] + (x * Math.cos(a) - y * Math.sin(a)) * s, c[1] + (x * Math.sin(a) + y * Math.cos(a)) * s * .9]);
+    // luz blanca que entra desde arriba
+    if (pr.k > 0) { g.globalAlpha = .55 * pr.k; g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(c[0] - 3, -2); g.lineTo(c[0] + 3, -2); g.lineTo(c[0] + 1, c[1] - s); g.lineTo(c[0] - 1, c[1] - s); g.closePath(); g.fill(); g.globalAlpha = 1; }
+    g.fillStyle = 'rgba(244,240,234,.85)'; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[1][0], pts[1][1]); g.lineTo(pts[2][0], pts[2][1]); g.closePath(); g.fill(); g.strokeStyle = '#2a2438'; g.lineWidth = 1.5; g.stroke(); g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.moveTo(pts[0][0] + 2, pts[0][1] + 4); g.lineTo(pts[2][0] + 5, pts[2][1] - 3); g.stroke();
+    // seis haces abriéndose hasta cada enemigo
+    if (pr.beams > 0) for (const t of targets) { const e = PJ([t.wx, t.wy, 0]), w = t.def.w * .6 * e[2]; for (let j = 0; j < 6; j++) { const q = clamp(pr.beams - j * .06, 0, 1); if (q <= 0) continue; const x0 = c[0] + (j - 2.5) * 2, y0 = c[1] + 4, x1 = lerp(x0, e[0] + (j - 2.5) * (w / 3), q), y1 = lerp(y0, e[1] - 2, q); g.globalAlpha = .55 + .2 * Math.sin(prism.t * .4 + j); g.fillStyle = RB[j]; g.beginPath(); g.moveTo(x0 - 1, y0); g.lineTo(x0 + 1, y0); g.lineTo(x1 + w / 6 * .8, y1); g.lineTo(x1 - w / 6 * .8, y1); g.closePath(); g.fill(); } g.globalAlpha = 1; }
+  });
+  for (let i = 1; i <= 16; i++) { pr.spin += .35; pr.k = i / 16; yield; }
+  for (let i = 1; i <= 24; i++) { pr.spin += .12; pr.beams = i / 20; if (i % 4 === 0) Audio.sfx('cursor', { semi: [0, 2, 4, 5, 7, 9][(i / 4 - 1) % 6], vol: .5 }); yield; }
+  // 3) los enemigos se pintan de arriba abajo con todos los colores y estallan
+  B.slowmo = 12; for (let i = 0; i < 30; i++) { for (const t of targets) { t.goop = null; goop(t, RB[i % 6], 30); if (i === 12) { B.shake = 6; damage(t, baseDmg(users.reduce((s, u) => s + u.atk, 0) / users.length, t.dfn, tech.power), col, 'Arcoíris'); } if (i % 3 === 0) burst(t.wx, t.wy, t.def.h * .6, RB[i % 6], 6, 1.6, 22, .05); } pr.spin += .2; yield; }
+  // 4) el arco cruza el cielo y llueve color; charcos de seis colores
+  prism.dur = 0; paper.dur = Math.min(paper.dur, paper.t + 30); B.rainbow = 40; Audio.sfx('rainbow'); Audio.sfx('heal_bells', { when: .4 });
+  const arc = fx(90, () => { const k = clamp(arc.t / 30, 0, 1), fade = arc.t > 70 ? (90 - arc.t) / 20 : 1; g.globalAlpha = fade * .9; RB.forEach((cc, j) => { g.strokeStyle = cc; g.lineWidth = 4; g.beginPath(); g.ellipse(W / 2, 128, 150 - j * 4, 104 - j * 4, 0, Math.PI, Math.PI + Math.PI * k); g.stroke(); }); const rnd = seeded(arc.t >> 2); g.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) { const a = Math.PI + rnd() * Math.PI * k, r = 150 - rnd() * 24; const x = W / 2 + Math.cos(a) * r, y = 128 + Math.sin(a) * r * .69; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; });
+  for (let i = 0; i < 40; i++) { for (let j = 0; j < 3; j++) B.particles.push({ wx: ec[0] + R(-70, 70), wy: ec[1] + R(-30, 30), wz: 80 + R(0, 20), vx: 0, vy: 0, vz: -R(1.5, 2.5), g: .05, col: RB[RI(0, 5)], t: 0, life: 40, size: 2 }); if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-60, 60), ec[1] + R(-24, 24), 0], w: R(6, 12), col: RB[i / 5 % 6 | 0], grow: 8, life: 200, under: true }); yield; }
+  users.forEach((u, j) => { u.pose = 'happy'; }); for (let i = 1; i <= 14; i++) { users.forEach((u, j) => { const k = i / 14; u.wx = lerp(u.wx, u.hx, .2); u.wy = lerp(u.wy, u.hy, .2); u.wz = Math.max(0, (1 - k) * 30 * (1 - k)); }); yield; }
+  users.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); yield* wait(20); users.forEach(u => u.pose = 'idle'); camReset();
 }
 // =====================================================================
 // Despacho de acciones
