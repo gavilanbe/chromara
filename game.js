@@ -748,6 +748,24 @@ function updateCover() {
   if (t === 146) { Audio.sfx('impact_sub', { vol: .5 }); Audio.sfx('plop', { semi: 2, when: .03 }); for (let i = 0; i < 12; i++) COVER.dust.push({ x: W / 2 + 64 + R(-30, 30), y: 118 + R(-6, 6), vx: R(-1.4, 1.4), vy: -R(.2, 1.2), t: 0, life: RI(12, 20), col: '#e9e1cc' }); } // el sticker se pega
   if (ANYKEY) { ANYKEY = false; if (!done) { COVER.t = 175; Audio.sfx('page', { vol: .4 }); } else { COVER.open = COVER.t; Audio.sfx('page'); for (const k in pressed) pressed[k] = false; } }
 }
+// Letras manuscritas como trazos (rejilla 8×14: ascendente 0, altura de x 4, base 10, descendente 14). Cada letra = lista de trazos (polilíneas).
+const arcPts = (cx, cy, r, a0, a1, n = 14) => { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); } return o; };
+const HAND = {
+  g: [[...arcPts(3.5, 7, 3, 0, -6.28), [6.5, 4.5], [6.5, 12], ...arcPts(4, 12, 2.5, 0, 3.14)]],
+  a: [[...arcPts(3.5, 7, 3, 0, -6.28), [6.5, 4.5], [6.5, 10], [8, 9.4]]],
+  v: [[[0.5, 4], [3.5, 10], [6.5, 4]]],
+  i: [[[3.5, 4], [3.5, 10], [5.2, 9.4]], [[3.5, 1.4], [3.6, 2.2]]],
+  l: [[[3, 0], [3, 9.4], [3.6, 10.1], [5.6, 9.6]]],
+  n: [[[1, 4], [1, 10], [1, 6.6], ...arcPts(4, 7, 3, 3.14, 6.28), [7, 10]]],
+  b: [[[1, 0], [1, 10], [1, 7], ...arcPts(4, 7, 3, 3.14, -3.14)]],
+  e: [[[1, 7], [7, 7], ...arcPts(4, 7, 3, 0, -5.3)]],
+};
+function coverStrokes() { // trazos de "gavilanbe" en pantalla, con longitudes acumuladas
+  if (COVER.strokes) return COVER.strokes;
+  const word = 'gavilanbe', S = 2.2, cw = 19, x0 = W / 2 - word.length * cw / 2 + 2, ty = 60, out = []; let acc = 0;
+  word.split('').forEach((ch, i) => { for (const st of HAND[ch]) { const pts = st.map(([x, y]) => [x0 + i * cw + x * S, ty + y * S]); let len = 0; for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); out.push({ pts, len, start: acc, letter: i }); acc += len + 6; } });
+  return COVER.strokes = { list: out, total: acc, x0, ty, cw, S };
+}
 function drawCoverArt(t) { // tapa de cartón con anillas y una etiqueta donde un lápiz escribe "gavilanbe" a mano; luego un sticker de "presenta" se pega de un golpe
   g.fillStyle = '#7a5a3a'; g.fillRect(0, 0, W, H); const rnd = seeded(21); g.fillStyle = '#8a6a48'; for (let i = 0; i < 1800; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1); g.fillStyle = '#5e4229'; for (let i = 0; i < 500; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
   g.fillStyle = '#5e4229'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.fillRect(W - 2, 0, 2, H);
@@ -755,18 +773,20 @@ function drawCoverArt(t) { // tapa de cartón con anillas y una etiqueta donde u
   const writing = t > 20 && t < 112, slap = t >= 140 && t < 152, shx = writing && t % 4 === 0 ? R(-.6, .6) : slap ? R(-1.5, 1.5) * (1 - (t - 140) / 12) : 0, shy = slap ? R(-1, 1) * (1 - (t - 140) / 12) : 0;
   g.save(); g.translate(Math.round(shx), Math.round(shy));
   page(66, 56, 188, 66); tape(60, 52, 40, 9); tape(220, 52, 40, 9);
-  const word = 'gavilanbe', cw = 16, x0 = W / 2 - word.length * cw / 2, ty = 74;
+  const CS = coverStrokes(), word = 'gavilanbe', cw = CS.cw, x0 = CS.x0, ty = CS.ty + 14;
   // línea guía a lápiz, muy tenue, que aparece antes de escribir
-  const gk = clamp((t - 8) / 12, 0, 1); if (gk > 0) { g.fillStyle = '#c9bd9c'; g.fillRect(x0 - 4, ty + 17, Math.round((word.length * cw + 8) * gk), 1); }
-  // letras: cada una se descubre con el lápiz y hace un pequeño pop al terminar
-  let penX = x0, penY = ty + 14, lifting = true;
-  word.split('').forEach((ch, i) => { const li = clamp((t - 20 - i * 10) / 10, 0, 1); if (li <= 0) return; const since = t - 20 - (i + 1) * 10, pop = since >= 0 && since < 6 ? 1 + Math.sin(since / 6 * Math.PI) * .18 : 1;
-    g.save(); g.beginPath(); g.rect(x0 + i * cw - 1, ty - 6, Math.round(cw * li) + 1, 26); g.clip(); g.translate(x0 + i * cw + cw / 2, ty + 8); g.scale(2 * pop, 2 * pop); txt(ch, -4, -4, INK, '#c9bd9c'); g.restore();
-    if (li < 1) { penX = x0 + i * cw + cw * li; penY = ty + 14 + Math.sin(t * 1.7) * 2.2; lifting = false; } });
+  const gk = clamp((t - 8) / 12, 0, 1); if (gk > 0) { g.fillStyle = '#c9bd9c'; g.fillRect(x0 - 4, ty + 9, Math.round((word.length * cw + 8) * gk), 1); }
+  // el lápiz recorre los trazos: los completos se dibujan enteros, el actual hasta donde va la punta
+  const prog = clamp((t - 20) / 90, 0, 1), dist = prog * CS.total; let penX = x0, penY = ty + 8, lifting = true;
+  for (const st of CS.list) { if (dist <= st.start) break; const k = clamp((dist - st.start) / st.len, 0, 1); const S2 = st.pts; g.fillStyle = INK;
+    for (let i = 1; i < S2.length; i++) { const segEnd = i / (S2.length - 1), segStart = (i - 1) / (S2.length - 1); if (k <= segStart) break; const kk = clamp((k - segStart) / (segEnd - segStart), 0, 1); const ex = lerp(S2[i - 1][0], S2[i][0], kk), ey = lerp(S2[i - 1][1], S2[i][1], kk); pstroke(S2[i - 1][0], S2[i - 1][1], ex, ey, 2, INK, 1, 0, false); }
+    if (k < 1) { const q = pointAt(S2, k); penX = q[0]; penY = q[1]; lifting = false; } }
+  if (prog >= 1) { lifting = true; }
+  if (t > 20 && t < 112 && lifting) { const nx = CS.list.find(st => st.start >= dist); if (nx) { penX = nx.pts[0][0]; penY = nx.pts[0][1] - 4; } }
   // subrayado a mano al acabar, y floritura: el lápiz sube girando y se va
-  const uk = clamp((t - 112) / 12, 0, 1); if (uk > 0) { g.fillStyle = INK; for (let i = 0; i < Math.round((word.length * cw + 6) * uk); i++) g.fillRect(x0 - 3 + i, ty + 19 + Math.round(Math.sin(i * .35) * 1.2), 1, 1); if (uk < 1) { penX = x0 - 3 + (word.length * cw + 6) * uk; penY = ty + 20; lifting = false; } }
+  const uk = clamp((t - 112) / 12, 0, 1); if (uk > 0) { g.fillStyle = INK; for (let i = 0; i < Math.round((word.length * cw + 6) * uk); i++) g.fillRect(x0 - 3 + i, ty + 12 + Math.round(Math.sin(i * .35) * 1.2), 1, 1); if (uk < 1) { penX = x0 - 3 + (word.length * cw + 6) * uk; penY = ty + 13; lifting = false; } }
   if (t > 20 && t < 140) { const img = propSprite('lapiz', C('amarillo')), P = PROP.lapiz, fk = clamp((t - 124) / 16, 0, 1), lift = lifting && uk >= 1 ? 1 : 0;
-    const px = lift ? lerp(x0 + word.length * cw + 4, W + 40, fk * fk) : penX, py = lift ? lerp(ty + 20, -30, fk) : penY - (lifting && uk < 1 ? 5 : 0), ang = lift ? -.95 + fk * 5 : -.95 + Math.sin(t * .8) * .06;
+    const px = lift ? lerp(x0 + word.length * cw + 4, W + 40, fk * fk) : penX, py = lift ? lerp(ty + 13, -30, fk) : penY, ang = lift ? -.95 + fk * 5 : -.95 + Math.sin(t * .8) * .05;
     drawProp(img, px, py, ang, 1, P.tip[0], P.tip[1], 1, lift ? 1 - fk * .6 : 1); if (!lifting && t % 2 === 0) COVER.dust.push({ x: penX + R(-2, 2), y: penY - 1, vx: R(-.5, .5), vy: -R(.3, .9), t: 0, life: RI(8, 14), col: '#6a6480' }); }
   g.restore();
   // sticker de "presenta": estrella troquelada con borde blanco, se pega de un golpe girando, luego brilla y se menea
