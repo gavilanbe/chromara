@@ -488,7 +488,7 @@ function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 
 // =====================================================================
 // 3. Estado global de partida
 // =====================================================================
-const Game = { state: 'title', t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), bossDown: false, intro: true, debug: false };
+const Game = { state: 'cover', t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), bossDown: false, intro: true, debug: false };
 function effStats(p) { // base + arma + accesorio
   const wpn = DATA.weapons[p.weapon] || {}, acc = DATA.accessories[p.acc] || {};
   const s = { hp: p.hp, mp: p.mp, atk: p.atk, def: p.def, spd: p.spd };
@@ -516,9 +516,9 @@ function walkable(px, py) { // hitbox pies 8×6
 function updateOverworld() {
   OW.t++;
   if (OW.landT > 0) { // entrada: caen del cielo y salpican, uno tras otro
-    OW.landT--; OW.landZ = OW.landZ || [0, 0, 0];
+    if (OW.landT > 900) return; OW.landT--; OW.landZ = OW.landZ || [0, 0, 0];
     Party.forEach((p, i) => { const k = clamp((48 - OW.landT - i * 6) / 26, 0, 1); OW.landZ[i] = k >= 1 ? 0 : 120 * (1 - k * k); if (k >= 1 && !OW.landed[i]) { OW.landed[i] = 1; Audio.sfx('plop', { semi: [0, 4, 7][i] }); for (let j = 0; j < 8; j++) OW.dust.push({ x: OW.x - i * 12 + R(-4, 4), y: OW.y + 1, vx: R(-1.2, 1.2), vy: -R(.5, 1.6), col: C(p.color), t: 0, life: RI(12, 20) }); } });
-    if (OW.landT === 0) { OW.landZ = null; Audio.play('map'); }
+    if (OW.landT === 0) { OW.landZ = null; Audio.play('map'); Audio.sfx('page', { vol: .4 }); }
     for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life);
     return;
   }
@@ -581,7 +581,7 @@ function drawOverworld() {
   }
   for (const p of OW.puddles || []) { const x = p.x - cx, y = p.y - cy; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue; g.fillStyle = ramp(p.col).sh; g.beginPath(); g.ellipse(x, y + 2, p.w, p.w * .45, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).base; g.beginPath(); g.ellipse(x - 1, y + 1, p.w - 2, p.w * .4 - 1, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).hi; g.fillRect(x - p.w * .5 | 0, y - 1, 3, 1); }
   // grupo: líder y seguidores por la estela (estilo CT), cada uno mirando hacia donde avanza
-  Party.forEach((p, i) => {
+  if (!(OW.landT > 900)) Party.forEach((p, i) => {
     let x = OW.x, y = OW.y, dir = OW.dir || 'down';
     if (i > 0) { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)], h2 = OW.hist[Math.min(OW.hist.length - 1, i * 12 + 4)]; if (h) { x = h[0]; y = h[1]; if (h2) { const ddx = h[0] - h2[0], ddy = h[1] - h2[1]; if (Math.abs(ddx) + Math.abs(ddy) > .5) dir = Math.abs(ddx) >= Math.abs(ddy) ? (ddx < 0 ? 'left' : 'right') : (ddy < 0 ? 'up' : 'down'); else dir = OW.dir || 'down'; } } else { x = OW.x - i * 12; } }
     const moving = OW.moving && (i === 0 || OW.hist.length > i * 12);
@@ -684,22 +684,52 @@ function drawLogo(t, x0, y0) {
   for (const d of TITLE.drips || []) { d.t++; d.vy += .05; d.y += d.vy; g.fillStyle = ramp(d.col).out; g.fillRect(Math.round(d.x) - 1, Math.round(d.y), 3, 3); g.fillStyle = ramp(d.col).base; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 2); g.fillStyle = ramp(d.col).hi; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
   TITLE.drips = (TITLE.drips || []).filter(d => d.y < 118);
 }
+// ---- Portada: el cuaderno cerrado. Cualquier tecla lo abre (y desbloquea el audio del navegador); la tapa se pasa y empieza el título con sonido.
+const COVER = { t: 0, open: 0 };
+function updateCover() {
+  COVER.t++;
+  if (COVER.open) { if (COVER.t - COVER.open === 1) { Audio.sfx('book_open'); } if (COVER.t - COVER.open >= 22) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; Audio.play((typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES.title) ? 'title' : 'map'); } return; }
+  if (Object.keys(pressed).some(k => pressed[k])) { COVER.open = COVER.t; Audio.sfx('page'); for (const k in pressed) pressed[k] = false; }
+}
+function drawCover() {
+  const t = COVER.t, k = COVER.open ? clamp((t - COVER.open) / 20, 0, 1) : 0, e = k * k * (3 - 2 * k);
+  if (k > 0) { TITLE.t = 0; drawTitle(); TITLE.t = 0; } // debajo, la primera página del título
+  const wdt = Math.max(1, Math.round(W * (1 - e)));
+  g.save(); g.beginPath(); g.rect(0, 0, wdt, H); g.clip();
+  // tapa de cartón con grano, anillas y etiqueta
+  g.fillStyle = '#7a5a3a'; g.fillRect(0, 0, W, H); const rnd = seeded(21); g.fillStyle = '#8a6a48'; for (let i = 0; i < 1800; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1); g.fillStyle = '#5e4229'; for (let i = 0; i < 500; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
+  g.fillStyle = '#5e4229'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.fillRect(W - 2, 0, 2, H);
+  for (let y = 10; y < H - 6; y += 12) { g.fillStyle = '#2a1a10'; g.fillRect(6, y, 5, 4); g.fillStyle = '#8c8ab0'; g.fillRect(2, y - 2, 9, 2); g.fillRect(2, y - 2, 2, 6); g.fillStyle = '#e8e6f0'; g.fillRect(3, y - 2, 5, 1); }
+  // etiqueta de papel pegada con cinta, con el logo y los tres
+  page(66, 46, 190, 92); tape(60, 42, 40, 9); tape(222, 42, 40, 9);
+  const lw = 8 * 23; let x0 = W / 2 - lw / 2 + 2; TITLE.letters.split('').forEach((ch, i) => { const spr = logoLetter(ch, C(TITLE.cols[i])); g.globalAlpha = .35; g.drawImage(spr, x0 + i * 23 + 2, 60 + 3); g.globalAlpha = 1; g.drawImage(spr, x0 + i * 23, 60); });
+  ui('cuaderno de pintor', W / 2 - 72, 92, TXT2);
+  DATA.party.forEach((p, i) => { const x = W / 2 - 40 + i * 40, hop = Math.abs(Math.sin(t * .08 + i * 1.2)) * 2; shadow(x, 128, 10); drawSprite(buildSprite(`${p.id}_front_mini`, C(p.color), null, { eyes: ((t + i * 50) % 160) < 6 ? 'blink' : 'normal' }), x, 128 - hop, 1.5, false, 1); });
+  if ((t / 30 | 0) % 2 && !COVER.open) { tape(W / 2 - 66, 150, 132, 14); ui('PULSA UNA TECLA', W / 2 - 60, 153, TXT); }
+  txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#c9a878', null);
+  g.restore();
+  if (k > 0) { const gr = g.createLinearGradient(wdt, 0, Math.min(W, wdt + 30), 0); gr.addColorStop(0, 'rgba(11,9,18,.55)'); gr.addColorStop(1, 'rgba(11,9,18,0)'); g.fillStyle = gr; g.fillRect(wdt, 0, 30, H); g.fillStyle = '#5e4229'; g.fillRect(wdt - 2, 0, 3, H); }
+}
 function updateTitle() {
   TITLE.t++;
-  if (TITLE.exit) { const ex = TITLE.t - TITLE.exit; if (ex === 14) Audio.sfx('fall'); if (ex === 30) Audio.sfx('hum_down', { vol: .5 }); if (ex >= 92) { TITLE.exit = 0; initOverworld(); OW.landT = 48; setState('overworld'); } return; }
-  if (hit('ok')) { if (TITLE.t < 350) { TITLE.t = 350; Audio.sfx('page'); return; } TITLE.exit = TITLE.t; Audio.sfx('confirm', { semi: 0 }); Audio.sfx('confirm', { semi: 4, when: .08 }); Audio.sfx('confirm', { semi: 7, when: .16 }); Audio.stop(); }
+  if (TITLE.exit) { const ex = TITLE.t - TITLE.exit; if (ex === 20) Audio.sfx('slow_drip', { vol: .5 }); if (ex >= 62) { TITLE.exit = 0; TITLE.snap = null; OW.landT = 48; OW.msgHold = false; setState('overworld'); } return; }
+  if (hit('ok')) { if (TITLE.t < 350) { TITLE.t = 350; Audio.sfx('page'); return; } TITLE.exit = TITLE.t; Audio.sfx('confirm', { semi: 0 }); Audio.sfx('confirm', { semi: 4, when: .08 }); Audio.sfx('confirm', { semi: 7, when: .16 }); }
 }
 function drawTitle() {
   const t = TITLE.t, cam = TITLE.cam;
   // vuelo lento sobre el mapa: la cámara orbita el lago
   const ex = TITLE.exit ? t - TITLE.exit : 0;
-  if (!TITLE.exit) { cam.yaw += .0035; cam.x = 300 + Math.cos(cam.yaw) * -150; cam.y = 200 + Math.sin(cam.yaw) * -150; Object.assign(SCENE.cam, cam); }
-  else { // picado hasta la vista cenital sobre el punto de inicio
-    const sx = MAP.spawn[0] * TILE + 8, sy = MAP.spawn[1] * TILE + 12, camX = clamp(Math.round(sx - W / 2), 0, MAP.w * TILE - W), camY = clamp(Math.round(sy - H / 2), 0, MAP.h * TILE - H);
-    const top = { x: camX + W / 2, y: camY + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 110, f: 110, hy: 90 }, q = clamp((ex - 16) / 70, 0, 1), e2 = q * q * (3 - 2 * q);
-    if (!TITLE.from) TITLE.from = Object.assign({}, cam);
-    const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(TITLE.from[key], top[key], e2); let d = top.yaw - TITLE.from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = TITLE.from.yaw + d * e2;
+  // salida: al pasar la página, debajo está el mapa. Se guarda la última imagen del título y se dobla hacia la izquierda.
+  if (ex >= 34) {
+    if (!TITLE.snap) { TITLE.snap = document.createElement('canvas'); TITLE.snap.width = W; TITLE.snap.height = H; TITLE.snap.getContext('2d').drawImage(buf, 0, 0); initOverworld(); OW.landT = 999; OW.msgHold = true; Audio.sfx('page'); }
+    drawOverworld();
+    const q = clamp((ex - 34) / 26, 0, 1), e2 = q * q * (3 - 2 * q), k = 1 - e2, wdt = Math.max(1, Math.round(W * k));
+    g.save(); g.globalAlpha = 1; g.drawImage(TITLE.snap, 0, 0, W, H, 0, 0, wdt, H); g.fillStyle = 'rgba(11,9,18,' + (.45 * e2).toFixed(2) + ')'; g.fillRect(0, 0, wdt, H); g.restore();
+    const gr = g.createLinearGradient(wdt, 0, Math.min(W, wdt + 26), 0); gr.addColorStop(0, 'rgba(11,9,18,.5)'); gr.addColorStop(1, 'rgba(11,9,18,0)'); g.fillStyle = gr; g.fillRect(wdt, 0, 26, H);
+    g.fillStyle = '#c9bd9c'; g.fillRect(wdt - 1, 0, 2, H); // canto de la hoja
+    return;
   }
+  cam.yaw += .0035; cam.x = 300 + Math.cos(cam.yaw) * -150; cam.y = 200 + Math.sin(cam.yaw) * -150; Object.assign(SCENE.cam, cam);
   const pal = Game.palette; drawSky(pal); drawFloor(pal, pal === 'gris' ? '#767c96' : '#9ed0f6', pal === 'gris' ? '#767c96' : '#9ed0f6');
   // papel por encima, agujereado por la mancha de tinta
   const hole = clamp((t - 34) / 70, 0, 1), R0 = hole * 300;
@@ -710,7 +740,7 @@ function drawTitle() {
     L.fillStyle = PENCIL; L.globalAlpha = .5; for (let y = 22; y < H; y += 14) L.fillRect(0, y, W, 1); L.globalAlpha = 1; L.fillStyle = '#c96a6a'; L.fillRect(28, 0, 1, H); // renglones y margen
     if (!TITLE.balls) { const r = seeded(11); TITLE.balls = []; for (let i = 0; i < 9; i++) TITLE.balls.push({ a: i / 9 * 6.28 + (r() - .5) * .5, d: .3 + r() * .7, r: .5 + r() * .5 }); TITLE.tendrils = []; for (let i = 0; i < 6; i++) TITLE.tendrils.push({ a: r() * 6.28, len: 1.2 + r(), w: .12 + r() * .2 }); }
     const sx = 160, sy = 100;
-    if (t >= 34) { titleSfx('splash', 'splash');
+    if (t >= 34) { titleSfx('splash', 'splash'); titleSfx('ink', 'ink_jet', { vol: .6 }); if (t === 40) Audio.sfx('hum_down', { vol: .35 });
       // borde de tinta alrededor del agujero, y el agujero
       L.fillStyle = '#0b0912'; for (const b of TITLE.balls) { const r = R0 * b.r + 3, d = R0 * b.d * .8; L.beginPath(); L.ellipse(sx + Math.cos(b.a) * d, sy + Math.sin(b.a) * d * .75, r, r * .8, 0, 0, 6.29); L.fill(); }
       L.globalCompositeOperation = 'destination-out';
@@ -745,10 +775,12 @@ function drawTitle() {
     if (mk > 0 && mk < 1 && (t - TALL - i * 6) === 18) Audio.sfx('plop', { semi: [0, 4, 7][i], vol: .5 });
     const posed = mk >= 1, breathe = posed ? 1 + Math.sin(t * .07 + i * 1.1) * .025 : 1, land = posed ? Math.max(0, 1 - (t - TALL - i * 6 - 36) / 10) : 0;
     const eyes = !born ? 'blink' : ((t + i * 50) % 160) < 6 ? 'blink' : posed && t > TALL + 80 && ((t - TALL) % 400) < 60 ? 'happy' : 'normal';
-    const exq = TITLE.exit ? clamp((t - TITLE.exit - 10 - i * 4) / 60, 0, 1) : 0, exe = exq * exq * (3 - 2 * exq), exHop = exq > 0 && exq < 1 ? Math.abs(Math.sin(exq * Math.PI * 3)) * 8 : 0, sc = lerp(1, .42, exe), xx = Math.round(lerp(x, W / 2 + (i === 0 ? 0 : i === 1 ? 10 : -10), exe)), gyy = Math.round(lerp(gy, H / 2 + 8, exe));
-    const spr = buildSprite(`${p.id}_title`, col, null, { eyes }), sx = (1.7 - .7 * e + over * .6) * (1 + land * .18) * sc, sy = Math.max(.08, e * (1 + over)) * breathe * (1 - land * .16) * sc;
-    if (TITLE.exit && exq > 0 && (t - TITLE.exit - 10 - i * 4) % 20 === 10) Audio.sfx('plop', { semi: [0, 4, 7][i], vol: .4 });
-    shadow(xx, gyy, Math.round((spr.width * .5 * sc) * (1 - (hopM + exHop) / 20)));
+    const exu = TITLE.exit ? Math.max(0, t - TITLE.exit - 4 - i * 5) : 0, crouch = exu > 0 && exu <= 7 ? exu / 7 : 0, launch = exu > 7 ? Math.pow(exu - 7, 2) * 1.1 : 0; // se agachan y salen disparados por arriba
+    if (exu === 8) Audio.sfx('whip', { semi: [0, 4, 7][i], vol: .5 });
+    const xx = x, gyy = gy, exHop = launch, sc = 1;
+    const spr = buildSprite(`${p.id}_title`, col, null, { eyes: exu > 7 ? 'happy' : eyes }), sx = (1.7 - .7 * e + over * .6) * (1 + land * .18) * (1 + crouch * .25), sy = Math.max(.08, e * (1 + over)) * breathe * (1 - land * .16) * (1 - crouch * .3) * (launch > 0 ? 1.15 : 1);
+    if (gyy - launch < -60) return;
+    shadow(xx, gyy, Math.max(2, Math.round((spr.width * .5 * sc) * (1 - (hopM + Math.min(exHop, 40)) / 50))));
     if (!born) { g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 16 * (1 - e) + 3, 4 * (1 - e) + 1, 0, 0, 6.29); g.fill(); }
     drawSprite(spr, xx, Math.round(gyy - hopM - exHop), sx, false, sy); if (p.id === 'anil' && born) drawSatellites(xx, gyy - hopM - exHop - 4, t, col, 1.1 * clamp((t - t0 - 70) / 20, 0, 1) * sc);
   });
@@ -777,10 +809,11 @@ function frame(ts) {
 }
 function update() {
   if (hit('debug')) Game.debug = !Game.debug;
-  if (typeof SFX !== 'undefined') { const want = Game.state === 'overworld' ? Game.palette : null; if ((SFX.amb ? SFX.amb.mode : null) !== want) SFX.ambient(want); }
+  if (typeof SFX !== 'undefined') { const want = (Game.state === 'overworld' || Game.state === 'title') ? Game.palette : null; if ((SFX.amb ? SFX.amb.mode : null) !== want) SFX.ambient(want); }
   if (Game.paused) { for (const k in pressed) pressed[k] = false; return; }
   Game.t++;
   switch (Game.state) {
+    case 'cover': updateCover(); break;
     case 'title': updateTitle(); break;
     case 'overworld': updateOverworld(); break;
     case 'transition': updateTransition(); break;
@@ -791,6 +824,7 @@ function update() {
 function render() {
   g.imageSmoothingEnabled = false;
   switch (Game.state) {
+    case 'cover': drawCover(); break;
     case 'title': drawTitle(); break;
     case 'overworld': drawOverworld(); break;
     case 'transition': drawTransition(); break;
@@ -807,8 +841,8 @@ window.__chromara = {
   atb() { if (B.party) B.party.forEach(u => u.atb = 100); },
   kill() { if (B.enemies) B.enemies.forEach(u => u.alive && (u.hp = 1)); },
   win() { if (B.enemies) B.enemies.forEach(u => u.alive && kill(u)); checkEnd(); },
-  start() { if (Game.state === 'title') { initOverworld(); setState('overworld'); } },
-  title(t) { TITLE.t = t; },
+  start() { if (Game.state === 'title' || Game.state === 'cover') { initOverworld(); setState('overworld'); } },
+  title(t) { setState('title'); TITLE.t = t; },
   pause(v = !Game.paused) { Game.paused = v; },
   colorize() { Game.palette = Game.palette === 'gris' ? 'vivo' : 'gris'; },
   sprite(o) { return makeDrop(o); },
