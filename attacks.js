@@ -99,6 +99,74 @@ function* techSalpicon(u, targets, tech, col) { // Añil salta, el pincel gira c
   for (let i = 0; i < 44; i++) { for (const d of drops) { if (i < d.delay) continue; d.k = clamp((i - d.delay) / 16, 0, 1); if (d.k >= 1 && !d.hit) { d.hit = true; Audio.sfx('splash_clean', { pan: -.2 }); burst(d.t.wx + d.ox, d.t.wy + d.oy, 2, C(col), 8, 1.6, 20, .1); mark({ kind: 'pool', p: [d.t.wx + d.ox, d.t.wy + d.oy + 2, 0], w: 8, col: ramp(C(col)).sh, grow: 4, life: 90, under: true }); if (!d.t.__hit) { d.t.__hit = 1; damage(d.t, baseDmg(u.atk * statusMult(u, 'tiznado'), d.t.dfn, tech.power), col, u.name); goop(d.t, C(col), 80); } } } yield; }
   df.dur = 0; targets.forEach(tt => tt.__hit = 0); yield* wait(26); u.pose = 'idle'; yield* wait(6); camReset();
 }
+
+// ---- Techs de herramienta cruzadas: cada personaje hace algo distinto con cada arma
+function* techTachon(u, t, tech, col) { // Carmín clava el lápiz delante del enemigo y lo tacha con un trazo pesado que lo deja lento
+  camFocus(u.wx, u.wy, { dist: 70, turn: .3, h: 40, ease: .1 }); yield* anticipate(u, 14); camFocus(t.wx, t.wy, { dist: 80, turn: -.3, h: 52, pitch: .68 }); u.pose = 'attack'; yield* whop(u, ...infront(u, t, t.def.w * .8 + 22), 10, 14); yield* wait(6);
+  const img = propSprite('lapiz', C(col)), P = PROP.lapiz, st = { wz: 90, x: t.wx - 18, y: t.wy + 6, a: 0 }, sh = shadowFx(st.x, st.y, 3, 999);
+  const pf = fx(999, () => { const c = PJ([st.x, st.y, st.wz]); drawProp(img, c[0], c[1], -1.35 + st.a, 1, P.tip[0], P.tip[1], 1.5 * c[2]); });
+  Audio.sfx('charge', { semi: 0 }); for (let i = 1; i <= 10; i++) { st.wz = lerp(90, 2, (i / 10) ** 2.4); sh.draw = () => { const c = project(st.x, st.y, 0); if (c) shadow(c[0], c[1], Math.round((3 + i) * c[2])); }; yield; }
+  sh.dur = 0; B.shake = 6; B.hitstop = 5; Audio.sfx('impact_sub', { vol: .7 }); burst(st.x, st.y, 2, GRAPHITE, 10, 1.6, 20, .1); mark({ kind: 'blob', p: [st.x, st.y, 0], w: 6, col: GRAPHITE2, seed: 4, life: 140, under: true }); yield* wait(8);
+  // arrastre pesado a través del enemigo
+  Audio.sfx('scratch_long'); const pts = [[st.x, st.y, 2], [t.wx, t.wy, t.def.h * .35], [t.wx + 22, t.wy - 6, 2]]; mark({ kind: 'path', pts, w: 7, col: GRAPHITE, grow: 14, life: 160, jit: 1 }); mark({ kind: 'path', pts: pts.map(q => [q[0] + 1, q[1] + 1, q[2]]), w: 3, col: GRAPHITE2, grow: 14, life: 160 });
+  for (let i = 1; i <= 14; i++) { const q = pointAt(pts, i / 14); st.x = q[0]; st.y = q[1]; st.wz = q[2]; st.a = -.3 * Math.sin(i / 14 * Math.PI); if (i % 3 === 0) { B.shake = 3; burst(q[0], q[1], q[2], GRAPHITE, 4, 1, 14, .1); } if (i === 7) { B.slowmo = 10; damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); t.status.lento = 3; num(t, 'LENTO', C('violeta')); goop(t, GRAPHITE, 60); } yield; }
+  for (let i = 1; i <= 8; i++) { st.wz += 6; pf.draw = () => { const c = PJ([st.x, st.y, st.wz]); drawProp(img, c[0], c[1], -1.35 + i * .1, 1, P.tip[0], P.tip[1], 1.5 * c[2], 1 - i / 9); }; yield; }
+  pf.dur = 0; yield* wait(20); yield* returnHome(u); yield* wait(8); camReset();
+}
+function* techManchurron(u, t, tech, col) { // el pincel se carga de Carmín hasta hincharse y planta un pegote enorme que chorrea
+  camFocus(u.wx, u.wy, { dist: 66, turn: .35, h: 38, ease: .1 }); u.pose = 'charge';
+  const img = propSprite('pincel', C(col)), P = PROP.pincel, st = { load: 0, x: u.wx, y: u.wy, wz: u.def.h + 14, a: -1.4 };
+  const pf = fx(999, () => { const c = PJ([st.x, st.y, st.wz]); drawProp(img, c[0], c[1], st.a, 1, P.tip[0], P.tip[1], 1.2 * c[2]); if (st.load > 0) { g.fillStyle = ramp(C(col)).base; g.beginPath(); g.arc(c[0], c[1], (2 + st.load * 9) * c[2], 0, 6.29); g.fill(); g.fillStyle = ramp(C(col)).hi; g.fillRect(c[0] - 3 * c[2], c[1] - (2 + st.load * 9) * c[2] * .6, 3, 2); } });
+  sparkle(u.wx, u.wy, u.def.h + 20); Audio.sfx('squeeze'); for (let i = 0; i < 30; i++) { st.load = i / 30; u.wz = Math.sin(i * .9) * 1.5; const sq = 1 - st.load * .25; u.sqz = sq; if (i % 2 === 0) B.particles.push({ wx: u.wx + R(-8, 8), wy: u.wy + R(-4, 4), wz: R(2, u.def.h * .6), tx: st.x, ty: st.y, tz: st.wz, col: C(col), t: 0, life: 10, dur: 10, arc: 6, stream: true }); if (i === 20) Audio.sfx('plop', { semi: 2 }); yield; }
+  u.sqz = 0; u.wz = 0; u.pose = 'attack'; camFocus(t.wx, t.wy, { dist: 78, turn: -.3, h: 44 }); Audio.sfx('whip');
+  for (let i = 1; i <= 12; i++) { const k = i / 12, e = k * k; st.x = lerp(u.wx, t.wx, e); st.y = lerp(u.wy, t.wy, e); st.wz = lerp(u.def.h + 14, t.def.h * .5, e) + Math.sin(k * Math.PI) * 30; st.a = -1.4 + k * 2.6; yield; }
+  pf.dur = 0; Audio.sfx('splash'); B.shake = 7; B.hitstop = 8; B.slowmo = 12;
+  damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); goop(t, C(col), 160); drips(t.wx, t.wy, t.def.h * .8, C(col), 12);
+  mark({ kind: 'blob', p: [t.wx, t.wy, t.def.h * .5], w: t.def.w * .6, col: C(col), seed: 9, life: 150, grow: 3 }); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * .9, col: ramp(C(col)).sh, grow: 16, life: 180, under: true });
+  yield* wait(30); u.pose = 'idle'; yield* wait(8); camReset();
+}
+function* techRafaga(u, targets, tech, col) { // Ámbar cruza la fila de enemigos a brochazos cortos, con estelas
+  const ec = enemyC(); camFocus(ec[0], ec[1], { dist: 110, turn: -.1, h: 62, pitch: .66 }); yield* anticipate(u, 12); u.pose = 'attack';
+  const T = [...targets].sort((a, b) => a.wy - b.wy), first = T[0], last = T[T.length - 1]; const from = side(first, 34), to = side(last, -34); const gh = ghostsOf(u); Audio.sfx('dash');
+  const img = propSprite('brocha', C(col)), P = PROP.brocha, st = { k: 0 };
+  const pf = fx(999, () => { const c = PJ([u.wx, u.wy, u.def.h * .6]); drawProp(img, c[0] + 10 * c[2], c[1] - 6 * c[2], -.6 + Math.sin(st.k * 40) * .5, -1, P.tip[0], P.tip[1], .95 * c[2]); });
+  u.wx = from[0]; u.wy = from[1]; const hit = new Set();
+  for (let i = 1; i <= 22; i++) { const k = i / 22; st.k = k; u.wx = lerp(from[0], to[0], k); u.wy = lerp(from[1], to[1], k); u.wz = Math.abs(Math.sin(k * Math.PI * 4)) * 4; gh.add();
+    for (const t of T) if (!hit.has(t) && Math.hypot(u.wx - t.wx, u.wy - t.wy) < 16) { hit.add(t); Audio.sfx('brush_sweep', { pan: -.2, vol: .7 }); mark({ kind: 'path', pts: [[t.wx - 8, t.wy - 3, t.def.h * .7], [t.wx + 8, t.wy + 3, t.def.h * .2]], w: 5, col: C(col), grow: 3, life: 70, jit: 1 }); damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); goop(t, C(col), 60); B.hitstop = 3; }
+    yield; }
+  pf.dur = 0; gh.end(); u.wz = 0; yield* wait(16); yield* returnHome(u, 12); yield* wait(6); camReset();
+}
+function* techPunteado(u, t, tech, col) { // cuatro toques de pincel a toda velocidad, cada uno deja un punto
+  camFocus(t.wx, t.wy, { dist: 74, turn: -.2, h: 40 }); yield* anticipate(u, 10); u.pose = 'attack'; const gh = ghostsOf(u); Audio.sfx('dash');
+  const [ax, ay] = infront(u, t, t.def.w * .7 + 14); for (let i = 1; i <= 7; i++) { const k = i / 7; u.wx = lerp(u.hx, ax, k * (2 - k)); u.wy = lerp(u.hy, ay, k * (2 - k)); if (i % 2) gh.add(); yield; } gh.end();
+  const img = propSprite('pincel', C(col)), P = PROP.pincel, st = { k: 0, tip: above(t, .5) };
+  const pf = fx(999, () => { const c = PJ(st.tip); drawProp(img, c[0] + 14 * c[2] - st.k * 10 * c[2], c[1] - 6 * c[2], -.2, -1, P.tip[0], P.tip[1], 1 * c[2]); });
+  const spots = [[-5, -3, .7], [5, 2, .45], [-2, 4, .3], [4, -4, .6]];
+  for (let h = 0; h < 4; h++) { const sp = spots[h]; st.tip = [t.wx + sp[0], t.wy + sp[1], t.def.h * sp[2]]; for (let i = 1; i <= 4; i++) { st.k = i / 4; yield; }
+    Audio.sfx('fwip', { pan: -.2 }); mark({ kind: 'blob', p: st.tip, w: 4, col: C(col), seed: h, grow: 2, life: 90 }); damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); if (h === 3) goop(t, C(col), 70); for (let i = 1; i <= 3; i++) { st.k = 1 - i / 3; yield; } }
+  pf.dur = 0; yield* wait(18); yield* returnHome(u, 8); yield* wait(6); camReset();
+}
+function* techAguada(u, targets, tech, col) { // Añil moja la brocha en sí misma y barre el campo con una banda de color diluido que empapa a todos
+  const ec = enemyC(); camFocus(lerp(u.wx, ec[0], .4), lerp(u.wy, ec[1], .4), { dist: 120, turn: .1, h: 70, pitch: .68 }); u.pose = 'charge';
+  const img = propSprite('brocha', C(col)), P = PROP.brocha, st = { dip: 0 }; sparkle(u.wx, u.wy, u.def.h + 22); Audio.sfx('brush_hiss');
+  const pf = fx(999, () => { const c = PJ(above(u, 1)); drawProp(img, c[0] + 8, c[1] - 30 * c[2] + st.dip, -1.3, 1, P.tip[0], P.tip[1], 1.1 * c[2]); });
+  for (let i = 0; i < 22; i++) { st.dip = i < 11 ? i * 2.4 : (22 - i) * 2.4; u.wz = i > 6 && i < 16 ? R(-1, 1) : 0; if (i > 7 && i % 2) drips(u.wx, u.wy, u.def.h * .6, C(col), 2); yield; }
+  pf.dur = 0; u.wz = 0; u.pose = 'attack'; camFocus(ec[0], ec[1], { dist: 104, turn: -.2, h: 60 }); Audio.sfx('brush_big'); Audio.sfx('splash_clean', { when: .3 });
+  const T = [...targets].sort((a, b) => a.wx - b.wx), L = side(ec.length ? { wx: ec[0], wy: ec[1] } : T[0], 70), Rr = side({ wx: ec[0], wy: ec[1] }, -70);
+  const band = fx(999, () => { const k = clamp(band.t / 24, 0, 1), a = PJ([lerp(L[0], Rr[0], Math.max(0, k - .35)), lerp(L[1], Rr[1], Math.max(0, k - .35)), 0]), b = PJ([lerp(L[0], Rr[0], k), lerp(L[1], Rr[1], k), 0]); g.globalAlpha = .45; g.fillStyle = C(col); g.beginPath(); g.moveTo(a[0], a[1] - 44 * a[2]); g.lineTo(b[0], b[1] - 44 * b[2]); g.lineTo(b[0], b[1] + 4); g.lineTo(a[0], a[1] + 4); g.closePath(); g.fill(); g.globalAlpha = 1; if (band.t % 2 === 0) drips(b[0] * 0 + lerp(L[0], Rr[0], k), lerp(L[1], Rr[1], k), 40, C(col), 2); });
+  const hit = new Set();
+  for (let i = 1; i <= 28; i++) { const k = i / 28, x = lerp(L[0], Rr[0], k), y = lerp(L[1], Rr[1], k); for (const t of T) if (!hit.has(t) && ((Rr[0] - L[0]) * (t.wx - x) + (Rr[1] - L[1]) * (t.wy - y)) <= 0) { hit.add(t); damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); t.status.lento = 3; num(t, 'EMPAPADO', C(col)); goop(t, C(col), 110); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * .8, col: ramp(C(col)).sh, grow: 10, life: 160, under: true }); } yield; }
+  band.dur = 0; yield* wait(24); u.pose = 'idle'; yield* wait(6); camReset();
+}
+function* techContorno(u, allies, tech, col) { // Añil perfila a lápiz a cada aliado: una línea de grafito que los protege
+  const pc = partyC(); camFocus(pc[0], pc[1], { dist: 80, turn: .4, h: 46 }); yield* anticipate(u, 10); u.pose = 'attack'; Audio.sfx('scratch');
+  for (const a of allies) {
+    const pts = []; for (let i = 0; i <= 12; i++) { const ang = i / 12 * 6.28 - 1.57; pts.push([a.wx + Math.cos(ang) * a.def.w * .6, a.wy + Math.sin(ang) * 4, a.def.h * .55 + Math.sin(ang) * a.def.h * .6]); }
+    yield* toolStroke({ kind: 'lapiz', color: C(col), pts, w: 2, col: GRAPHITE, under: GRAPHITE2, frames: 12, fac: 1, life: 40, jit: 1, scale: 1 });
+    a.status.contorno = 3; num(a, 'CONTORNO', '#8c8ab0'); sparkle(a.wx, a.wy, a.def.h + 6, '#f4f0ea'); Audio.sfx('tinkle', { semi: SEMI[a.id] || 0, vol: .5 }); yield* wait(4);
+  }
+  yield* wait(16); u.pose = 'idle'; yield* wait(6); camReset();
+}
 // =====================================================================
 // Combos: carga y fusión común, liberación propia de cada mezcla
 // =====================================================================
@@ -186,7 +254,13 @@ function* actTech(users, tech, targets, col) {
   users.forEach(tickStatus); const names = users.map(u => u.name).join('+'); say(names + ': ' + tech.name, C(col));
   const id = Object.keys(DATA.techs).find(k => DATA.techs[k] === tech);
   if (id === 'brochazo') yield* techBrochazo(users[0], targets[0], tech, col);
+  else if (id === 'tachon') yield* techTachon(users[0], targets[0], tech, col);
+  else if (id === 'manchurron') yield* techManchurron(users[0], targets[0], tech, col);
+  else if (id === 'rafaga') yield* techRafaga(users[0], targets, tech, col);
   else if (id === 'trazo') yield* techTrazo(users[0], targets[0], tech, col);
+  else if (id === 'punteado') yield* techPunteado(users[0], targets[0], tech, col);
+  else if (id === 'aguada') yield* techAguada(users[0], targets, tech, col);
+  else if (id === 'contorno') yield* techContorno(users[0], targets, tech, col);
   else if (id === 'salpicon') yield* techSalpicon(users[0], targets, tech, col);
   else if (id === 'llamarada') yield* techLlamarada(users, targets, tech, col);
   else if (id === 'brote') yield* techBrote(users, targets, tech, col);

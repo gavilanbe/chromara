@@ -504,9 +504,10 @@ function setState(s) { Game.state = s; Game.t = 0; }
 // =====================================================================
 const OW = { x: 0, y: 0, cam: { x: 0, y: 0 }, hist: [], moving: false, t: 0, msg: null, menu: null, foes: [] };
 function initOverworld() {
-  OW.x = MAP.spawn[0] * TILE + 8; OW.y = MAP.spawn[1] * TILE + 12; OW.hist = []; OW.puddles = []; OW.dust = []; OW.vx = OW.vy = 0; OW.bob = 0; OW.dir = 'down'; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
+  OW.x = MAP.spawn[0] * TILE + 8; OW.y = MAP.spawn[1] * TILE + 12; OW.hist = []; OW.puddles = []; OW.dust = []; OW.vx = OW.vy = 0; OW.bob = 0; OW.dir = 'down'; OW.landT = 0; OW.landZ = null; OW.landed = [0, 0, 0]; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
   OW.foes = MAP.spots.map(s => ({ key: s.key, hx: s.x * TILE + 8, hy: s.y * TILE + 12, x: s.x * TILE + 8, y: s.y * TILE + 12, tx: 0, ty: 0, t: RI(0, 60), enemies: DATA.encounters[s.key], boss: s.key === 'B', seed: s.x * 7 + s.y }));
   if (Game.intro) OW.msg = { lines: DATA.texts.intro, t: 0 };
+  OW.msgWait = true;
 }
 function walkable(px, py) { // hitbox pies 8×6
   for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (solid(tileAt((px + dx) / TILE | 0, (py + dy) / TILE | 0))) return false;
@@ -514,7 +515,14 @@ function walkable(px, py) { // hitbox pies 8×6
 }
 function updateOverworld() {
   OW.t++;
-  if (OW.msg) { OW.msg.t++; if (OW.msg.t > 20 && (hit('ok') || hit('back'))) { OW.msg = null; Audio.sfx('page'); Game.intro = false; if (OW.msg === null && Game.bossDown && !Game.ended) Game.ended = true; } return; }
+  if (OW.landT > 0) { // entrada: caen del cielo y salpican, uno tras otro
+    OW.landT--; OW.landZ = OW.landZ || [0, 0, 0];
+    Party.forEach((p, i) => { const k = clamp((48 - OW.landT - i * 6) / 26, 0, 1); OW.landZ[i] = k >= 1 ? 0 : 120 * (1 - k * k); if (k >= 1 && !OW.landed[i]) { OW.landed[i] = 1; Audio.sfx('plop', { semi: [0, 4, 7][i] }); for (let j = 0; j < 8; j++) OW.dust.push({ x: OW.x - i * 12 + R(-4, 4), y: OW.y + 1, vx: R(-1.2, 1.2), vy: -R(.5, 1.6), col: C(p.color), t: 0, life: RI(12, 20) }); } });
+    if (OW.landT === 0) { OW.landZ = null; Audio.play('map'); }
+    for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life);
+    return;
+  }
+  if (OW.msg) { if (OW.landT > 0) return; OW.msg.t++; if (OW.msg.t > 20 && (hit('ok') || hit('back'))) { OW.msg = null; Audio.sfx('page'); Game.intro = false; if (OW.msg === null && Game.bossDown && !Game.ended) Game.ended = true; } return; }
   if (OW.menu) { updateMenu(); return; }
   if (hit('ok')) { openMenu(); return; }
   // movimiento con aceleración y frenada; el líder bota al andar (es una gota)
@@ -557,10 +565,11 @@ const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
 function mapDrop(p, x, y, dir, bob, moving, t, idx) {
   const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : DIRVIEW[dir] || 'back';
   const blink = !moving && ((t + idx * 53) % 170) < 6, spr = buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' });
-  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
-  shadow(x, y, Math.round((p.w * .42) * (1 - hop * .3)));
+  const lz = OW.landZ ? OW.landZ[idx] || 0 : 0;
+  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3 + lz, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
+  shadow(x, y, Math.max(2, Math.round((p.w * .42) * (1 - hop * .3) * (1 - lz / 160))));
   if (dead) { drawSprite(spr, x, y, 1, false, .45); return; }
-  drawSprite(spr, x, Math.round(y - wz), sq[0], dir === 'right', sq[1]);
+  drawSprite(spr, x, Math.round(y - wz), lz > 0 ? .9 : sq[0], dir === 'right', lz > 0 ? 1.15 : sq[1]);
   if (p.id === 'anil') drawSatellites(x, y - wz, t + idx * 10, col, .4);
 }
 function drawOverworld() {
@@ -587,7 +596,7 @@ function drawOverworld() {
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }
   // HUD
   win(4, 4, 124, 16); swatch(8, 8, C('amarillo')); ui('PIGMENTO ' + Game.pigmento, 18, 8, TXT);
-  if (OW.msg) drawMessage(OW.msg.lines);
+  if (OW.msg && !(OW.landT > 0)) drawMessage(OW.msg.lines);
   if (OW.menu) drawMenu();
 }
 function drawMessage(lines) {
@@ -595,41 +604,7 @@ function drawMessage(lines) {
   lines.forEach((l, i) => ui(l, 16, H - h - 1 + i * 10, i === 0 ? GOLD : TXT));
   if ((Game.t / 20 | 0) % 2) ui('▼', W - 24, H - 16, TXT2);
 }
-// --- Menú de estado/equipo (Enter en el mapa)
-const ACC_LIST = Object.keys(DATA.accessories);
-function openMenu() { OW.menu = { idx: 0 }; Audio.sfx('book_open'); }
-function updateMenu() {
-  const m = OW.menu;
-  if (hit('back')) { OW.menu = null; Audio.sfx('book_close'); return; }
-  if (hit('down')) { m.idx = (m.idx + 1) % 3; Audio.sfx('cursor', semiOf(Party[m.idx])); }
-  if (hit('up')) { m.idx = (m.idx + 2) % 3; Audio.sfx('cursor', semiOf(Party[m.idx])); }
-  const p = Party[m.idx];
-  if (hit('left') || hit('right')) {
-    const before = effStats(p); const i = ACC_LIST.indexOf(p.acc); p.acc = ACC_LIST[(i + (hit.__dir = keys.right ? 1 : ACC_LIST.length - 1)) % ACC_LIST.length];
-    const after = effStats(p); p.cur.hp = clamp(p.cur.hp + after.hp - before.hp, 1, after.hp); p.cur.mp = clamp(p.cur.mp + after.mp - before.mp, 0, after.mp); Audio.sfx('equip');
-  }
-}
-function drawMenu() {
-  g.fillStyle = 'rgba(11,9,18,0.45)'; g.fillRect(0, 0, W, H);
-  win(8, 8, 304, 164);
-  ui('CHROMARA', 16, 14, GOLD); swatch(196, 14, C('amarillo')); ui('Pigmento ' + Game.pigmento, 206, 14, TXT);
-  Party.forEach((p, i) => {
-    const y = 28 + i * 34, s = effStats(p), sel = OW.menu.idx === i;
-    if (sel) { hilite(24, y + 14, 296, 28, C(p.color), .2); dropCursor(16, y + 8, C(p.color)); }
-    drawDrop({ color: C(p.color), shape: p.shape, w: Math.round(p.w * .7), h: Math.round(p.h * .7) }, 36, y + 26, 'idle', (Game.t / 12 + i | 0) % 4);
-    ui(p.name, 56, y, sel ? TXT : C(p.color)); ui(p.role, 56, y + 10, TXT2);
-    ui(`HP ${p.cur.hp}/${s.hp}`, 120, y, TXT); ui(`MP ${p.cur.mp}/${s.mp}`, 120, y + 10, TXT);
-    ui(`ATK${s.atk} DEF${s.def} SPD${s.spd}`, 120, y + 20, TXT2);
-    g.drawImage(iconSprite(p.weapon, C(p.color)), 220, y - 2); ui(DATA.weapons[p.weapon].name, 234, y, TXT);
-    ui((sel ? '◄' : ' ') + DATA.accessories[p.acc].name + (sel ? '►' : ''), 226, y + 10, sel ? GOLD : TXT);
-  });
-  const p = Party[OW.menu.idx];
-  win(8, 132, 304, 40);
-  ui(DATA.accessories[p.acc].desc, 16, 138, TXT);
-  const inv = Object.entries(Game.inventory).filter(([, n]) => n > 0).map(([k, n]) => `${DATA.items[k].short || DATA.items[k].name} x${n}`).join('  ');
-  ui(inv || 'Sin objetos', 16, 150, TXT2);
-  ui('◄► accesorio   X cerrar', 16, 161, TXT3);
-}
+// (El menú de estado/equipo vive en gui.js)
 
 // =====================================================================
 // 7. Título, bucle principal, debug
@@ -678,18 +653,22 @@ function drawLogo(t, x0, y0) {
   const word = TITLE.letters, cw = 23; TITLE.L = TITLE.L || word.split('').map(() => ({ painted: -1, drips: [], spl: [] }));
   const baseY = y0 + LOGO_H;
   // charquitos de pintura bajo las letras (se juntan entre sí)
-  word.split('').forEach((ch, i) => { const S = TITLE.L[i]; if (S.painted < 0) return; const q = clamp((t - S.painted) / 40, 0, 1), col = C(TITLE.cols[i]), x = x0 + i * cw + LOGO_W / 2 + 1; g.fillStyle = ramp(col).sh; g.beginPath(); g.ellipse(x, baseY + 2, (6 + q * 10) * 1.1, 2 + q * 2.2, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(col).base; g.beginPath(); g.ellipse(x - 1, baseY + 1.5, 5 + q * 9, 1.5 + q * 1.6, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(col).hi; g.fillRect(x - 5, baseY + 1, 3, 1); });
+  word.split('').forEach((ch, i) => { const S = TITLE.L[i]; if (S.painted < 0) return; const q = clamp((t - S.painted) / 40, 0, 1) * (TITLE.exit ? clamp(1 - (t - TITLE.exit - 20) / 40, 0, 1) : 1), col = C(TITLE.cols[i]), x = x0 + i * cw + LOGO_W / 2 + 1; if (q <= 0) return; g.fillStyle = ramp(col).sh; g.beginPath(); g.ellipse(x, baseY + 2, (6 + q * 10) * 1.1, 2 + q * 2.2, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(col).base; g.beginPath(); g.ellipse(x - 1, baseY + 1.5, 5 + q * 9, 1.5 + q * 1.6, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(col).hi; g.fillRect(x - 5, baseY + 1, 3, 1); });
   word.split('').forEach((ch, i) => {
     const S = TITLE.L[i], k = clamp((t - 100 - i * 9) / 12, 0, 1); if (k <= 0) return;
     const col = C(TITLE.cols[i]), rp = ramp(col), spr = logoLetter(ch, col), x = x0 + i * cw;
     if (k < 1) titleSfx('l' + i, 'brush_sweep', { pan: (i - 4) * .1, vol: .5 });
     if (k >= 1 && S.painted < 0) { S.painted = t; Audio.sfx('plop', { semi: i * 2 - 6 }); for (let j = 0; j < 10; j++) S.spl.push({ x: x + LOGO_W / 2 + R(-6, 6), y: y0 + LOGO_H / 2 + R(-8, 8), vx: R(-1.6, 1.6), vy: -R(.5, 2.4), t: 0 }); S.drips = [{ x: (POOLS[ch] || [[10, 20]])[0][0] + R(-1, 1), len: 0, max: R(5, 11), speed: R(.08, .16) }]; if (POOLS[ch] && POOLS[ch][1] && Math.random() < .6) S.drips.push({ x: POOLS[ch][1][0], len: 0, max: R(3, 8), speed: R(.06, .12) }); }
     const since = S.painted < 0 ? 0 : t - S.painted, pop = S.painted < 0 ? 0 : Math.max(0, 1 - since / 26), popS = 1 + Math.sin(since * .5) * .28 * pop;
+    const exl = TITLE.exit ? Math.max(0, t - TITLE.exit - i * 3) : 0; // salida: las letras se derriten y caen
     // onda de gelatina que recorre la palabra cada pocos segundos: cada letra hace boing al pasar, con un chispazo en su luz
     const wv = t > 320 ? ((t - 320) % 260) / 260 : -1, wk = wv < 0 ? 0 : clamp(1 - Math.abs(wv * (word.length + 3) - 1.5 - i), 0, 1), boing = Math.sin(wk * Math.PI);
-    const wob = .8 + pop * 4 + boing * 3.5 + (t > 200 ? Math.sin(t * .05 + i) * .3 + .3 : 0), sy = popS * (1 + Math.sin(t * .11 + i * .9) * .025 + boing * .14), phase = t * .18 + i * 1.3;
+    const wob = .8 + pop * 4 + boing * 3.5 + (t > 200 ? Math.sin(t * .05 + i) * .3 + .3 : 0) + (exl > 0 ? Math.min(6, exl * .5) : 0), sy = popS * (1 + Math.sin(t * .11 + i * .9) * .025 + boing * .14) * (exl > 0 ? 1 + Math.min(.5, exl * .04) : 1), phase = t * .18 + i * 1.3;
     if (boing > .85 && S.drips[0] && S.drips[0].len < S.drips[0].max) S.drips[0].len += .5;
-    const bob = t > 200 ? Math.sin(t * .06 + i * .7) * 1.5 : 0, y = Math.round(y0 + bob) + (k < 1 ? (1 - k) * 6 | 0 : 0);
+    if (wk > .95 && S.lastNote !== Math.floor((t - 320) / 260)) { S.lastNote = Math.floor((t - 320) / 260); Audio.sfx('cursor', { semi: [0, 2, 4, 5, 7, 9, 11, 12][i], vol: .35 }); }
+    const fall = exl > 6 ? Math.pow(exl - 6, 2) * .22 : 0; if (exl === 6) Audio.sfx('slow_drip', { semi: i * 2 - 8, vol: .6 });
+    const bob = t > 200 ? Math.sin(t * .06 + i * .7) * 1.5 : 0, y = Math.round(y0 + bob + fall) + (k < 1 ? (1 - k) * 6 | 0 : 0);
+    if (y > H + 10) return;
     g.save(); g.beginPath(); g.rect(x - 3, y - 6, Math.round((spr.width + 6) * k), spr.height + 10); g.clip();
     g.globalAlpha = .4; g.drawImage(spr, x + 2, y + 3); g.globalAlpha = 1; // sombra de tinta
     drawGooey(spr, x, y, wob, sy, phase);
@@ -707,13 +686,21 @@ function drawLogo(t, x0, y0) {
 }
 function updateTitle() {
   TITLE.t++;
-  if (hit('ok')) { if (TITLE.t < 350) { TITLE.t = 350; return; } Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); }
+  if (TITLE.exit) { const ex = TITLE.t - TITLE.exit; if (ex === 14) Audio.sfx('fall'); if (ex === 30) Audio.sfx('hum_down', { vol: .5 }); if (ex >= 92) { TITLE.exit = 0; initOverworld(); OW.landT = 48; setState('overworld'); } return; }
+  if (hit('ok')) { if (TITLE.t < 350) { TITLE.t = 350; Audio.sfx('page'); return; } TITLE.exit = TITLE.t; Audio.sfx('confirm', { semi: 0 }); Audio.sfx('confirm', { semi: 4, when: .08 }); Audio.sfx('confirm', { semi: 7, when: .16 }); Audio.stop(); }
 }
 function drawTitle() {
   const t = TITLE.t, cam = TITLE.cam;
   // vuelo lento sobre el mapa: la cámara orbita el lago
-  cam.yaw += .0035; cam.x = 300 + Math.cos(cam.yaw) * -150; cam.y = 200 + Math.sin(cam.yaw) * -150;
-  const pal = Game.palette; Object.assign(SCENE.cam, cam); drawSky(pal); drawFloor(pal, pal === 'gris' ? '#767c96' : '#9ed0f6', pal === 'gris' ? '#767c96' : '#9ed0f6');
+  const ex = TITLE.exit ? t - TITLE.exit : 0;
+  if (!TITLE.exit) { cam.yaw += .0035; cam.x = 300 + Math.cos(cam.yaw) * -150; cam.y = 200 + Math.sin(cam.yaw) * -150; Object.assign(SCENE.cam, cam); }
+  else { // picado hasta la vista cenital sobre el punto de inicio
+    const sx = MAP.spawn[0] * TILE + 8, sy = MAP.spawn[1] * TILE + 12, camX = clamp(Math.round(sx - W / 2), 0, MAP.w * TILE - W), camY = clamp(Math.round(sy - H / 2), 0, MAP.h * TILE - H);
+    const top = { x: camX + W / 2, y: camY + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 110, f: 110, hy: 90 }, q = clamp((ex - 16) / 70, 0, 1), e2 = q * q * (3 - 2 * q);
+    if (!TITLE.from) TITLE.from = Object.assign({}, cam);
+    const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(TITLE.from[key], top[key], e2); let d = top.yaw - TITLE.from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = TITLE.from.yaw + d * e2;
+  }
+  const pal = Game.palette; drawSky(pal); drawFloor(pal, pal === 'gris' ? '#767c96' : '#9ed0f6', pal === 'gris' ? '#767c96' : '#9ed0f6');
   // papel por encima, agujereado por la mancha de tinta
   const hole = clamp((t - 34) / 70, 0, 1), R0 = hole * 300;
   if (hole < 1) { // el papel va en una capa aparte para poder agujerearlo y ver el mundo debajo
@@ -758,13 +745,15 @@ function drawTitle() {
     if (mk > 0 && mk < 1 && (t - TALL - i * 6) === 18) Audio.sfx('plop', { semi: [0, 4, 7][i], vol: .5 });
     const posed = mk >= 1, breathe = posed ? 1 + Math.sin(t * .07 + i * 1.1) * .025 : 1, land = posed ? Math.max(0, 1 - (t - TALL - i * 6 - 36) / 10) : 0;
     const eyes = !born ? 'blink' : ((t + i * 50) % 160) < 6 ? 'blink' : posed && t > TALL + 80 && ((t - TALL) % 400) < 60 ? 'happy' : 'normal';
-    const spr = buildSprite(`${p.id}_title`, col, null, { eyes }), sx = (1.7 - .7 * e + over * .6) * (1 + land * .18), sy = Math.max(.08, e * (1 + over)) * breathe * (1 - land * .16);
-    shadow(x, gy, Math.round((spr.width * .5) * (1 - hopM / 20)));
+    const exq = TITLE.exit ? clamp((t - TITLE.exit - 10 - i * 4) / 60, 0, 1) : 0, exe = exq * exq * (3 - 2 * exq), exHop = exq > 0 && exq < 1 ? Math.abs(Math.sin(exq * Math.PI * 3)) * 8 : 0, sc = lerp(1, .42, exe), xx = Math.round(lerp(x, W / 2 + (i === 0 ? 0 : i === 1 ? 10 : -10), exe)), gyy = Math.round(lerp(gy, H / 2 + 8, exe));
+    const spr = buildSprite(`${p.id}_title`, col, null, { eyes }), sx = (1.7 - .7 * e + over * .6) * (1 + land * .18) * sc, sy = Math.max(.08, e * (1 + over)) * breathe * (1 - land * .16) * sc;
+    if (TITLE.exit && exq > 0 && (t - TITLE.exit - 10 - i * 4) % 20 === 10) Audio.sfx('plop', { semi: [0, 4, 7][i], vol: .4 });
+    shadow(xx, gyy, Math.round((spr.width * .5 * sc) * (1 - (hopM + exHop) / 20)));
     if (!born) { g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 16 * (1 - e) + 3, 4 * (1 - e) + 1, 0, 0, 6.29); g.fill(); }
-    drawSprite(spr, x, Math.round(gy - hopM), sx, false, sy); if (p.id === 'anil' && born) drawSatellites(x, gy - hopM - 4, t, col, 1.1 * clamp((t - t0 - 70) / 20, 0, 1));
+    drawSprite(spr, xx, Math.round(gyy - hopM - exHop), sx, false, sy); if (p.id === 'anil' && born) drawSatellites(xx, gyy - hopM - exHop - 4, t, col, 1.1 * clamp((t - t0 - 70) / 20, 0, 1) * sc);
   });
   for (const q of TITLE.spl || []) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += .14; if (q.y > 140) { q.y = 140; q.vy *= -.3; q.vx *= .6; } g.fillStyle = q.t < 8 ? ramp(q.col).hi : ramp(q.col).base; g.fillRect(Math.round(q.x), Math.round(q.y), 2, 2); } TITLE.spl = (TITLE.spl || []).filter(q => q.t < 30);
-  if (t > 350) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 158, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 161, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 173, '#7a7694', null); }
+  if (t > 350 && !TITLE.exit) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 158, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 161, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 173, '#7a7694', null); }
 }
 function drawDebug() {
   win(W - 124, 24, 120, 70, { solid: 'rgba(11,9,18,0.85)' }); txt('DEBUG', W - 114, 28, '#f2c93a');

@@ -28,13 +28,14 @@ const centroid = arr => { const P = arr.length ? arr : [{ wx: 0, wy: 0 }]; retur
 const partyC = () => centroid(alive(B.party)), enemyC = () => centroid(alive(B.enemies));
 const homeC = arr => [arr.reduce((s, u) => s + u.hx, 0) / arr.length, arr.reduce((s, u) => s + u.hy, 0) / arr.length];
 function statusMult(u, k) { return u.status[k] ? (k === 'tiznado' ? .7 : .6) : 1; }
+function drawContorno(u) { const c = project(u.wx, u.wy, 0); if (!c) return; const s = u.sc * B.unitScale, w = u.def.w * .55 * s, h = u.def.h * .6 * s; g.strokeStyle = '#4a4460'; g.lineWidth = 1; g.setLineDash([2, 2]); g.lineDashOffset = -(B.t >> 1); g.beginPath(); g.ellipse(u.x, u.y - h, w + 3, h + 3, 0, 0, 6.29); g.stroke(); g.setLineDash([]); }
 function baseDmg(atk, def, power) { return Math.max(2, (atk * 2 - def * .7) * power); }
 function tickStatus(u) { for (const k in u.status) if (--u.status[k] <= 0) delete u.status[k]; }
 function say(s, col = '#f4f0ea') { B.msg = { s, col }; B.msgT = 70; }
 function num(u, v, col, big) { B.nums.push({ x: u.x + R(-4, 4), y: u.y - u.def.h * u.sc - 6, v: String(v), col, t: 0, vy: -1.6, big }); }
 function damage(target, raw, col, src) {
   if (!target.alive) return 0;
-  const mult = colorMult(col, target.color), dmg = Math.max(1, Math.round(raw * mult * R(.92, 1.08)));
+  const mult = colorMult(col, target.color), dmg = Math.max(1, Math.round(raw * mult * R(.92, 1.08) * (target.status.contorno ? .6 : 1)));
   target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14;
   num(target, dmg, mult >= 2 ? '#f2c93a' : mult < 1 ? '#8c8ab0' : '#f4f0ea', mult >= 2);
   impactFx(target, C(col), mult >= 2 ? 1.6 : mult < 1 ? .6 : 1);
@@ -282,12 +283,12 @@ function* toolStroke(o) {
 // =====================================================================
 // 6. Menú de batalla, ATB, bucle de actualización, fin
 // =====================================================================
-function techsFor(u) {
-  return Object.entries(DATA.techs).filter(([, t]) => t.users.includes(u.id)).map(([id, t]) => {
-    const users = t.users.map(uid => B.party.find(p => p.id === uid));
+function techsFor(u) { // techs de herramienta (según el arma que empuña, en su color) + combos por parejas de colores
+  return Object.entries(DATA.techs).filter(([, t]) => t.weapon ? (u.data.weapon === t.weapon && t.user === u.id) : t.users.includes(u.id)).map(([id, t]) => {
+    const users = t.weapon ? [u] : t.users.map(uid => B.party.find(p => p.id === uid)), col = t.weapon ? u.color : t.color;
     const cost = uid => Math.max(1, t.mp - (DATA.accessories[B.party.find(p => p.id === uid).acc].techDiscount || 0));
     const ready = users.every(p => p.alive && (p === u || (p.atb >= 100 && !p.acting))), mpOk = users.every(p => p.mp >= cost(p.id));
-    return { id, t, users, ready, mpOk, avail: ready && mpOk, cost: cost(u.id), combo: users.length > 1 };
+    return { id, t, users, col, ready, mpOk, avail: ready && mpOk, cost: cost(u.id), combo: users.length > 1 };
   });
 }
 function openCmd(u) { B.menu = { unit: u, level: 'cmd', idx: 0 }; }
@@ -314,7 +315,7 @@ function updateBattleMenu() {
         if (!e.avail) { Audio.sfx('nope'); say(!e.ready ? 'El compañero aún no está listo' : 'Falta pigmento (MP)', '#8c8ab0'); return; }
         Audio.sfx('confirm', semiOf(u)); m.pending = { type: 'tech', tech: e };
         if (e.t.target === 'enemy') { m.level = 'target'; m.targets = alive(B.enemies); m.tidx = 0; }
-        else commit(alive(B.enemies));
+        else commit(e.t.target === 'party' ? alive(B.party) : alive(B.enemies));
       } else {
         Audio.sfx('confirm', semiOf(u)); m.pending = { type: 'item', item: e.id }; m.level = 'target'; m.targets = e.it.target === 'enemy' ? alive(B.enemies) : B.party.filter(p => p.alive); m.tidx = 0;
       }
@@ -331,7 +332,7 @@ function updateBattleMenu() {
 function commit(targets) {
   const m = B.menu, u = m.unit, p = m.pending; let gen, users = [u];
   if (p.type === 'attack') gen = actAttack(u, targets[0]);
-  else if (p.type === 'tech') { users = p.tech.users; users.forEach(x => { x.mp -= Math.max(1, p.tech.t.mp - (DATA.accessories[x.acc].techDiscount || 0)); }); gen = actTech(users, p.tech.t, targets, p.tech.t.color); }
+  else if (p.type === 'tech') { users = p.tech.users; users.forEach(x => { x.mp -= Math.max(1, p.tech.t.mp - (DATA.accessories[x.acc].techDiscount || 0)); }); gen = actTech(users, p.tech.t, targets, p.tech.col); }
   else gen = actItem(u, p.item, targets[0]);
   users.forEach(x => { x.atb = 0; B.queue = B.queue.filter(q => q !== x); });
   B.menu = null; B.actQueue.push(tracked(u, gen)); B.busy = true;
@@ -449,6 +450,7 @@ function drawUnit(u) {
   if (u.kind === 'enemy' && u.alive && u.boss) bar(u.x - 20, u.y + 4, 40, 4, u.hp / u.maxhp, '#8b48c8');
   if (u.status.tiznado && u.alive) { g.fillStyle = '#2a2438'; g.fillRect(u.x - 3, u.y - u.def.h * s - 6, 6, 2); }
   if (u.status.lento && u.alive) txt('z', u.x + 6, u.y - u.def.h * s - 10, C('violeta'), null);
+  if (u.status.contorno && u.alive) drawContorno(u);
 }
 function drawGroundLayer() {
   // charco de tinta de los enemigos (aparece al drenar la mancha)

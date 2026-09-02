@@ -75,7 +75,7 @@ function drawBattleUI() {
     ui('MP', 232, y, TXT2); ui(String(u.mp).padStart(2), 248, y, TXT); pencilBar(232, y + 9, 32, 4, u.mp / u.maxmp, desat(col, .4, .1));
     atbBrush(270, y + 3, u.alive ? u.atb / 100 : 0, col, B.t);
     if (u.atb >= 100 && u.alive) { const k = (B.t >> 2) % 12; g.fillStyle = ramp(col).base; g.fillRect(290, y + 9 + (k < 6 ? k : 5), 1, 2); }
-    if (u.status.tiznado) smudgeIcon(300, y + 1); if (u.status.lento) ui('z', 306, y - 1, C('violeta'));
+    if (u.status.tiznado) smudgeIcon(300, y + 1); if (u.status.lento) ui('z', 306, y - 1, C('violeta')); if (u.status.contorno) { g.strokeStyle = '#4a4460'; g.setLineDash([1, 1]); g.strokeRect(299.5, y + .5, 8, 8); g.setLineDash([]); }
   });
   if (!m) { ui('...', 12, y0 + 8, TXT3); GUI.lastLevel = null; return; }
   const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item' || (m.level === 'target' && m.pending.type !== 'attack');
@@ -100,7 +100,7 @@ function drawBattleUI() {
     const i = top + kk, y = wy + 7 + kk * 12;
     if (i === sel) { hilite(14, y + 3, ww - 6, 11, ucol, .35); dropCursor(10, y - 1, ucol); }
     if (isTech) {
-      swatch(20, y, C(e.t.color), !e.avail); ui(e.t.name, 31, y, e.avail ? TXT : TXT3);
+      swatch(20, y, C(e.col), !e.avail); ui(e.t.name, 31, y, e.avail ? TXT : TXT3);
       e.users.filter(x => x !== u).forEach((x, q) => { g.globalAlpha = e.avail ? 1 : .4; g.drawImage(iconSprite('drop', C(x.color)), 122 + q * 9, y - 3); g.globalAlpha = 1; });
       const cs = String(e.cost); ui(cs, ww - 8 - cs.length * 8, y, e.avail ? TXT2 : TXT3);
     } else {
@@ -114,8 +114,8 @@ function drawBattleUI() {
   if (isTech && L[sel]) {
     const e = L[sel]; tape(0, 3, W, 24);
     let x = 8; e.users.forEach((us, j) => { swatch(x, 7, C(us.color)); x += 8; if (j < e.users.length - 1) { ui('+', x, 7, TXT2); x += 9; } });
-    if (e.combo) { ui('=', x + 1, 7, TXT2); x += 10; swatch(x, 7, C(e.t.color)); x += 10; }
-    ui(e.t.name + ' · ' + e.cost + ' MP', x + 2, 7, e.avail ? ramp(C(e.t.color)).sh : TXT3);
+    if (e.combo) { ui('=', x + 1, 7, TXT2); x += 10; swatch(x, 7, C(e.col)); x += 10; }
+    ui(e.t.name + ' · ' + e.cost + ' MP', x + 2, 7, e.avail ? ramp(C(e.col)).sh : TXT3);
     if (e.combo) { const cs = 'con ' + e.users.filter(q => q !== u).map(q => q.name).join(' y '); ui(cs, W - 8 - cs.length * 8, 7, e.avail ? TXT2 : TXT3); }
     ui(e.t.desc.slice(0, 38), 8, 17, e.avail ? TXT : TXT3);
     if (!e.avail) { const ns = !e.ready ? '(compañero no listo)' : '(sin MP)'; ui(ns, W - 8 - ns.length * 8, 17, C('rojo')); }
@@ -124,3 +124,86 @@ function drawBattleUI() {
 }
 // Etiqueta del objetivo: cinta de carrocero con nombre y HP
 function targetLabel(t) { const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 22, x0 = clamp(t.x - w / 2, 2, W - w - 2) | 0; tape(x0, 4, w, 14); swatch(x0 + 5, 7, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 15, 7, TXT); }
+
+// =====================================================================
+// Menú de estado/equipo: el cuaderno del pintor. Se abre con rebote, fichas a la izquierda, retrato y equipo a la derecha.
+// ↑↓ personaje · Z entra en el equipo · ↑↓ arma/accesorio · ◄► cambia (la herramienta entra de golpe y salpica) · X vuelve/cierra
+// =====================================================================
+const ACC_LIST = Object.keys(DATA.accessories), WPN_LIST = Object.keys(DATA.weapons);
+const easeBack = k => 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
+function openMenu() { OW.menu = { idx: 0, level: 'chars', row: 0, t: 0, hl: 30, pop: 0, swing: 0, spl: [], delta: null, flip: 99 }; Audio.sfx('book_open'); }
+function menuStats(p) { return effStats(p); }
+function updateMenu() {
+  const m = OW.menu; if (m.closing) { if (m.t - m.closeT > 10) OW.menu = null; return; }
+  if (m.t < 8) return; // abriéndose
+  const p = Party[m.idx], note = () => Audio.sfx('cursor', { semi: SEMI[p.id] || 0 });
+  if (m.level === 'chars') {
+    if (hit('down')) { m.idx = (m.idx + 1) % 3; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); } if (hit('up')) { m.idx = (m.idx + 2) % 3; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); }
+    if (hit('ok')) { m.level = 'equip'; m.row = 0; Audio.sfx('page'); }
+    if (hit('back')) { m.closing = true; m.closeT = m.t; Audio.sfx('book_close'); }
+    return;
+  }
+  if (hit('down') || hit('up')) { m.row = 1 - m.row; note(); }
+  if (hit('back')) { m.level = 'chars'; Audio.sfx('cancel'); return; }
+  if (hit('left') || hit('right')) {
+    const dir = keys.right ? 1 : -1, before = effStats(p);
+    if (m.row === 0) { const i = WPN_LIST.indexOf(p.weapon), nw = WPN_LIST[(i + dir + WPN_LIST.length) % WPN_LIST.length], other = Party.find(q => q !== p && q.weapon === nw); if (other) other.weapon = p.weapon; p.weapon = nw; m.swapped = other ? other.name : null; } // si otro la lleva, se la cambias
+    else { const i = ACC_LIST.indexOf(p.acc); p.acc = ACC_LIST[(i + dir + ACC_LIST.length) % ACC_LIST.length]; }
+    const after = effStats(p); p.cur.hp = clamp(p.cur.hp + after.hp - before.hp, 1, after.hp); p.cur.mp = clamp(p.cur.mp + after.mp - before.mp, 0, after.mp);
+    m.delta = { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp, t: 0 };
+    m.swing = 1; m.swingDir = dir; Audio.sfx('fwip'); Audio.sfx('equip', { when: .06 }); Audio.sfx('plop', { when: .14, semi: SEMI[p.id] || 0 });
+    const col = C(p.color); for (let j = 0; j < 8; j++) m.spl.push({ x: 226 + R(-10, 10), y: (m.row ? 130 : 98) + R(-4, 4), vx: R(-1.4, 1.4), vy: -R(.4, 1.8), col, t: 0 });
+  }
+}
+function drawMenu() {
+  const m = OW.menu; m.t++; m.flip++;
+  const k = m.closing ? clamp(1 - (m.t - m.closeT) / 10, 0, 1) : clamp(m.t / 16, 0, 1), e = m.closing ? k * k : easeBack(k), oy = Math.round((1 - e) * 200);
+  g.fillStyle = 'rgba(11,9,18,' + (.5 * e).toFixed(2) + ')'; g.fillRect(0, 0, W, H);
+  g.save(); g.translate(0, oy);
+  const p = Party[m.idx], col = C(p.color), rp = ramp(col), s = effStats(p);
+  // ---- página izquierda: fichas
+  page(6, 8, 128, 164, { rings: true });
+  ui('CUADERNO', 22, 14, GOLD); swatch(94, 14, C('amarillo')); ui(String(Game.pigmento), 104, 14, TXT);
+  const hy = 34 + m.idx * 44; m.hl = lerp(m.hl, hy, .3);
+  hilite(18, Math.round(m.hl) + 18, 128, 34, col, m.level === 'chars' ? .28 : .14);
+  Party.forEach((q, i) => {
+    const y = 34 + i * 44, qs = effStats(q), qc = C(q.color), sel = i === m.idx, popS = sel && m.pop > 0 ? 1 + m.pop * .25 : 1;
+    if (sel) m.pop = Math.max(0, m.pop - .12);
+    g.save(); g.translate(30, y + 14); g.scale(popS, popS); g.translate(-30, -y - 14); sticker(30, y + 14, { id: q.id, color: q.color, alive: q.cur.hp > 0, hp: q.cur.hp, maxhp: qs.hp }, 9); g.restore();
+    ui(q.name, 46, y + 2, ramp(qc).sh); ui(q.role, 46, y + 12, TXT2);
+    ui('HP', 46, y + 24, TXT3); pencilBar(64, y + 25, 34, 4, q.cur.hp / qs.hp, qc); ui('MP', 102, y + 24, TXT3); pencilBar(118, y + 25, 12, 4, q.cur.mp / qs.mp, desat(qc, .4, .1));
+    if (sel && m.level === 'chars') dropCursor(10, y + 10, qc);
+  });
+  // ---- página derecha: retrato, stats y equipo (pasa hoja al cambiar de personaje)
+  const fk = clamp(m.flip / 7, 0, 1), fsc = Math.sin(fk * Math.PI / 2);
+  g.save(); g.translate(140, 0); g.scale(Math.max(.05, fsc), 1);
+  page(0, 8, 174, 164);
+  // retrato con esquinas de cinta
+  const spr = buildSprite(`${p.id}_title`, col, null, { eyes: ((m.t + 20) % 150) < 6 ? 'blink' : p.cur.hp <= 0 ? 'ko' : 'normal' });
+  const px = 38, py = 44, pw = 64, ph = 56; g.fillStyle = '#e9e1cc'; g.fillRect(px - pw / 2, py - ph / 2 + 4, pw, ph); g.fillStyle = PENCIL; g.strokeStyle = PENCIL; g.strokeRect(px - pw / 2 + .5, py - ph / 2 + 4.5, pw - 1, ph - 1);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => tape(px + a * (pw / 2 - 8) - 7, py + b * (ph / 2 - 3) + 1, 14, 5));
+  const bounce = m.pop > 0 ? 1 + Math.sin(m.pop * Math.PI) * .15 : 1, breathe = 1 + Math.sin(m.t * .08) * .02;
+  shadow(px, py + ph / 2 - 2, 20); drawSprite(spr, px, py + ph / 2 - 2, bounce, false, breathe * (2 - bounce)); if (p.id === 'anil') drawSatellites(px, py + ph / 2 - 6, m.t, col, .8);
+  ui(p.name, 80, 16, rp.sh); ui(p.role, 80, 26, TXT2);
+  const D = m.delta && m.delta.t < 50 ? m.delta : null; if (m.delta) m.delta.t++;
+  const stat = (label, val, x, y, d) => { ui(label, x, y, TXT3); ui(String(val), x + label.length * 8 + 4, y, TXT); if (d) { const dx = x + label.length * 8 + 4 + String(val).length * 8 + 4; ui((d > 0 ? '+' : '') + d, dx, y - Math.round((1 - clamp(D.t / 12, 0, 1)) * 4), d > 0 ? '#2f9a48' : C('rojo')); } };
+  stat('HP', p.cur.hp + '/' + s.hp, 80, 38, D && D.hp); stat('MP', p.cur.mp + '/' + s.mp, 80, 48, D && D.mp);
+  stat('ATK', s.atk, 80, 60, D && D.atk); stat('DEF', s.def, 80, 70, D && D.def); stat('SPD', s.spd, 80, 80, D && D.spd);
+  // equipo
+  const rows = [['ARMA', DATA.weapons[p.weapon].name, DATA.weapons[p.weapon].desc], ['ACCESORIO', DATA.accessories[p.acc].name, DATA.accessories[p.acc].desc]];
+  if (m.swing > 0) m.swing = Math.max(0, m.swing - .09);
+  rows.forEach(([label, name, desc], r) => {
+    const y = 92 + r * 28, sel = m.level === 'equip' && m.row === r; ui(label, 12, y, TXT3);
+    if (sel) { hilite(10, y + 17, 166, 16, col, .3); ui('◄', 10, y + 12, rp.sh); ui('►', 158, y + 12, rp.sh); }
+    const sw = sel && m.swing > 0 ? m.swingDir * Math.sin(m.swing * Math.PI) * 14 * m.swing : 0, ang = sel && m.swing > 0 ? Math.sin(m.swing * Math.PI * 2) * .3 * m.swing : 0;
+    if (r === 0) { const img = propSprite(p.weapon, col), P = PROP[p.weapon]; drawProp(img, 46 + sw, y + 20, ang - .2, 1, P.tip[0], P.tip[1], .62); }
+    else { const icons = { paleta: 'tech', goma: 'item', sacapuntas: 'lapiz', lienzo: 'item', difumino: 'pincel' }; g.save(); g.translate(30 + sw, y + 18); g.rotate(ang); g.drawImage(iconSprite(icons[p.acc] || 'item', col), -6, -6); g.restore(); }
+    ui(name, 66, y + 12, sel ? TXT : TXT2);
+  });
+  const wrap = (txt, n) => { const out = []; let line = ''; for (const w of txt.split(' ')) { if ((line + ' ' + w).trim().length > n) { out.push(line.trim()); line = w; } else line += ' ' + w; } if (line.trim()) out.push(line.trim()); return out.slice(0, 2); };
+  const desc = m.level === 'equip' ? (m.row === 0 && m.swapped && m.delta && m.delta.t < 90 ? 'Se la cambias a ' + m.swapped + '. ' + rows[0][2] : rows[m.row][2]) : p.role === 'Guardia' ? 'Sostiene el dibujo hasta el final.' : p.role === 'Veloz' ? 'Corre para que nadie la borre.' : 'Pinta por pintar.';
+  wrap(desc, 20).forEach((l, i) => ui(l, 10, 141 + i * 10, TXT));
+  ui(m.level === 'equip' ? '◄► cambiar · X volver' : 'Z equipo · X cerrar', 10, 161, TXT3);
+  for (const q of m.spl) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += .12; g.fillStyle = q.t < 8 ? ramp(q.col).hi : ramp(q.col).base; g.fillRect(Math.round(q.x - 140), Math.round(q.y), 2, 2); } m.spl = m.spl.filter(q => q.t < 24);
+  g.restore(); g.restore();
+}

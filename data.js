@@ -45,9 +45,16 @@ const DATA = {
 
   // ---- Techs. users define si es simple/doble/triple. color decide el multiplicador.
   techs: {
-    brochazo:  { name: 'Brochazo',     users: ['carmin'],                  color: 'rojo',     mp: 4, power: 1.8, target: 'enemy',  desc: 'Trazo rojo brutal a un enemigo.' },
-    trazo:     { name: 'Trazo doble',  users: ['ambar'],                   color: 'amarillo', mp: 3, power: 0.85, hits: 2, target: 'enemy', desc: 'Dos trazos amarillos rapidísimos.' },
-    salpicon:  { name: 'Salpicón',     users: ['anil'],                    color: 'azul',     mp: 5, power: 1.1, target: 'enemies', desc: 'Salpica azul a todos los enemigos.' },
+    // techs de herramienta: cada personaje tiene una tech propia con cada arma (user + weapon), siempre de su color
+    brochazo:   { name: 'Brochazo',    user: 'carmin', weapon: 'brocha', mp: 4, power: 1.8, target: 'enemy',   desc: 'La brocha cae como un mazo y estampa una Z.' },
+    tachon:     { name: 'Tachón',      user: 'carmin', weapon: 'lapiz',  mp: 4, power: 1.5, target: 'enemy',   status: 'lento', desc: 'Clava el lápiz y tacha al enemigo. Lo ralentiza.' },
+    manchurron: { name: 'Manchurrón',  user: 'carmin', weapon: 'pincel', mp: 5, power: 1.7, target: 'enemy',   desc: 'Carga el pincel hasta reventar y planta un pegote.' },
+    rafaga:     { name: 'Ráfaga',      user: 'ambar',  weapon: 'brocha', mp: 4, power: 0.7, target: 'enemies', desc: 'Cruza la fila de enemigos a brochazos rápidos.' },
+    trazo:      { name: 'Trazo doble', user: 'ambar',  weapon: 'lapiz',  mp: 3, power: 0.85, hits: 2, target: 'enemy', desc: 'Dos trazos rapidísimos en X.' },
+    punteado:   { name: 'Punteado',    user: 'ambar',  weapon: 'pincel', mp: 4, power: 0.45, hits: 4, target: 'enemy', desc: 'Cuatro toques de pincel a toda velocidad.' },
+    aguada:     { name: 'Aguada',      user: 'anil',   weapon: 'brocha', mp: 5, power: 0.9, target: 'enemies', status: 'lento', desc: 'Un baño de color diluido empapa a todos.' },
+    contorno:   { name: 'Contorno',    user: 'anil',   weapon: 'lapiz',  mp: 4, power: 0,   target: 'party',   status: 'contorno', desc: 'Perfila a lápiz al grupo: reciben menos daño.' },
+    salpicon:   { name: 'Salpicón',    user: 'anil',   weapon: 'pincel', mp: 5, power: 1.1, target: 'enemies', desc: 'Salta y salpica a todos los enemigos.' },
     llamarada: { name: 'Llamarada',    users: ['carmin', 'ambar'],         color: 'naranja',  mp: 6, power: 1.5, target: 'enemies', desc: 'Rojo+Amarillo: fuego naranja en área.' },
     brote:     { name: 'Brote',        users: ['ambar', 'anil'],           color: 'verde',    mp: 5, power: 0.7, heal: 0.35, target: 'enemies', desc: 'Amarillo+Azul: brota vida verde. Cura al grupo y daña.' },
     eclipse:   { name: 'Eclipse',      users: ['carmin', 'anil'],          color: 'violeta',  mp: 7, power: 3.0, target: 'enemy', status: 'lento', desc: 'Rojo+Azul: violeta que aplasta y ralentiza.' },
