@@ -167,6 +167,39 @@ function* techContorno(u, allies, tech, col) { // Añil perfila a lápiz a cada 
   }
   yield* wait(16); u.pose = 'idle'; yield* wait(6); camReset();
 }
+
+// ---- La Pluma: cada gota escribe distinto
+function* techFirma(u, t, tech, col) { // la pluma firma con floritura sobre el enemigo y remata con el punto final: queda firmado (recibe más daño)
+  camFocus(u.wx, u.wy, { dist: 70, turn: .3, h: 40, ease: .1 }); yield* anticipate(u, 12); camFocus(t.wx, t.wy, { dist: 78, turn: -.3, h: 46 }); u.pose = 'attack'; yield* whop(u, ...infront(u, t, t.def.w * .7 + 18), 10, 12); yield* wait(4);
+  const img = propSprite('pluma', C(col)), P = PROP.pluma, c0 = t.wx, c1 = t.wy, h = t.def.h; // floritura: dos bucles y un rasgo largo
+  const pts = []; for (let i = 0; i <= 22; i++) { const k = i / 22, a = k * 12.5; pts.push([c0 - 14 + k * 30 + Math.cos(a) * 6 * (1 - k * .5), c1 + Math.sin(a) * 3, h * .25 + Math.sin(a) * h * .3 + k * h * .35]); }
+  pts.push([c0 + 20, c1 - 4, h * .9], [c0 + 26, c1 - 6, h * 1.05]);
+  Audio.sfx('scratch_long'); Audio.sfx('scratch', { when: .25 });
+  yield* toolStroke({ kind: 'pluma', color: C(col), pts, w: 3, col: C(col), frames: 22, fac: -1, life: 140, jit: 0, scale: 1.1, onTip: (k, wp) => { if (Math.random() < .35) B.particles.push({ wx: wp[0], wy: wp[1], wz: wp[2], vx: R(-.3, .3), vy: 0, vz: R(.2, .8), g: .06, col: C(col), t: 0, life: 12, size: 1 }); } });
+  // el punto final: la pluma se clava
+  const dot = [c0 + 2, c1, h * .55]; sparkle(dot[0], dot[1], dot[2], '#ffffff'); B.hitstop = 8; B.shake = 6; B.slowmo = 10; Audio.sfx('impact_sub', { vol: .6 });
+  mark({ kind: 'blob', p: dot, w: 6, col: C(col), grow: 2, life: 140, seed: 2 }); damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); t.status.firmado = 3; num(t, 'FIRMADO', C(col)); goop(t, C(col), 90);
+  yield* wait(22); yield* returnHome(u); yield* wait(6); camReset();
+}
+function* techTaquigrafia(u, targets, tech, col) { // Ámbar cruza el campo escribiendo símbolos a toda velocidad: tres golpes repartidos, cada uno deja un glifo
+  const ec = enemyC(); camFocus(ec[0], ec[1], { dist: 104, turn: -.1, h: 60, pitch: .64 }); yield* anticipate(u, 10); u.pose = 'attack'; const gh = ghostsOf(u); const img = propSprite('pluma', C(col)), P = PROP.pluma;
+  const T = alive(targets); for (let h = 0; h < 3; h++) { const t = T[(h + RI(0, T.length - 1)) % T.length]; Audio.sfx('dash', { vol: .7 });
+    const [ax, ay] = infront(u, t, t.def.w * .6 + 12); for (let i = 1; i <= 5; i++) { const k = i / 5; u.wx = lerp(u.wx, ax, k); u.wy = lerp(u.wy, ay, k); gh.add(); yield; }
+    const gl = []; for (let i = 0; i < 4; i++) gl.push([t.wx + R(-8, 8), t.wy + R(-3, 3), t.def.h * R(.2, .9)]); Audio.sfx('scratch', { vol: .6 });
+    yield* toolStroke({ kind: 'pluma', color: C(col), pts: gl, w: 2, col: C(col), frames: 4, fac: -1, life: 90, jit: 1, scale: 1 });
+    damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, tech.power), col, u.name); if (h === 2) goop(t, C(col), 60); yield* wait(3); }
+  gh.end(); yield* wait(16); yield* returnHome(u, 8); yield* wait(6); camReset();
+}
+function* techCaligrafia(u, a, tech, col) { // Añil escribe el nombre del aliado en el aire, letra a letra; al acabar, el aliado se cura y se limpia
+  camFocus(a.wx, a.wy, { dist: 84, turn: .35, h: 50, pitch: .55, hy: 92, ease: .1 }); yield* anticipate(u, 10); u.pose = 'attack';
+  const name = a.name.toLowerCase(), img = propSprite('pluma', C(col)), P = PROP.pluma, st = { d: 0, HS: null };
+  const wf = fx(999, () => { const c = PJ([a.wx, a.wy, a.def.h + 2]); const S = 1.3 * c[2], cw = 11 * c[2]; if (!st.HS || st.cx !== (c[0] | 0) || st.cy !== (c[1] | 0)) { st.HS = handStrokes(name, c[0] - name.length * cw / 2, c[1] - 12 * S, S, cw); st.cx = c[0] | 0; st.cy = c[1] | 0; } drawHand(st.HS, st.d * st.HS.total, C(col), 2);
+    if (st.d < 1) { const cur = st.HS.list.find(x => st.d * st.HS.total < x.start + x.len) || st.HS.list[st.HS.list.length - 1]; const k = clamp((st.d * st.HS.total - cur.start) / cur.len, 0, 1), q = pointAt(cur.pts, k); drawProp(img, q[0], q[1], -.9, 1, P.tip[0], P.tip[1], 1 * c[2]); } });
+  for (let i = 1; i <= 40; i++) { st.d = i / 40; if (i % 5 === 0) Audio.sfx('scratch', { vol: .3, semi: 4 + (i / 5) % 4 }); yield; }
+  Audio.sfx('tinkle', { semi: 7 }); Audio.sfx('heal_bells', { when: .1 }); B.flash = { col: C(col), a: .25 };
+  heal(a, Math.round(a.maxhp * tech.heal)); if (tech.cure) { delete a.status.tiznado; delete a.status.lento; num(a, 'LIMPIO', '#f4f0ea'); } sparkle(a.wx, a.wy, a.def.h + 6, '#ffffff'); burst(a.wx, a.wy, a.def.h * .5, C(col), 12, 1.4, 26, .02);
+  for (let i = 0; i < 24; i++) { st.d = 1; yield; } wf.dur = 0; u.pose = 'idle'; yield* wait(8); camReset();
+}
 // =====================================================================
 // Combos: carga y fusión común, liberación propia de cada mezcla
 // =====================================================================
@@ -347,6 +380,9 @@ function* actTech(users, tech, targets, col) {
   else if (id === 'aguada') yield* techAguada(users[0], targets, tech, col);
   else if (id === 'contorno') yield* techContorno(users[0], targets, tech, col);
   else if (id === 'salpicon') yield* techSalpicon(users[0], targets, tech, col);
+  else if (id === 'firma') yield* techFirma(users[0], targets[0], tech, col);
+  else if (id === 'taquigrafia') yield* techTaquigrafia(users[0], targets, tech, col);
+  else if (id === 'caligrafia') yield* techCaligrafia(users[0], targets[0], tech, col);
   else if (id === 'llamarada') yield* techLlamarada(users, targets, tech, col);
   else if (id === 'brote') yield* techBrote(users, targets, tech, col);
   else if (id === 'eclipse') yield* techEclipse(users, targets[0], tech, col);

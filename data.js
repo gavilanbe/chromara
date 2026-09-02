@@ -21,6 +21,7 @@ const DATA = {
     brocha: { name: 'Brocha',  atk: 6, spd: -1, desc: 'Brocha gorda. Trazos contundentes.' },
     lapiz:  { name: 'Lápiz',   atk: 4, spd: 2,  desc: 'Lápiz afilado. Rápido y preciso.' },
     pincel: { name: 'Pincel',  atk: 3, mp: 6,   desc: 'Pincel fino. Canaliza más pigmento.' },
+    pluma:  { name: 'Pluma',   atk: 5, mp: 4,   found: true, desc: 'Estilográfica del delineante. Escribe con tu color.' },
   },
   accessories: {
     paleta:     { name: 'Paleta',      mp: 8,  techDiscount: 1, desc: 'Las techs cuestan 1 MP menos.' },
@@ -54,6 +55,9 @@ const DATA = {
     punteado:   { name: 'Punteado',    user: 'ambar',  weapon: 'pincel', mp: 4, power: 0.45, hits: 4, target: 'enemy', desc: 'Cuatro toques de pincel a toda velocidad.' },
     aguada:     { name: 'Aguada',      user: 'anil',   weapon: 'brocha', mp: 5, power: 0.9, target: 'enemies', status: 'lento', desc: 'Un baño de color diluido empapa a todos.' },
     contorno:   { name: 'Contorno',    user: 'anil',   weapon: 'lapiz',  mp: 4, power: 0,   target: 'party',   status: 'contorno', desc: 'Perfila a lápiz al grupo: reciben menos daño.' },
+    firma:      { name: 'Firma',       user: 'carmin', weapon: 'pluma',  mp: 5, power: 1.6, target: 'enemy',   status: 'firmado', desc: 'Firma al enemigo con floritura: recibe más daño.' },
+    taquigrafia:{ name: 'Taquigrafía', user: 'ambar',  weapon: 'pluma',  mp: 4, power: 0.5, hits: 3, target: 'enemies', desc: 'Tres golpes rapidísimos repartidos.' },
+    caligrafia: { name: 'Caligrafía',  user: 'anil',   weapon: 'pluma',  mp: 5, power: 0, heal: 0.4, target: 'ally', cure: true, desc: 'Escribe bien el nombre de un aliado: cura y limpia.' },
     salpicon:   { name: 'Salpicón',    user: 'anil',   weapon: 'pincel', mp: 5, power: 1.1, target: 'enemies', desc: 'Salta y salpica a todos los enemigos.' },
     llamarada: { name: 'Llamarada',    users: ['carmin', 'ambar'],         color: 'naranja',  mp: 6, power: 1.5, target: 'enemies', desc: 'Rojo+Amarillo: fuego naranja en área.' },
     brote:     { name: 'Brote',        users: ['ambar', 'anil'],           color: 'verde',    mp: 5, power: 0.7, heal: 0.35, target: 'enemies', desc: 'Amarillo+Azul: brota vida verde. Cura al grupo y daña.' },
@@ -83,7 +87,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  k tintero  R río de tinta  G goma empujable  W estante  E estuche  w semilla  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -100,15 +104,15 @@ const DATA = {
     'T....~~~...=....~~~~~.....T....TT......T',
     'T..........=...~~~~..........TT........T',
     'T...1......=...~~~~....r...............T',
-    'T..........=====~~~~======.....x.......T',
-    'T........T.....~~~~.....=..............T',
-    'T...S...TT......~~~~....=...T.....6....T',
-    'T......TT........~~~~...=..TT..........T',
-    'T.....TT..........~~~~..=..T...........T',
-    'T.....T.V..........~~~~.=..............T',
-    'T..P..T.............~~~~=.....r........T',
-    'T.....T.S............~~~=~.............T',
-    'T.....T...............~~=~~............T',
+    'T..........=====~~~~=====...........TTTT',
+    'T........T.....~~~~.....=.G..k......T..T',
+    'T...S...TT......~~~~....=....RR....TTETT',
+    'T......TT........~~~~...=....RR....T..TT',
+    'T.....TT..........~~~~..=....RR....TWWTT',
+    'T.....T.V..........~~~~.=....RR.....w..T',
+    'T..P..T.............~~~~=....RR........T',
+    'T.....T.S............~~~=....RR........T',
+    'T.....T...............~~=..S.RR........T',
     'T.....TT...............~=~~~...........T',
     'T......TT..............~=~~~~..........T',
     'T.......TTT...........~~=~~~~~.........T',
@@ -117,7 +121,9 @@ const DATA = {
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
   ],
 
-  signs: { '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
+  signs: { '27,23': ['Post-it del delineante:', 'Tapona el tintero, deja', 'secar, y une los puntos', '1→5. Dos se ven a oscuras.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
+  // ---- Puzle del estuche: puntos a unir (coordenadas de tile con decimales), los ocultos solo se ven con Revelar
+  puzzle: { dots: [{ n: 1, x: 28.4, y: 21.4 }, { n: 2, x: 29.5, y: 21.2, hidden: true }, { n: 3, x: 30.5, y: 20.4 }, { n: 4, x: 31.4, y: 21.6, hidden: true }, { n: 5, x: 32.4, y: 20.8 }], tries: 3 },
   // ---- Diálogo previo a la jefa (who: tinta | carmin | ambar | anil)
   bossDialogue: [
     { who: 'tinta', text: 'Otra vez color en mi página.' },

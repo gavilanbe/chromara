@@ -26,7 +26,7 @@ function seeded(seed) { let s = seed >>> 0; return () => { s += 0x6D2B79F5; let 
 
 // --- Input
 const keys = {}, pressed = {};
-const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', z: 'ok', Enter: 'ok', ' ': 'ok', x: 'back', Escape: 'back', Tab: 'swap', F1: 'debug' };
+const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', z: 'ok', Enter: 'ok', ' ': 'ok', x: 'back', Escape: 'back', Tab: 'swap', c: 'ring', F1: 'debug' };
 addEventListener('keydown', e => {
   const k = KEYMAP[e.key] || KEYMAP[e.key.toLowerCase()];
   if (!k) return;
@@ -460,6 +460,7 @@ DATA.map.forEach((row, y) => {
     if (ch === 'P') { MAP.spawn = [x, y]; ch = '.'; }
     else if (ch === 'V') { MAP.jar = { x, y }; ch = '.'; }
     else if (ch === 'S') { (MAP.signs = MAP.signs || []).push({ x, y, lines: DATA.signs[x + ',' + y] || ['Post-it'] }); ch = '.'; }
+    else if ('kRGWEw'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], shelf: [] }; if (ch === 'k') P.tintero = [x, y]; else if (ch === 'R') P.river.push([x, y]); else if (ch === 'G') P.block0 = [x, y]; else if (ch === 'W') P.shelf.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; else if (ch === 'w') P.seed = [x, y]; ch = ch === 'R' ? ',' : '.'; }
     else if (DATA.encounters[ch]) { MAP.spots.push({ key: ch, x, y }); ch = ch === 'B' ? ',' : (ch === '5' ? ',' : '.'); }
     out += ch;
   }
@@ -482,7 +483,8 @@ function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 
 // =====================================================================
 // 3. Estado global de partida
 // =====================================================================
-const Game = { state: 'cover', t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), bossDown: false, intro: true, debug: false };
+const PUZ0 = () => ({ block: MAP.pz ? [...MAP.pz.block0] : [0, 0], plugged: false, dry: 0, revealed: false, next: 1, drawn: [], tries: DATA.puzzle.tries, bridged: false, vine: 0, opened: false, wrong: null });
+const Game = { state: 'cover', owned: {}, puzzle: null, t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), bossDown: false, intro: true, debug: false };
 function effStats(p) { // base + arma + accesorio
   const wpn = DATA.weapons[p.weapon] || {}, acc = DATA.accessories[p.acc] || {};
   const s = { hp: p.hp, mp: p.mp, atk: p.atk, def: p.def, spd: p.spd };
@@ -498,12 +500,23 @@ function setState(s) { Game.state = s; Game.t = 0; }
 // =====================================================================
 const OW = { x: 0, y: 0, cam: { x: 0, y: 0 }, hist: [], moving: false, t: 0, msg: null, menu: null, foes: [] };
 function initOverworld() {
+  if (!Game.puzzle) Game.puzzle = PUZ0();
   OW.x = MAP.spawn[0] * TILE + 8; OW.y = MAP.spawn[1] * TILE + 12; OW.hist = []; OW.puddles = []; OW.dust = []; OW.vx = OW.vy = 0; OW.bob = 0; OW.dir = 'down'; OW.landT = 0; OW.landZ = null; OW.landed = [0, 0, 0]; OW.jar = { bubbles: [], tint: [], hidden: [false, false, false], jump: [null, null, null], pos: [], wob: 0, glow: 0, cd: 0 }; OW.heal = null; OW.floats = []; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
   OW.foes = MAP.spots.map(s => ({ key: s.key, hx: s.x * TILE + 8, hy: s.y * TILE + 12, x: s.x * TILE + 8, y: s.y * TILE + 12, tx: 0, ty: 0, t: RI(0, 60), enemies: DATA.encounters[s.key], boss: s.key === 'B', seed: s.x * 7 + s.y }));
   if (Game.intro) OW.msg = { lines: DATA.texts.intro, t: 0 };
   OW.msgWait = true;
 }
+function pzSolidTile(tx, ty) { // objetos del puzle que bloquean el paso
+  const P = MAP.pz, Z = Game.puzzle; if (!P || !Z) return false;
+  if (P.tintero && tx === P.tintero[0] && ty === P.tintero[1]) return true;
+  if (Z.block[0] === tx && Z.block[1] === ty) return true;
+  if (P.estuche && tx === P.estuche[0] && ty === P.estuche[1]) return true;
+  if (P.shelf.some(([x, y]) => x === tx && y === ty)) return !(Z.vine >= 1 && P.seed && tx === P.seed[0] && ty === P.seed[1] - 1);
+  if (P.river.some(([x, y]) => x === tx && y === ty)) return !(Z.bridged || Z.drawn.some(sg => sg[2] >= 1 && (sg[1][0] / TILE | 0) === tx && (sg[1][1] / TILE | 0) === ty));
+  return false;
+}
 function walkable(px, py) { // hitbox pies 8×6
+  for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (pzSolidTile((px + dx) / TILE | 0, (py + dy) / TILE | 0)) return false;
   if (MAP.jar) { const jx = MAP.jar.x * TILE, jy = MAP.jar.y * TILE; if (px > jx - 4 && px < jx + 36 && py > jy - 2 && py < jy + 30) return false; }
   for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (solid(tileAt((px + dx) / TILE | 0, (py + dy) / TILE | 0))) return false;
   return true;
@@ -524,8 +537,12 @@ function updateOverworld() {
   for (const sg of MAP.signs || []) { const d = Math.hypot(OW.x - sg.x * TILE - 8, OW.y - sg.y * TILE - 8); if (d < 14 && !sg.read) { sg.read = true; OW.msg = { lines: sg.lines, t: 0 }; Audio.sfx('page'); return; } if (d > 24) sg.read = false; }
   if (OW.hint > 0) OW.hint--;
   if (MAP.jar) { const jx = MAP.jar.x * TILE + 16, jy = MAP.jar.y * TILE + 34, d = Math.hypot(OW.x - jx, OW.y - jy); if (d > 40) J.cd = 0; if (d < 16 && !J.cd) { J.pos = Party.map((p, i) => { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; return i === 0 ? [OW.x, OW.y] : (h ? [h[0], h[1]] : [OW.x - i * 12, OW.y]); }); OW.vx = OW.vy = 0; OW.moving = false; OW.heal = healGen(); return; } }
+  if (OW.act) { if (OW.act.next().done) OW.act = null; for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life); return; }
+  if (OW.ring) { updateRing(); return; }
   if (OW.menu) { updateMenu(); return; }
-  if (hit('ok')) { openMenu(); return; }
+  if (hit('ok')) { if (MAP.pz && MAP.pz.estuche && !Game.puzzle.opened && Math.hypot(OW.x - MAP.pz.estuche[0] * TILE - 8, OW.y - MAP.pz.estuche[1] * TILE - 8) < 26) { OW.act = openEstucheGen(); return; } openMenu(); return; }
+  if (hit('ring')) { openRing(); return; }
+  if (Game.puzzle.plugged && Game.puzzle.dry < 1) { Game.puzzle.dry = Math.min(1, Game.puzzle.dry + .0028); if (Game.puzzle.dry >= 1) { Audio.sfx('crumbs'); Audio.sfx('page', { vol: .4 }); } }
   // movimiento con aceleración y frenada; el líder bota al andar (es una gota)
   let dx = 0, dy = 0; if (keys.left) dx--; if (keys.right) dx++; if (keys.up) dy--; if (keys.down) dy++;
   if (dx && dy) { dx *= .707; dy *= .707; }
@@ -597,6 +614,92 @@ function* healGen() { // el grupo salta dentro del vaso, el agua se tiñe de sus
   J.glow = 0; yield* wait(10);
   OW.msg = { lines: ['Aclaráis las gotas en el vaso.', '', '¡HP y MP al máximo!'], t: 0 }; J.cd = 1;
 }
+// ---- Ruedita de utensilios (la psinergia de Chromara): cada arma da una habilidad de campo; el dueño se adelanta y la ejecuta
+const FIELD = [
+  { id: 'empujar', name: 'Empujar', weapon: 'brocha', mp: 0, desc: 'Mueve gomas y trastos' },
+  { id: 'trazar', name: 'Trazar', weapon: 'lapiz', mp: 1, desc: 'Une los puntos' },
+  { id: 'regar', name: 'Regar', weapon: 'pincel', mp: 2, desc: 'Hace brotar semillas' },
+  { id: 'revelar', name: 'Revelar', combo: ['carmin', 'anil'], mp: 3, desc: 'Muestra lo oculto' },
+];
+function fieldOwner(f) { return f.weapon ? Party.find(p => p.weapon === f.weapon && p.cur.hp > 0) : null; }
+function fieldOk(f) { if (f.combo) return f.combo.every(id => { const p = Party.find(q => q.id === id); return p && p.cur.hp > 0 && p.cur.mp >= f.mp; }); const o = fieldOwner(f); return !!o && o.cur.mp >= f.mp; }
+function openRing() { OW.ring = { idx: 0, t: 0 }; Audio.sfx('book_open', { vol: .6 }); }
+function updateRing() {
+  const r = OW.ring; r.t++;
+  if (hit('left')) { r.idx = (r.idx + 3) % 4; Audio.sfx('cursor', { semi: r.idx * 2 }); } if (hit('right') || hit('down') || hit('up')) { r.idx = (r.idx + 1) % 4; Audio.sfx('cursor', { semi: r.idx * 2 }); }
+  if (hit('back') || hit('ring')) { OW.ring = null; Audio.sfx('cancel'); return; }
+  if (hit('ok')) { const f = FIELD[r.idx]; if (!fieldOk(f)) { Audio.sfx('nope'); OW.msg = { lines: [f.name + ': ' + (f.combo ? 'hacen falta Carmín y Añil con MP.' : fieldOwner(f) ? 'sin pigmento suficiente.' : 'nadie lleva ' + DATA.weapons[f.weapon].name.toLowerCase() + '.')], t: 0 }; OW.ring = null; return; } OW.ring = null; Audio.sfx('confirm'); OW.act = fieldGen(f); }
+}
+function drawRing() {
+  const r = OW.ring, cx = OW.x - Math.round(OW.cam.x), cy = OW.y - Math.round(OW.cam.y) - 6, k = clamp(r.t / 6, 0, 1), rad = 24 * k;
+  g.fillStyle = 'rgba(11,9,18,.25)'; g.fillRect(0, 0, W, H);
+  FIELD.forEach((f, i) => { const a = -Math.PI / 2 + i * Math.PI / 2 + (1 - k) * .6, x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad * .7, sel = i === r.idx, ok = fieldOk(f), owner = fieldOwner(f), col = owner ? C(owner.color) : f.combo ? C('violeta') : '#9a90a8';
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y, sel ? 10 : 8, 0, 6.29); g.fill(); g.fillStyle = ok ? col : '#c9c4d4'; g.beginPath(); g.arc(x, y, sel ? 8.5 : 6.5, 0, 6.29); g.fill();
+    g.globalAlpha = ok ? 1 : .45; g.drawImage(iconSprite(f.weapon || 'tech', col), Math.round(x - 6), Math.round(y - 6)); g.globalAlpha = 1;
+    if (sel) { const w = f.name.length * 8 + 16; tape(cx - w / 2, cy + 26, w, 14); ui(f.name, cx - w / 2 + 8, cy + 29, TXT); const d = f.desc + (f.mp ? ' · ' + f.mp + ' MP' : ''); ui(d, W / 2 - d.length * 4, H - 14, TXT2); } });
+}
+function nearestDot(px, py) { // el siguiente punto si está al alcance; si no, el más cercano sin unir (que será un error)
+  const Z = Game.puzzle, vis = DATA.puzzle.dots.filter(d => !(d.hidden && !Z.revealed) && d.n >= Z.next), dist = d => Math.hypot(px - d.x * TILE, py - d.y * TILE); const nx = vis.find(d => d.n === Z.next); if (nx && dist(nx) < 28) return nx; let best = null, bd = 28; for (const d of vis) { const dd = dist(d); if (dd < bd) { bd = dd; best = d; } } return best; }
+function* fieldGen(f) {
+  const P = MAP.pz, Z = Game.puzzle, owner = f.combo ? Party.find(q => q.id === f.combo[0]) : fieldOwner(f), lx = OW.x / TILE | 0, ly = (OW.y + 2) / TILE | 0, dir = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[OW.dir] || [0, 1];
+  const say2 = lines => { OW.msg = { lines, t: 0 }; };
+  if (f.id === 'empujar') {
+    const bx = Z.block[0], by = Z.block[1]; if (Math.abs(bx - lx) + Math.abs(by - ly) !== 1 || (bx - lx !== dir[0] || by - ly !== dir[1])) { say2(['No hay nada que empujar por ahí.']); return; }
+    const tx = bx + dir[0], ty = by + dir[1]; if (solid(tileAt(tx, ty)) || pzSolidTile(tx, ty)) { Audio.sfx('nope'); say2(['La goma no pasa por ahí.']); return; }
+    Audio.sfx('rub'); Z.push = { from: [bx, by], to: [tx, ty], k: 0 }; for (let i = 1; i <= 14; i++) { Z.push.k = i / 14; if (i % 4 === 0) for (let j = 0; j < 3; j++) OW.dust.push({ x: bx * TILE + 8 + R(-6, 6), y: by * TILE + 14, vx: -dir[0] * R(.3, 1), vy: -R(.2, .6), col: '#e86a8a', t: 0, life: RI(8, 14) }); yield; }
+    Z.block = [tx, ty]; Z.push = null; Audio.sfx('impact_sub', { vol: .4 });
+    if (P.tintero && Math.abs(tx - P.tintero[0]) + Math.abs(ty - P.tintero[1]) === 1 && !Z.plugged) { Z.plugged = true; Audio.sfx('plop', { semi: -4 }); Audio.sfx('hum_down', { vol: .3 }); yield* wait(10); say2(['La goma tapona el tintero.', 'La tinta deja de manar:', 'el río empieza a secarse.']); }
+    return;
+  }
+  if (f.id === 'trazar') {
+    const d = nearestDot(OW.x, OW.y); if (!d) { say2(['No hay puntos que unir aquí.']); return; }
+    if (Z.bridged) { say2(['Ya está trazado.']); return; }
+    if (Z.dry < 1) { Audio.sfx('nope'); say2(['La tinta aún está húmeda:', 'el lápiz resbala.']); return; }
+    owner.cur.mp -= f.mp; const from = Z.next === 1 ? [d.x * TILE, d.y * TILE] : Z.drawn[Z.drawn.length - 1][1];
+    if (d.n !== Z.next) {
+      Audio.sfx('scratch_long'); const pts = []; for (let i = 0; i <= 8; i++) pts.push([lerp(from[0], d.x * TILE, i / 8) + R(-5, 5), lerp(from[1], d.y * TILE, i / 8) + R(-5, 5)]); Z.wrong = { pts, k: 0 }; for (let i = 1; i <= 12; i++) { Z.wrong.k = i / 12; yield; } yield* wait(10);
+      Audio.sfx('rub'); Audio.sfx('crumbs', { when: .2 }); for (let i = 1; i <= 12; i++) { Z.wrong.k = 1 - i / 12; for (let j = 0; j < 2; j++) OW.dust.push({ x: lerp(from[0], d.x * TILE, R(0, 1)), y: lerp(from[1], d.y * TILE, R(0, 1)), vx: R(-.5, .5), vy: -R(.3, .9), col: '#e86a8a', t: 0, life: RI(8, 14) }); yield; }
+      Z.wrong = null; Z.drawn = []; Z.next = 1; Z.tries = Math.max(0, Z.tries - 1); say2(['Ese no era el siguiente.', Z.tries > 0 ? 'La Goma lo borra. Quedan ' + Z.tries + '.' : 'La Goma está gastada… pero', 'un delineante nunca se rinde.']); if (Z.tries === 0) Z.tries = 3; return; }
+    Audio.sfx('scratch'); const seg = [from, [d.x * TILE, d.y * TILE], 0]; Z.drawn.push(seg); for (let i = 1; i <= 12; i++) { seg[2] = i / 12; yield; }
+    Z.next++; if (Z.next > DATA.puzzle.dots.length) { Z.bridged = true; Audio.sfx('tinkle', { semi: 7 }); Audio.sfx('confirm', { when: .1 }); yield* wait(8); say2(['Los puntos forman un puente', 'de rayas sobre la tinta seca.']); }
+    return;
+  }
+  if (f.id === 'regar') {
+    if (!P.seed || Math.hypot(OW.x - P.seed[0] * TILE - 8, OW.y - P.seed[1] * TILE - 8) > 30) { say2(['No hay nada que regar aquí.']); return; }
+    if (Z.vine >= 1) { say2(['La enredadera ya está crecida.']); return; }
+    owner.cur.mp -= f.mp; Audio.sfx('splash_clean'); for (let i = 0; i < 14; i++) { for (let j = 0; j < 2; j++) OW.dust.push({ x: P.seed[0] * TILE + 8 + R(-5, 5), y: P.seed[1] * TILE + 4, vx: R(-.4, .4), vy: -R(.5, 1.4), col: C('azul'), t: 0, life: RI(10, 16) }); yield; }
+    Audio.sfx('grow'); for (let i = 1; i <= 40; i++) { Z.vine = i / 40; if (i % 8 === 0) Audio.sfx('leaves', { vol: .5 }); if (i % 3 === 0) OW.dust.push({ x: P.seed[0] * TILE + 8 + R(-6, 6), y: P.seed[1] * TILE + 8 - Z.vine * 26, vx: R(-.3, .3), vy: -R(.2, .5), col: '#7ecb60', t: 0, life: 16 }); yield; }
+    Audio.sfx('tinkle', { semi: 4 }); say2(['Brota una enredadera', 'que trepa por el estante.']); return;
+  }
+  if (f.id === 'revelar') {
+    f.combo.forEach(id => { const q = Party.find(p => p.id === id); q.cur.mp -= f.mp; }); Audio.sfx('hum_down'); Audio.sfx('glass', { when: .3 });
+    Z.reveal = 0; for (let i = 1; i <= 90; i++) { Z.reveal = i < 15 ? i / 15 : i > 70 ? (90 - i) / 20 : 1; if (i === 20) { Z.revealed = true; Audio.sfx('tinkle', { semi: 2 }); } yield; }
+    Z.reveal = 0; return;
+  }
+}
+function* openEstucheGen() {
+  const P = MAP.pz, Z = Game.puzzle; Z.zip = 0; OW.vx = OW.vy = 0; OW.moving = false;
+  for (let i = 1; i <= 24; i++) { Z.zip = i / 24; if (i % 3 === 0) Audio.sfx('scratch', { vol: .3, semi: i }); yield; }
+  Z.open = 0; Audio.sfx('page'); for (let i = 1; i <= 10; i++) { Z.open = i / 10; yield; }
+  Audio.sfx('mix'); Audio.sfx('tinkle', { semi: 0, when: .1 }); Audio.sfx('tinkle', { semi: 4, when: .25 }); Audio.sfx('tinkle', { semi: 7, when: .4 });
+  Z.rise = 0; for (let i = 1; i <= 40; i++) { Z.rise = i / 40; if (i % 4 === 0) OW.dust.push({ x: P.estuche[0] * TILE + 8 + R(-10, 10), y: P.estuche[1] * TILE + 6 - Z.rise * 20, vx: R(-.4, .4), vy: -R(.2, .6), col: i % 2 ? '#fff3c0' : '#c9c4d4', t: 0, life: 20 }); yield; }
+  yield* wait(20); Z.opened = true; Game.owned.pluma = true; Z.rise = 0;
+  OW.msg = { lines: ['¡Has conseguido la Pluma!', 'Estilográfica del delineante:', 'escribe con el color de quien', 'la empuña. Equípala en el menú.'], t: 0 };
+}
+function pzSprite(kind, pal) {
+  return cached(`pz|${kind}|${pal}`, () => {
+    const c = document.createElement('canvas'); c.width = 24; c.height = 24; const x = c.getContext('2d');
+    if (kind === 'tintero') { px(x, '#2a2438', 5, 4, 14, 18); px(x, '#3e3852', 6, 5, 12, 16); px(x, '#5a5670', 7, 6, 3, 12); px(x, '#c9c4d4', 8, 1, 8, 4); px(x, '#8c8ab0', 8, 4, 8, 1); px(x, '#f4f0ea', 8, 10, 8, 6); px(x, '#2a2438', 9, 12, 6, 1); px(x, '#2a2438', 9, 14, 4, 1); px(x, '#0b0912', 5, 20, 14, 2); }
+    else if (kind === 'goma') { px(x, '#2a2438', 2, 8, 20, 12); px(x, '#f0a0b8', 3, 9, 11, 10); px(x, '#fbd0dc', 3, 9, 11, 2); px(x, '#c06a88', 3, 17, 11, 2); px(x, '#c9c4d4', 14, 9, 7, 10); px(x, '#f4f0ea', 14, 9, 7, 2); px(x, '#6a6480', 14, 17, 7, 2); px(x, '#2a2438', 13, 9, 1, 10); }
+    else if (kind === 'estuche') { px(x, '#2a2438', 1, 8, 22, 12); px(x, C('violeta'), 2, 9, 20, 10); px(x, ramp(C('violeta')).hi, 2, 9, 20, 2); px(x, ramp(C('violeta')).sh, 2, 17, 20, 2); for (let i = 3; i < 21; i += 2) px(x, i % 4 === 3 ? '#c9c4d4' : '#8c8ab0', i, 12, 1, 2); px(x, '#f4f0ea', 9, 13, 6, 3); px(x, '#2a2438', 10, 14, 4, 1); }
+    else if (kind === 'semilla') { px(x, '#5e4229', 10, 14, 4, 4); px(x, '#8a6a48', 10, 14, 2, 2); px(x, '#3d8a2f', 11, 12, 1, 2); }
+    return c;
+  });
+}
+function drawVine(x, y, k) {
+  const H = k * 30; g.strokeStyle = '#227a38'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); for (let i = 1; i <= 8; i++) { const q = i / 8; g.lineTo(x + Math.sin(q * 6) * 3, y - H * q); } g.stroke();
+  for (let i = 0; i < 4; i++) { const q = .2 + i * .2; if (k < q) break; const lx = x + Math.sin(q * 6) * 3, ly = y - H * q, dir = i % 2 ? 1 : -1; g.fillStyle = i % 2 ? '#4fb84a' : '#2f9a48'; g.beginPath(); g.ellipse(lx + dir * 4, ly, 4, 2, dir * -.5, 0, 6.29); g.fill(); }
+}
 // Sprite de un miembro del grupo en el mapa: vista según dirección (espaldas al subir, frente al bajar, perfil a los lados)
 const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
 function mapDrop(p, x, y, dir, bob, moving, t, idx) {
@@ -618,6 +721,26 @@ function drawOverworld() {
   }
   for (const p of OW.puddles || []) { const x = p.x - cx, y = p.y - cy; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue; g.fillStyle = ramp(p.col).sh; g.beginPath(); g.ellipse(x, y + 2, p.w, p.w * .45, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).base; g.beginPath(); g.ellipse(x - 1, y + 1, p.w - 2, p.w * .4 - 1, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).hi; g.fillRect(x - p.w * .5 | 0, y - 1, 3, 1); }
   // grupo: líder y seguidores por la estela (estilo CT), cada uno mirando hacia donde avanza
+  if (MAP.pz && Game.puzzle) { const P = MAP.pz, Z = Game.puzzle;
+    for (const [tx, ty] of P.river) { const x = tx * TILE - cx, y = ty * TILE - cy; if (x < -16 || y < -16 || x > W || y > H) continue; const dry = Z.dry;
+      if (dry < 1) { g.fillStyle = 'rgba(11,9,18,' + (.55 * (1 - dry)).toFixed(2) + ')'; g.fillRect(x, y, 16, 16); g.fillStyle = '#3a3652'; const fl = (OW.t + ty * 5) % 16; g.fillRect(x + 3, y + fl, 2, 3); g.fillRect(x + 11, y + (fl + 8) % 16, 2, 2); if (!Z.plugged || dry < .5) { g.fillStyle = '#5a5670'; g.fillRect(x + 6, y + (fl + 4) % 16, 1, 1); } }
+      if (dry > 0) { g.globalAlpha = dry; g.fillStyle = '#4a4655'; g.fillRect(x + 2, y + 5, 6, 1); g.fillRect(x + 8, y + 6, 1, 4); g.fillRect(x + 9, y + 10, 5, 1); g.fillRect(x + 3, y + 12, 1, 3); g.fillRect(x + 12, y + 2, 1, 3); g.globalAlpha = 1; } }
+    if (P.tintero) { const x = P.tintero[0] * TILE - cx, y = P.tintero[1] * TILE - cy; ents.push({ y: P.tintero[1] * TILE + 16, draw: () => { shadow(x + 12, y + 20, 14); g.drawImage(pzSprite('tintero', pal), x - 4, y - 6); if (!Z.plugged) { g.fillStyle = '#0b0912'; g.fillRect(x + 4, y + 12 + (OW.t >> 2) % 3, 8, 4); g.fillRect(x + 6, y + 16, 4, 4); } } }); }
+    const bx = Z.push ? lerp(Z.push.from[0], Z.push.to[0], Z.push.k) : Z.block[0], by = Z.push ? lerp(Z.push.from[1], Z.push.to[1], Z.push.k) : Z.block[1];
+    ents.push({ y: by * TILE + 15, draw: () => { shadow(bx * TILE + 8 - cx, by * TILE + 15 - cy, 16); g.drawImage(pzSprite('goma', pal), Math.round(bx * TILE - 4 - cx), Math.round(by * TILE - 6 - cy)); } });
+    for (const [tx, ty] of P.shelf) { const x = tx * TILE - cx, y = ty * TILE - cy; g.fillStyle = PAL[pal].ruler; g.fillRect(x, y + 4, 16, 12); g.fillStyle = PAL[pal].ruler2; g.fillRect(x, y + 4, 16, 2); g.fillRect(x, y + 14, 16, 2); g.fillStyle = PAL[pal].rulerInk; for (let i = 0; i < 16; i += 2) g.fillRect(x + i, y + 6, 1, i % 8 === 0 ? 4 : i % 4 === 0 ? 3 : 2); }
+    for (const d of DATA.puzzle.dots) { if (d.hidden && !Z.revealed && !(Z.reveal > 0)) continue; const x = d.x * TILE - cx, y = d.y * TILE - cy, a = d.hidden && !Z.revealed ? Z.reveal : 1; g.globalAlpha = a; g.fillStyle = d.n < Z.next ? '#4a4655' : INK; g.beginPath(); g.arc(x, y, 2.5, 0, 6.29); g.fill(); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, y - 1, 1, 1); txt(String(d.n), x + 3, y - 9, d.n === Z.next ? GOLD : '#c9c4d4', '#0b0912'); g.globalAlpha = 1; }
+    for (const seg of Z.drawn) pstroke(seg[0][0] - cx, seg[0][1] - cy, lerp(seg[0][0], seg[1][0], seg[2]) - cx, lerp(seg[0][1], seg[1][1], seg[2]) - cy, 2, INK, 1, 0, false);
+    if (Z.wrong) { const n = Math.round((Z.wrong.pts.length - 1) * Z.wrong.k); for (let i = 1; i <= n; i++) pstroke(Z.wrong.pts[i - 1][0] - cx, Z.wrong.pts[i - 1][1] - cy, Z.wrong.pts[i][0] - cx, Z.wrong.pts[i][1] - cy, 2, '#6a6480', 1, 1, false); }
+    if (Z.bridged) { g.fillStyle = '#f4f0ea'; for (const seg of Z.drawn) { const L = Math.hypot(seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]); for (let i = 0; i < L; i += 4) g.fillRect(Math.round(lerp(seg[0][0], seg[1][0], i / L) - cx), Math.round(lerp(seg[0][1], seg[1][1], i / L) - cy), 2, 1); } }
+    if (P.seed) { const x = P.seed[0] * TILE - cx, y = P.seed[1] * TILE - cy; ents.push({ y: P.seed[1] * TILE + 12, draw: () => { if (Z.vine <= 0) g.drawImage(pzSprite('semilla', pal), x - 4, y - 4); else drawVine(x + 8, y + 12, Z.vine); } }); }
+    if (P.estuche) { const x = P.estuche[0] * TILE - cx, y = P.estuche[1] * TILE - cy; ents.push({ y: P.estuche[1] * TILE + 16, draw: () => { shadow(x + 8, y + 15, 18); const spr = pzSprite('estuche', pal); g.drawImage(spr, x - 4, y - 4);
+      if (Z.zip != null && !Z.opened) { g.fillStyle = '#f4f0ea'; g.fillRect(x - 2 + Math.round(Z.zip * 18), y + 8, 2, 2); }
+      if (Z.open != null && !Z.opened) { g.fillStyle = ramp(C('violeta')).sh; g.fillRect(x - 2, y + 5 - Math.round(Z.open * 6), 20, Math.round(Z.open * 6)); g.fillStyle = '#e9e1cc'; g.fillRect(x - 1, y + 5, 18, 3); }
+      if (Z.rise > 0) { const ry = y + 4 - Z.rise * 26, img = propSprite('pluma', C('azul')); g.save(); g.translate(x + 8, ry); g.rotate(-1.2 + Math.sin(OW.t * .2) * .1); g.drawImage(img, -24, -8); g.restore(); if (Z.rise > .5) { const w = 'La Pluma'.length * 8 + 16; tape(x + 8 - w / 2, ry - 26, w, 14); ui('La Pluma', x + 8 - w / 2 + 8, ry - 23, TXT); } g.fillStyle = '#fff3c0'; g.globalAlpha = .6 * Math.sin(Z.rise * Math.PI); g.beginPath(); g.arc(x + 8, ry, 14, 0, 6.29); g.fill(); g.globalAlpha = 1; }
+      if (Z.opened) { g.fillStyle = ramp(C('violeta')).sh; g.fillRect(x - 2, y - 1, 20, 6); g.fillStyle = '#e9e1cc'; g.fillRect(x - 1, y + 5, 18, 3); } } }); }
+    if (Z.reveal > 0) { g.fillStyle = 'rgba(11,9,18,' + (.6 * Z.reveal).toFixed(2) + ')'; g.fillRect(0, 0, W, H); }
+  }
   for (const sg of MAP.signs || []) ents.push({ y: sg.y * TILE + 14, draw: () => { shadow(sg.x * TILE + 8 - cx, sg.y * TILE + 14 - cy, 8); g.drawImage(signSprite(), sg.x * TILE + 1 - cx, sg.y * TILE - 2 - cy); } });
   if (MAP.jar) { const J = OW.jar, jx = MAP.jar.x * TILE, jy = MAP.jar.y * TILE; ents.push({ y: jy + 32, draw: () => {
     const x = jx - cx, y = jy - cy, wob = J.wob > 0 ? Math.sin(OW.t * .8) * J.wob * .08 : 0; g.save(); g.translate(x + 16, y + 34); g.scale(1 + wob, 1 - wob); g.translate(-16, -34);
@@ -649,6 +772,7 @@ function drawOverworld() {
   // brújula al vaso cuando alguien va tocado y no está cerca
   if (MAP.jar) { const jx = MAP.jar.x * TILE + 16, jy = MAP.jar.y * TILE + 34, d = Math.hypot(jx - OW.x, jy - OW.y), hurt = Party.some(q => q.cur.hp < effStats(q).hp * .5 || q.cur.mp < effStats(q).mp * .25);
     if (hurt && d > 48 && !OW.heal) { win(W - 44, 4, 40, 18); g.drawImage(jarSprite(pal), W - 40, 6, 11, 13); const a = Math.atan2(jy - OW.y, jx - OW.x), ax = W - 18, ay = 13, bl = (OW.t / 20 | 0) % 2; g.fillStyle = bl ? '#e23c3c' : '#2a2438'; g.beginPath(); g.moveTo(ax + Math.cos(a) * 6, ay + Math.sin(a) * 6); g.lineTo(ax + Math.cos(a + 2.5) * 5, ay + Math.sin(a + 2.5) * 5); g.lineTo(ax + Math.cos(a - 2.5) * 5, ay + Math.sin(a - 2.5) * 5); g.closePath(); g.fill(); } }
+  if (OW.ring) drawRing();
   if (OW.msg && !(OW.landT > 0)) drawMessage(OW.msg.lines);
   if (OW.menu) drawMenu();
 }
@@ -759,7 +883,16 @@ const HAND = {
   n: [[[1, 4], [1, 10], [1, 6.6], ...arcPts(4, 7, 3, 3.14, 6.28), [7, 10]]],
   b: [[[1, 0], [1, 10], [1, 7], ...arcPts(4, 7, 3, 3.14, -3.14)]],
   e: [[[1, 7], [7, 7], ...arcPts(4, 7, 3, 0, -5.3)]],
+  c: [[...arcPts(4, 7, 3, -.9, -5.4)]],
+  r: [[[1.5, 4], [1.5, 10], [1.5, 6.5], ...arcPts(4.5, 7, 3, 3.14, 4.9)]],
+  m: [[[0.5, 4], [0.5, 10], [0.5, 6.5], ...arcPts(2.5, 6.5, 2, 3.14, 6.28), [4.5, 10], [4.5, 6.5], ...arcPts(6.5, 6.5, 2, 3.14, 6.28), [8.5, 10]]],
+  'ñ': [[[1, 4], [1, 10], [1, 6.6], ...arcPts(4, 7, 3, 3.14, 6.28), [7, 10]], [[1.5, 2], [3, 1], [5, 2.2], [6.5, 1.2]]],
+  'í': [[[3.5, 4], [3.5, 10], [5.2, 9.4]], [[3, 2.4], [4.4, 1]]],
+  'á': [[...arcPts(3.5, 7, 3, 0, -6.28), [6.5, 4.5], [6.5, 10], [8, 9.4]], [[3.5, 2.4], [5, 1]]],
 };
+// trazos de una palabra a mano en pantalla: [{pts,len,start}] y longitud total
+function handStrokes(word, x0, y0, S = 1.4, cw = 12) { const out = []; let acc = 0; word.split('').forEach((ch, i) => { for (const st of HAND[ch] || []) { const pts = st.map(([x, y]) => [x0 + i * cw + x * S, y0 + y * S]); let len = 0; for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); out.push({ pts, len, start: acc }); acc += len + 4; } }); return { list: out, total: acc }; }
+function drawHand(HS, dist, col, w = 2) { for (const st of HS.list) { if (dist <= st.start) break; const k = clamp((dist - st.start) / st.len, 0, 1), P = st.pts; for (let i = 1; i < P.length; i++) { const segEnd = i / (P.length - 1), segStart = (i - 1) / (P.length - 1); if (k <= segStart) break; const kk = clamp((k - segStart) / (segEnd - segStart), 0, 1); pstroke(P[i - 1][0], P[i - 1][1], lerp(P[i - 1][0], P[i][0], kk), lerp(P[i - 1][1], P[i][1], kk), w, col, 1, 0, false); } } }
 function coverStrokes() { // trazos de "gavilanbe" en pantalla, con longitudes acumuladas
   if (COVER.strokes) return COVER.strokes;
   const word = 'gavilanbe', S = 2.2, cw = 19, x0 = W / 2 - word.length * cw / 2 + 2, ty = 60, out = []; let acc = 0;

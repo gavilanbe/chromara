@@ -35,7 +35,7 @@ function say(s, col = '#f4f0ea') { B.msg = { s, col }; B.msgT = 70; }
 function num(u, v, col, big) { B.nums.push({ x: u.x + R(-4, 4), y: u.y - u.def.h * u.sc - 6, v: String(v), col, t: 0, vy: -1.6, big }); }
 function damage(target, raw, col, src) {
   if (!target.alive) return 0;
-  const mult = colorMult(col, target.color), dmg = Math.max(1, Math.round(raw * mult * R(.92, 1.08) * (target.status.contorno ? .6 : 1)));
+  const mult = colorMult(col, target.color), dmg = Math.max(1, Math.round(raw * mult * R(.92, 1.08) * (target.status.contorno ? .6 : 1) * (target.status.firmado && target.kind === 'enemy' ? 1.3 : 1)));
   target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14; target.uiHit = 12;
   num(target, dmg, mult >= 2 ? '#f2c93a' : mult < 1 ? '#8c8ab0' : '#f4f0ea', mult >= 2);
   impactFx(target, C(col), mult >= 2 ? 1.6 : mult < 1 ? .6 : 1);
@@ -291,6 +291,11 @@ function propSprite(kind, color) {
         F('#2a2438', 1, 2, 30, 12); F('#f4f0ea', 2, 3, 16, 10); F('#ffffff', 2, 3, 16, 1); F('#c9c4d4', 2, 11, 16, 2); F('#e86a8a', 18, 3, 12, 10); F('#f4a0b8', 18, 3, 12, 1); F('#b84a6a', 18, 11, 12, 2);
         F('#3a6fe2', 12, 2, 7, 12); F('#8fb4f2', 13, 3, 5, 1); F('#f4f0ea', 13, 6, 5, 2); F('#1f3f8a', 13, 12, 5, 1); F('#0b0912', 1, 2, 1, 1); F('#0b0912', 30, 2, 1, 1); F('#0b0912', 1, 13, 1, 1); F('#0b0912', 30, 13, 1, 1);
         break; }
+      case 'pluma': { // estilográfica: capuchón negro con clip dorado, cuerpo lacado, plumín dorado con la ranura y la punta cargada del color
+        F(O, 0, 4, 22, 8); F('#1e1a2c', 1, 5, 20, 6); F('#4a4460', 2, 5, 18, 1); F('#0b0912', 1, 9, 20, 2); F('#f2c93a', 4, 3, 12, 2); F('#c9a02a', 4, 5, 12, 1); F('#fbe28a', 5, 3, 3, 1);
+        F(O, 22, 4, 12, 8); F('#2a2438', 23, 5, 10, 6); F('#5a5670', 23, 5, 10, 1); F('#0b0912', 23, 9, 10, 2); F('#f2c93a', 32, 5, 2, 6);
+        F(O, 34, 5, 12, 6); F('#f2c93a', 35, 6, 10, 4); F('#fbe28a', 35, 6, 10, 1); F('#c9a02a', 35, 9, 10, 1); F('#8a6a12', 39, 6, 1, 4); F(O, 44, 7, 3, 2); F(rp.base, 45, 7, 2, 2); F(rp.hi, 45, 7, 1, 1);
+        break; }
       case 'tubo': { // tubo de pintura metálico: pliegue, etiqueta con muestra de color, tapón
         F(MET[3], 0, 3, 4, 10); F(MET[2], 1, 4, 2, 8); F(MET[0], 1, 5, 1, 1); F(MET[3], 3, 2, 26, 12); F(MET[1], 4, 3, 24, 10); F(MET[0], 4, 3, 24, 2); F(MET[0], 4, 5, 2, 6); F(MET[2], 4, 11, 24, 2);
         F('#f4f0ea', 11, 3, 10, 10); F(rp.base, 13, 5, 4, 5); F(rp.hi, 13, 5, 4, 1); F(rp.dk, 16, 5, 1, 5); F('#2a2438', 18, 5, 2, 1); F('#2a2438', 18, 7, 2, 1); F('#2a2438', 18, 9, 1, 1);
@@ -300,7 +305,7 @@ function propSprite(kind, color) {
     return c;
   });
 }
-const PROP = { brocha: { tip: [58, 20], a: 1.05 }, lapiz: { tip: [47, 7], a: 0.95 }, pincel: { tip: [47, 12], a: 1.0 }, goma: { tip: [16, 8], a: 0 }, tubo: { tip: [41, 8], a: Math.PI / 2 } };
+const PROP = { brocha: { tip: [58, 20], a: 1.05 }, lapiz: { tip: [47, 7], a: 0.95 }, pincel: { tip: [47, 12], a: 1.0 }, pluma: { tip: [46, 8], a: 0.9 }, goma: { tip: [16, 8], a: 0 }, tubo: { tip: [41, 8], a: Math.PI / 2 } };
 const facing = u => u.kind === 'party' ? -1 : 1; // hacia dónde ataca (en pantalla: el grupo mira a la izquierda)
 function drawProp(img, x, y, a, fac, px = 1, py = 5, scale = 1, alpha = 1) { g.save(); g.globalAlpha = alpha; g.translate(Math.round(x), Math.round(y)); g.scale(fac, 1); g.rotate(a); g.imageSmoothingEnabled = false; g.drawImage(img, -px * scale, -py * scale, img.width * scale, img.height * scale); g.restore(); }
 // La herramienta protagonista: aparece con destello, recorre un camino de mundo con la punta dejando su trazo y se retira.
@@ -353,6 +358,7 @@ function updateBattleMenu() {
         if (!e.avail) { Audio.sfx('nope'); say(!e.ready ? 'El compañero aún no está listo' : 'Falta pigmento (MP)', '#8c8ab0'); return; }
         Audio.sfx('confirm', semiOf(u)); m.pending = { type: 'tech', tech: e };
         if (e.t.target === 'enemy') { m.level = 'target'; m.targets = alive(B.enemies); m.tidx = 0; }
+        else if (e.t.target === 'ally') { m.level = 'target'; m.targets = alive(B.party); m.tidx = 0; }
         else commit(e.t.target === 'party' ? alive(B.party) : alive(B.enemies));
       } else {
         Audio.sfx('confirm', semiOf(u)); m.pending = { type: 'item', item: e.id }; m.level = 'target'; m.targets = e.it.target === 'enemy' ? alive(B.enemies) : B.party.filter(p => p.alive); m.tidx = 0;
@@ -466,7 +472,7 @@ function* victoryGen() {
   OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; if (Party.some(q => q.cur.hp < effStats(q).hp * .6 || q.cur.mp < effStats(q).mp * .3)) OW.hint = 150; setState('overworld'); Audio.play('map');
 }
 function resetGame() {
-  Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false;
+  Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false; Game.owned = {}; Game.puzzle = PUZ0();
   Party.forEach((p, i) => { p.acc = DATA.party[i].acc; const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; });
   initOverworld(); setState('overworld'); Audio.play('map');
 }
@@ -500,6 +506,7 @@ function drawUnit(u) {
   if (u.status.tiznado && u.alive) { g.fillStyle = '#2a2438'; g.fillRect(u.x - 3, u.y - u.def.h * s - 6, 6, 2); }
   if (u.status.lento && u.alive) txt('z', u.x + 6, u.y - u.def.h * s - 10, C('violeta'), null);
   if (u.status.contorno && u.alive) drawContorno(u);
+  if (u.status.firmado && u.alive) { const c = project(u.wx, u.wy, 0); if (c) { g.fillStyle = C('rojo'); g.fillRect(u.x + 8, u.y - u.def.h * s - 4, 2, 5); g.fillRect(u.x + 6, u.y - u.def.h * s - 2, 2, 1); g.fillRect(u.x + 10, u.y - u.def.h * s - 6, 2, 1); } }
 }
 function drawGroundLayer() {
   // charco de tinta de los enemigos (aparece al drenar la mancha)

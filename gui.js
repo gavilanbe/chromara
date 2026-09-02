@@ -195,7 +195,7 @@ function updateMenu() {
   if (hit('back')) { m.level = 'chars'; Audio.sfx('cancel'); return; }
   if (hit('left') || hit('right')) {
     const dir = keys.right ? 1 : -1, before = effStats(p);
-    if (m.row === 0) { const i = WPN_LIST.indexOf(p.weapon), nw = WPN_LIST[(i + dir + WPN_LIST.length) % WPN_LIST.length], other = Party.find(q => q !== p && q.weapon === nw); if (other) other.weapon = p.weapon; p.weapon = nw; m.swapped = other ? other.name : null; } // si otro la lleva, se la cambias
+    if (m.row === 0) { const L = WPN_LIST.filter(k => !DATA.weapons[k].found || Game.owned[k]); const i = L.indexOf(p.weapon), nw = L[(i + dir + L.length) % L.length], other = Party.find(q => q !== p && q.weapon === nw); if (other) other.weapon = p.weapon; p.weapon = nw; m.swapped = other ? other.name : null; } // si otro la lleva, se la cambias; las armas encontradas entran en la rueda
     else { const i = ACC_LIST.indexOf(p.acc); p.acc = ACC_LIST[(i + dir + ACC_LIST.length) % ACC_LIST.length]; }
     const after = effStats(p); p.cur.hp = clamp(p.cur.hp + after.hp - before.hp, 1, after.hp); p.cur.mp = clamp(p.cur.mp + after.mp - before.mp, 0, after.mp);
     m.delta = { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp, t: 0 };
