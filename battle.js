@@ -93,7 +93,7 @@ function initBattle(foe) {
   B.props = B.props.filter(o => { if (o.kind !== 'T') return true; const p = project(o.wx, o.wy, 0, SCENE.rest); if (!p) return true; return !U.some(q => p[3] < q[3] && Math.abs(p[0] - q[0]) < 34 && p[1] > q[1] - 12 && p[1] < q[1] + 70); });
   const ec = homeC(B.enemies); B.puddle = { wx: ec[0], wy: ec[1], rx: n === 1 ? 26 : 46, ry: n === 1 ? 12 : 20, k: 0 };
   B.gen = transitionGen(foe);
-  B.unitScale = 1; B.propScale = .5;
+  B.unitScale = .5; B.propScale = .5;
 }
 function startTransition(foe) { initBattle(foe); setState('transition'); }
 
@@ -117,9 +117,9 @@ function* transitionGen(foe) {
   T.tendrils = []; for (let i = 0; i < 7; i++) T.tendrils.push({ a: R(0, 6.28), len: R(1.2, 2.2), w: R(.12, .3), sp: R(.6, 1.4) });
   const top = { x: Math.round(OW.cam.x) + W / 2, y: Math.round(OW.cam.y) + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 110, f: 110, hy: 90 };
   camSet(top);
-  for (let i = 0; i < 40; i++) { T.k = i / 40; const k = clamp((i - 8) / 30, 0, 1), e = k * k * (3 - 2 * k); B.propScale = lerp(.5, 1, e);
+  for (let i = 0; i < 40; i++) { T.k = i / 40; const k = clamp((i - 8) / 30, 0, 1), e = k * k * (3 - 2 * k); B.propScale = lerp(.5, 1, e); B.unitScale = lerp(.5, 1, e);
     const c = SCENE.cam, r = SCENE.rest; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(top[key], r[key], e); c.yaw = lerp(top.yaw, r.yaw, e); yield; }
-  camSet(SCENE.rest); B.propScale = 1;
+  camSet(SCENE.rest); B.propScale = 1; B.unitScale = 1;
   // 5) la tinta se escurre hacia los enemigos y se vuelve su charco; los enemigos emergen, el grupo rebota a su formación
   T.stage = 'drain'; T.k = 0; Audio.sfx('slow_drip'); Audio.sfx('ink_jet', { when: .2 });
   const from = B.party.map(u => [u.wx, u.wy]);
@@ -402,7 +402,7 @@ function* victoryGen() {
   SCENE.goal = null;
   for (let i = 0; i < 56; i++) {
     const k = i / 56, e = k * k * (3 - 2 * k); rings.forEach(r => r.t++);
-    if (i > 10) { const kk = clamp((i - 10) / 40, 0, 1), ee = kk * kk * (3 - 2 * kk); const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(from[key], top[key], ee); let d = top.yaw - from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = from.yaw + d * ee; B.propScale = lerp(1, .5, ee); }
+    if (i > 10) { const kk = clamp((i - 10) / 40, 0, 1), ee = kk * kk * (3 - 2 * kk); const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(from[key], top[key], ee); let d = top.yaw - from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = from.yaw + d * ee; B.propScale = lerp(1, .5, ee); B.unitScale = lerp(1, .5, ee); }
     B.party.forEach((u, j) => { const kk = clamp((i - 6 - j * 4) / 30, 0, 1); u.wx = lerp(start[j][0], dest[j][0], kk); u.wy = lerp(start[j][1], dest[j][1], kk); u.wz = kk > 0 && kk < 1 ? Math.abs(Math.sin(kk * Math.PI * 3)) * 10 : 0; u.pose = kk < 1 ? 'hop' : 'idle'; });
     B.puddle.k = Math.max(0, B.puddle.k - .04);
     yield;

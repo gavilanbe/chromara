@@ -532,7 +532,7 @@ function updateOverworld() {
     if (Math.floor(OW.bob) > Math.floor(prev)) { // aterrizaje: gotitas del color del líder y paso según el terreno
       const tx = OW.x / TILE | 0, ty = (OW.y + 3) / TILE | 0, ch = tileAt(tx, ty); const wood = ch === '=' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tileAt(tx + a, ty + b) === '~');
       Audio.sfx(wood ? 'step_wood' : ch === '=' ? 'step_path' : 'step_grass', { pan: (Math.floor(OW.bob) & 1) ? .15 : -.15 });
-      for (let i = 0; i < 2; i++) OW.dust.push({ x: OW.x + R(-3, 3), y: OW.y + 1, vx: R(-.5, .5), vy: -R(.4, .9), col: C(Party[0].color), t: 0, life: RI(10, 16) });
+      for (let i = 0; i < 2; i++) OW.dust.push({ x: OW.x + R(-2, 2), y: OW.y + 1, vx: R(-.5, .5), vy: -R(.4, .9), col: C(Party[0].color), t: 0, life: RI(10, 16) });
     }
   } else { OW.bob = 0; }
   for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life);
@@ -556,12 +556,12 @@ function updateOverworld() {
 const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
 function mapDrop(p, x, y, dir, bob, moving, t, idx) {
   const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : DIRVIEW[dir] || 'back';
-  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = buildSprite(`${p.id}_${view}`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' });
-  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 4, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
-  shadow(x, y, Math.round((p.w * .5) * (1 - hop * .3)));
+  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = miniSprite(`${p.id}_${view}`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' });
+  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
+  shadow(x, y, Math.round((p.w * .42) * (1 - hop * .3)));
   if (dead) { drawSprite(spr, x, y, 1, false, .45); return; }
   drawSprite(spr, x, Math.round(y - wz), sq[0], dir === 'right', sq[1]);
-  if (p.id === 'anil') drawSatellites(x, y - wz, t + idx * 10, col, .6);
+  if (p.id === 'anil') drawSatellites(x, y - wz, t + idx * 10, col, .4);
 }
 function drawOverworld() {
   const cx = Math.round(OW.cam.x), cy = Math.round(OW.cam.y), wf = (OW.t / 9 | 0) % 4, pal = Game.palette;
@@ -581,7 +581,7 @@ function drawOverworld() {
   for (const f of OW.foes) {
     if (Game.defeated.has(f.key)) continue;
     const e = DATA.enemies[f.enemies[0]], core = e.color === 'negro' ? null : C(e.color);
-    ents.push({ y: f.y, draw: () => { const hop = Math.abs(Math.sin((OW.t + f.seed * 7) * (f.seen ? .25 : .12))) * (f.seen ? 4 : 2), x = f.x - cx, y = f.y - cy; shadow(x, y, f.boss ? 20 : 10); const spr = buildSprite(f.enemies[0], C('negro'), core, { eyes: 'normal' }); drawSprite(spr, x, Math.round(y - hop), f.boss ? 1.3 : 1, f.dirLeft); if (f.alert > 0) { const by = y - spr.height - 10 + (f.alert > 24 ? (30 - f.alert) : 0); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, by, 2, 6); g.fillRect(x - 1, by + 8, 2, 2); } } });
+    ents.push({ y: f.y, draw: () => { const hop = Math.abs(Math.sin((OW.t + f.seed * 7) * (f.seen ? .25 : .12))) * (f.seen ? 4 : 2), x = f.x - cx, y = f.y - cy; shadow(x, y, f.boss ? 18 : 8); const spr = f.boss ? buildSprite(f.enemies[0], C('negro'), core, { eyes: 'normal' }) : miniSprite(f.enemies[0], C('negro'), core, { eyes: 'normal' }); drawSprite(spr, x, Math.round(y - hop), f.boss ? .8 : 1.15, f.dirLeft); if (f.alert > 0) { const by = y - spr.height - 10 + (f.alert > 24 ? (30 - f.alert) : 0); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, by, 2, 6); g.fillRect(x - 1, by + 8, 2, 2); } } });
   }
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }

@@ -364,3 +364,25 @@ function unitSpriteInfo(u, frame) {
   const sq = (SQ[pose] || SQ.idle), [sx, sy] = sq[frame % sq.length];
   return { spr, sx, sy };
 }
+// Versión mini (2:1) de un sprite para el mapa: por cada bloque 2×2 se queda el color más frecuente; si el bloque toca el
+// borde del sprite gana el contorno. Así conserva silueta y ojos sin el emborronado de un escalado normal.
+function miniSprite(name, color, core, opt = {}) {
+  const key = `mini|${name}|${color}|${core || ''}|${opt.eyes || 'normal'}`;
+  return cached(key, () => {
+    const src = buildSprite(name, color, core, opt), sw = src.width, sh = src.height, d = src.getContext('2d').getImageData(0, 0, sw, sh).data;
+    const w = Math.ceil(sw / 2), h = Math.ceil(sh / 2), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d');
+    const out = ramp(color).out, [orr, og, ob] = hexRgb(out);
+    const at = (px, py) => (px < 0 || py < 0 || px >= sw || py >= sh) ? null : (d[(py * sw + px) * 4 + 3] ? [d[(py * sw + px) * 4], d[(py * sw + px) * 4 + 1], d[(py * sw + px) * 4 + 2]] : null);
+    for (let y = 0; y < h; y++) for (let X = 0; X < w; X++) {
+      const cols = {}, list = []; let edge = false;
+      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) { const px = X * 2 + dx, py = y * 2 + dy, p = at(px, py); if (!p) { edge = true; continue; } const k = p.join(','); cols[k] = (cols[k] || 0) + 1; list.push(k); if (!at(px - 1, py) || !at(px + 1, py) || !at(px, py - 1) || !at(px, py + 1)) edge = true; }
+      if (list.length < 2) continue;
+      let best = null, bn = 0; for (const k in cols) if (cols[k] > bn) { bn = cols[k]; best = k; }
+      const isOut = `${orr},${og},${ob}`; if (edge && cols[isOut]) best = isOut;
+      // ojos: si hay píxel de ojo (blanco o negro puro) en el bloque, conservarlo
+      for (const k of list) if (k === '244,240,234' || k === '20,18,28' || k === '255,255,255') { best = k; break; }
+      x.fillStyle = `rgb(${best})`; x.fillRect(X, y, 1, 1);
+    }
+    c.__key = key; return c;
+  });
+}
