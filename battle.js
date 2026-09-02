@@ -100,7 +100,7 @@ function initBattle(foe) {
   const U = B.units.map(u => project(u.hx, u.hy, 0, SCENE.rest)).filter(Boolean);
   B.props = B.props.filter(o => { if (o.kind !== 'T') return true; const p = project(o.wx, o.wy, 0, SCENE.rest); if (!p) return true; return !U.some(q => p[3] < q[3] && Math.abs(p[0] - q[0]) < 34 && p[1] > q[1] - 12 && p[1] < q[1] + 70); });
   const ec = homeC(B.enemies); B.puddle = { wx: ec[0], wy: ec[1], rx: n === 1 ? 26 : 46, ry: n === 1 ? 12 : 20, k: 0 };
-  B.gen = transitionGen(foe);
+  B.gen = foe.boss ? bossTransitionGen(foe) : transitionGen(foe);
   B.unitScale = .5; B.propScale = .5;
 }
 function startTransition(foe) { initBattle(foe); setState('transition'); }
@@ -140,10 +140,54 @@ function* transitionGen(foe) {
   B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); B.enemies.forEach(u => { u.wz = 0; });
   B.tr = null; B.phase = 'fight'; B.fightStart = B.t; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
 }
+// Mancha de tinta: cuerpo irregular (radio por ángulo con armónicos), dedos que se alargan con temblor, brillo húmedo en el borde,
+// salpicaduras satélite y goterones que cuelgan por abajo. k = crecimiento 0..1, t = tiempo para el temblor.
+function inkSplat(x, y, R, k, t, seed = 1, drips = true) {
+  const rnd = seeded(seed), H = []; for (let i = 0; i < 4; i++) H.push({ n: 2 + i * 2 + (rnd() * 2 | 0), a: (.35 - i * .07) * (.5 + rnd() * .5), ph: rnd() * 6.28 });
+  const F = []; for (let i = 0; i < 8; i++) F.push({ a: rnd() * 6.28, len: 1.4 + rnd() * 1.4, w: .1 + rnd() * .16, sp: .6 + rnd() * .9, wob: rnd() * 6.28 });
+  const S = []; for (let i = 0; i < 10; i++) S.push({ a: rnd() * 6.28, d: 1.3 + rnd() * .9, r: .05 + rnd() * .09, at: .3 + rnd() * .6 });
+  const r = a => R * (1 + H.reduce((s, h) => s + h.a * Math.sin(h.n * a + h.ph + t * .01), 0));
+  g.fillStyle = '#0b0912'; g.beginPath(); for (let i = 0; i <= 64; i++) { const a = i / 64 * 6.28, rr = r(a); if (i) g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * .8); else g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * .8); } g.closePath(); g.fill();
+  for (const f of F) { const L = R * f.len * clamp(k * f.sp, 0, 1) * (1 + .06 * Math.sin(t * .2 + f.wob)), w = R * f.w; g.save(); g.translate(x, y); g.rotate(f.a); g.scale(1, .8); g.beginPath(); g.moveTo(0, -w * 2); g.quadraticCurveTo(L * .6, -w * .6, L, 0); g.quadraticCurveTo(L * .6, w * .6, 0, w * 2); g.closePath(); g.fill(); g.beginPath(); g.arc(L, 0, w * 1.3, 0, 6.29); g.fill(); g.restore(); }
+  for (const sp of S) { if (k < sp.at) continue; const q = clamp((k - sp.at) / .2, 0, 1), d = R * sp.d * (0.6 + q * .4); g.beginPath(); g.ellipse(x + Math.cos(sp.a) * d, y + Math.sin(sp.a) * d * .8, R * sp.r * q, R * sp.r * q * .8, sp.a, 0, 6.29); g.fill(); }
+  if (drips) { g.fillStyle = '#0b0912'; for (let i = 0; i < 4; i++) { const a = 1.2 + i * .45, rr = r(a), dx = x + Math.cos(a) * rr, dy = y + Math.sin(a) * rr * .8, L = clamp((k - .4) * 40, 0, 12 + i * 4) * (1 + .05 * Math.sin(t * .3 + i)); g.fillRect(dx - 1, dy - 2, 3, L + 2); g.beginPath(); g.arc(dx + .5, dy + L, 2, 0, 6.29); g.fill(); } }
+  // brillo húmedo: un arco claro dentro del borde superior izquierdo y un reflejo
+  g.strokeStyle = '#3a3652'; g.lineWidth = 2; g.globalAlpha = .9; g.beginPath(); for (let i = 22; i <= 40; i++) { const a = i / 64 * 6.28 + 3.14, rr = r(a) - 3; if (i === 22) g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * .8); else g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * .8); } g.stroke(); g.globalAlpha = 1;
+  g.fillStyle = '#4a4664'; g.fillRect(Math.round(x - R * .35), Math.round(y - R * .45), Math.max(2, R * .18 | 0), 2);
+}
+// Transición de la jefa: el Tiznal retumba, La Tinta emerge, diálogo, la tinta inunda desde los bordes y se retira como una marea
+function* bossTransitionGen(foe) {
+  const T = B.tr; T.boss = true; T.foe = foe; Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
+  T.stage = 'rumble'; for (let i = 0; i < 50; i++) { T.k = i / 50; if (i % 10 === 0) { B.shake = 3; Audio.sfx('impact_sub', { vol: .35 }); } yield; }
+  Audio.sfx('ink_jet'); Audio.sfx('splash', { when: .2 });
+  T.stage = 'rise'; for (let i = 0; i < 40; i++) { T.k = i / 40; if (i === 30) B.shake = 5; yield; }
+  // diálogo
+  T.stage = 'dialogue'; T.dlg = { i: 0, ch: 0, t: 0 };
+  const D = DATA.bossDialogue;
+  while (T.dlg.i < D.length) { const line = D[T.dlg.i]; T.dlg.t++; if (T.dlg.ch < line.text.length) { T.dlg.ch += (T.dlg.t % 2 === 0 ? 1 : 0); if (T.dlg.t % 6 === 0) Audio.sfx('scratch', { vol: .18, semi: line.who === 'tinta' ? -7 : 4 }); }
+    if (hit('ok')) { if (T.dlg.ch < line.text.length) T.dlg.ch = line.text.length; else { T.dlg.i++; T.dlg.ch = 0; T.dlg.t = 0; Audio.sfx('page', { vol: .5 }); } }
+    yield; }
+  // inundación: la tinta sube por los bordes hasta cubrirlo todo
+  T.stage = 'flood'; Audio.sfx('ink_jet'); Audio.sfx('hum_down', { vol: .6 }); Audio.play('boss');
+  for (let i = 0; i < 46; i++) { T.k = i / 46; if (i === 40) B.shake = 6; yield; }
+  T.overworld = false; T.stage = 'tide'; camSet(SCENE.rest); B.unitScale = 1; B.propScale = 1; B.puddle.k = 1;
+  B.enemies.forEach(u => { u.wz = 0; }); B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; u.pose = 'idle'; });
+  Audio.sfx('splash', { vol: .6 }); for (let i = 0; i < 50; i++) { T.k = i / 50; if (i === 10) Audio.sfx('slow_drip'); yield; }
+  B.tr = null; B.phase = 'fight'; B.fightStart = B.t; say('LA TINTA', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
+}
 // Dibujo de la transición sobre el mapa cenital (fases 1-3) y de la mancha/gotas sobre la escena (4-5)
 function drawTransitionFx() {
   const T = B.tr; if (!T || !T.stage) return;
   const lead = B.party[0];
+  if (T.boss) { // jefa
+    const foe = T.foe, fx0 = foe.x - Math.round(OW.cam.x), fy0 = foe.y - Math.round(OW.cam.y);
+    if (T.stage === 'rumble') { g.fillStyle = 'rgba(11,9,18,' + (T.k * .45).toFixed(2) + ')'; g.fillRect(0, 0, W, H); for (let r = 0; r < 3; r++) { const q = ((T.k * 3 + r * .33) % 1); g.strokeStyle = 'rgba(74,70,100,' + (.6 * (1 - q)).toFixed(2) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(fx0, fy0, 6 + q * 90, 3 + q * 40, 0, 0, 6.29); g.stroke(); } }
+    else if (T.stage === 'rise') { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); const k = T.k, spr = buildSprite('tinta', C('negro'), null, { eyes: k > .6 ? 'normal' : 'blink' }); g.save(); g.beginPath(); g.rect(0, 0, W, fy0 + 6); g.clip(); drawSprite(spr, fx0, fy0 + 6 + (1 - k) * 44, 1, false, 1 + (1 - k) * .3); g.restore(); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 30 + k * 10, 8 + k * 3, 0, 0, 6.29); g.fill(); if (k > .3) for (let i = 0; i < 6; i++) { const a = i * 1.05 + k * 2, d = 20 + Math.sin(k * 9 + i) * 6; g.fillRect(fx0 + Math.cos(a) * d - 1, fy0 + 4 + Math.sin(a) * d * .35 - (k * 10 * ((i * 7) % 3 + 1)) % 14, 2, 3); } }
+    else if (T.stage === 'dialogue') { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); const spr = buildSprite('tinta', C('negro'), null, { eyes: 'normal' }); drawSprite(spr, fx0, fy0 + 6 + Math.sin(B.t * .06) * 1.5, 1, false, 1 + Math.sin(B.t * .06) * .02); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 40, 11, 0, 0, 6.29); g.fill(); drawDialogue(T.dlg); }
+    else if (T.stage === 'flood') { const k = T.k, e = k * k; g.fillStyle = '#0b0912'; for (let x = 0; x <= W; x += 4) { const hb = e * (H * .62) + Math.sin(x * .05 + B.t * .15) * 6 + Math.sin(x * .13) * 3; g.fillRect(x, H - hb, 4, hb + 2); const ht = e * (H * .5) + Math.sin(x * .07 + B.t * .12) * 5; g.fillRect(x, 0, 4, ht); } for (let y = 0; y <= H; y += 4) { const wl = e * (W * .55) + Math.sin(y * .06 + B.t * .13) * 6; g.fillRect(0, y, wl, 4); g.fillRect(W - wl, y, wl, 4); } if (k > .5) { g.fillStyle = '#2a2438'; for (let i = 0; i < 12; i++) { const rnd = seeded(i * 9); g.fillRect(rnd() * W | 0, (H * .4 + rnd() * 20 - e * 40) | 0, 3, 1); } } }
+    else if (T.stage === 'tide') { const k = T.k, e = 1 - Math.pow(1 - k, 2); g.fillStyle = '#0b0912'; for (let x = 0; x <= W; x += 4) { const top = e * (H + 30) + Math.sin(x * .05 + B.t * .2) * 8 + Math.sin(x * .17) * 4; g.fillRect(x, top - 4, 4, H); g.fillStyle = '#3a3652'; g.fillRect(x, top - 5, 4, 2); g.fillStyle = '#0b0912'; } }
+    return;
+  }
   if (T.overworld) {
     const sx = lead.wx - OW.cam.x, sy = lead.wy - OW.cam.y, foe = T.foe, fx0 = foe.x - OW.cam.x, fy0 = foe.y - OW.cam.y;
     if (T.stage === 'detect') { // el enemigo late; sombra circular creciente sobre el grupo
@@ -164,16 +208,11 @@ function drawTransitionFx() {
   if (T.stage === 'blot') { // mancha orgánica: metabolas + tentáculos, delante va la onda que desatura
     const k = T.k, grow = Math.sin(Math.min(1, k * 1.15) * Math.PI / 2), R0 = 22 + grow * 96;
     const [sx, sy] = [lerp(lead.wx - OW.cam.x, p[0], clamp((k - .2) / .75, 0, 1)), lerp(lead.wy - OW.cam.y, p[1], clamp((k - .2) / .75, 0, 1))];
-    g.globalCompositeOperation = 'saturation'; g.fillStyle = '#7a7a7a'; g.beginPath(); g.ellipse(sx, sy, R0 * 1.9, R0 * 1.3, 0, 0, 6.29); g.fill(); g.globalCompositeOperation = 'source-over';
-    g.fillStyle = '#0b0912';
-    for (const b of T.balls) { const r = R0 * b.r * (0.8 + .2 * Math.sin(B.t * .3 + b.ph)), d = R0 * b.d * .8; g.beginPath(); g.ellipse(sx + Math.cos(b.a) * d, sy + Math.sin(b.a) * d * .75, r, r * .8, 0, 0, 6.29); g.fill(); }
-    for (const t of T.tendrils) { const L = R0 * t.len * Math.min(1, k * t.sp + .2); g.save(); g.translate(sx, sy); g.rotate(t.a); g.beginPath(); g.ellipse(L * .5, 0, L * .5, R0 * t.w, 0, 0, 6.29); g.fill(); g.beginPath(); g.arc(L, 0, R0 * t.w * 1.6, 0, 6.29); g.fill(); g.restore(); }
-    g.fillStyle = '#2a2438'; g.fillRect(sx - R0 * .3 | 0, sy - R0 * .5 | 0, R0 * .12 | 0, 2);
+    g.globalCompositeOperation = 'saturation'; g.fillStyle = '#7a7a7a'; g.beginPath(); g.ellipse(sx, sy, R0 * 2.1, R0 * 1.5, 0, 0, 6.29); g.fill(); g.globalCompositeOperation = 'source-over';
+    inkSplat(sx, sy, R0 * .75, k, B.t, 7, true);
   } else if (T.stage === 'drain') { // la mancha se escurre hacia el charco de los enemigos y encoge
     const k = T.k, e = k * k, cx = lerp(p[0], q[0], e), cy = lerp(p[1], q[1], e), R0 = lerp(118, B.puddle.rx, e);
-    g.fillStyle = '#0b0912';
-    for (const b of T.balls) { const r = R0 * b.r * (1 - e * .6), d = R0 * b.d * (1 - e); g.beginPath(); g.ellipse(cx + Math.cos(b.a) * d, cy + Math.sin(b.a) * d * .6, r, r * .5, 0, 0, 6.29); g.fill(); }
-    for (const t of T.tendrils) { const L = R0 * t.len * (1 - e); g.save(); g.translate(cx, cy); g.rotate(t.a); g.beginPath(); g.ellipse(L * .5, 0, L * .5, R0 * t.w * .6, 0, 0, 6.29); g.fill(); g.restore(); }
+    g.save(); g.translate(cx, cy); g.scale(1, .75); inkSplat(0, 0, R0 * .75, 1 - e * .8, B.t, 7, false); g.restore();
   }
 }
 

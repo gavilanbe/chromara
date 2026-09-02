@@ -118,6 +118,15 @@ const DATA = {
   ],
 
   signs: { '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
+  // ---- Diálogo previo a la jefa (who: tinta | carmin | ambar | anil)
+  bossDialogue: [
+    { who: 'tinta', text: 'Otra vez color en mi página.' },
+    { who: 'tinta', text: 'Yo tracé cada línea de Chromara antes de que nadie pintara nada. Cuando llegasteis, nadie volvió a mirar el contorno.' },
+    { who: 'carmin', text: 'El contorno sigue ahí. Debajo de todo.' },
+    { who: 'tinta', text: 'Debajo. Exacto. Pues hoy la página vuelve al boceto. Bebed.' },
+    { who: 'anil', text: 'Un dibujo terminado tiene las dos cosas: la línea y el color.' },
+    { who: 'tinta', text: 'Demostradlo.' },
+  ],
   texts: {
     intro: ['Chromara pierde sus colores.', 'Las Gotas Negras beben el pigmento', 'de todo lo que tocan.', '', 'Tres gotas primarias salen a', 'devolver el color al mundo.'],
     ending: ['La Tinta se disuelve.', '', 'Chromara recupera su color.', '', 'Gracias por jugar la PoC.'],

@@ -252,3 +252,17 @@ function pageCurl(snap, k, back = PAPER, back2 = PAPER2) {
   // canto de la hoja sobre el pliegue
   const edge = flat.filter(q => Math.abs((q[0] - P[0]) * u[0] + (q[1] - P[1]) * u[1]) < .5); if (edge.length >= 2) { g.strokeStyle = '#c9bd9c'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(edge[0][0], edge[0][1]); g.lineTo(edge[1][0], edge[1][1]); g.stroke(); }
 }
+
+// =====================================================================
+// Diálogo: página abajo con retrato en pegatina, nombre en su color y texto a máquina de escribir. Z completa/avanza.
+// =====================================================================
+const SPEAKERS = { tinta: { name: 'La Tinta', col: '#8c8ab0', spr: () => buildSprite('tinta', C('negro'), null, { eyes: 'normal' }), sc: 1 }, carmin: { name: 'Carmín', col: 'rojo', spr: () => buildSprite('carmin_title', C('rojo'), null, {}), sc: 1 }, ambar: { name: 'Ámbar', col: 'amarillo', spr: () => buildSprite('ambar_title', C('amarillo'), null, {}), sc: .9 }, anil: { name: 'Añil', col: 'azul', spr: () => buildSprite('anil_title', C('azul'), null, {}), sc: .9 } };
+function drawDialogue(dlg) {
+  const D = DATA.bossDialogue, line = D[Math.min(dlg.i, D.length - 1)], sp = SPEAKERS[line.who], col = sp.col.startsWith('#') ? sp.col : C(sp.col), left = line.who !== 'tinta';
+  const y0 = 118, h = 58; page(6, y0, W - 12, h, { rings: true, tint: col });
+  const px0 = left ? 22 : W - 40, s = sp.spr(); g.save(); g.beginPath(); g.rect(px0 - 18, y0 + 6, 36, 40); g.clip(); g.fillStyle = '#e9e1cc'; g.fillRect(px0 - 18, y0 + 6, 36, 40); shadow(px0, y0 + 44, 20); drawSprite(s, px0, y0 + 44 - (dlg.t % 60 < 4 ? 1 : 0), sp.sc, !left, sp.sc); g.restore(); g.strokeStyle = PENCIL; g.strokeRect(px0 - 17.5, y0 + 6.5, 35, 39); tape(px0 - 12, y0 + 2, 24, 6);
+  const tx = left ? 46 : 14; ui(sp.name, tx, y0 + 6, ramp(col).sh);
+  const words = line.text.slice(0, dlg.ch).split(' '), lines = []; let cur = ''; for (const w of words) { if ((cur + ' ' + w).trim().length > 28) { lines.push(cur.trim()); cur = w; } else cur += ' ' + w; } if (cur.trim()) lines.push(cur.trim());
+  lines.slice(0, 3).forEach((l, i) => ui(l, tx, y0 + 18 + i * 11, TXT));
+  if (dlg.ch >= line.text.length && (B.t / 20 | 0) % 2) ui('▼', W - 24, y0 + h - 12, TXT2);
+}
