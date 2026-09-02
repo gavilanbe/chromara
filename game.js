@@ -707,7 +707,7 @@ function drawLogo(t, x0, y0) {
 }
 function updateTitle() {
   TITLE.t++;
-  if (hit('ok')) { if (TITLE.t < 310) { TITLE.t = 310; return; } Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); }
+  if (hit('ok')) { if (TITLE.t < 350) { TITLE.t = 350; return; } Audio.sfx('ok'); initOverworld(); setState('overworld'); Audio.play('map'); }
 }
 function drawTitle() {
   const t = TITLE.t, cam = TITLE.cam;
@@ -736,32 +736,35 @@ function drawTitle() {
     if (t > 8 && t < 34) { const k = (t - 8) / 26, y = lerp(-24, 96, k * k); g.fillStyle = 'rgba(11,9,18,' + (.2 + k * .3) + ')'; g.beginPath(); g.ellipse(sx, sy, 14 - k * 6, 5 - k * 2, 0, 0, 6.29); g.fill(); drawDrop({ color: C('negro'), shape: 'tall', w: 16, h: 24 }, sx, y, 'hop', 0, { dark: true }); titleSfx('fall', 'fall'); }
   }
   drawLogo(t, W / 2 - 8 * 23 / 2 + 2, 28);
-  if (t > 178) { const k = clamp((t - 178) / 20, 0, 1); g.globalAlpha = k; txtC('Las gotas que devolvieron el color', W / 2, 88, '#f4f0ea', '#14121c'); g.globalAlpha = 1; }
-  // las tres gotas nacen de los goterones de sus letras: C (rojo) → Carmín, R (amarillo) → Ámbar, M (azul) → Añil
-  const LX = [0, 2, 4], lcw = 23, lx0 = W / 2 - 8 * lcw / 2 + 2, lbase = 28 + LOGO_H;
+  // las tres gotas nacen de los goterones de sus letras: C (rojo) → Carmín, R (amarillo) → Ámbar, M (azul) → Añil.
+  // Cuando han nacido las tres, saltan al centro y se colocan en formación.
+  const LX = [0, 2, 4], lcw = 23, lx0 = W / 2 - 8 * lcw / 2 + 2, lbase = 28 + LOGO_H, gy = 150, T0 = [175, 203, 231], TALL = T0[2] + 32 + 40, CX = [160, 208, 112];
   DATA.party.forEach((p, i) => {
-    const li = LX[i], x = lx0 + li * lcw + POOLS[TITLE.letters[li]][0][0] + 1, gy = 138, col = C(p.color), rp = ramp(col), t0 = 175 + i * 28, u = t - t0;
+    const li = LX[i], xl = lx0 + li * lcw + POOLS[TITLE.letters[li]][0][0] + 1, col = C(p.color), rp = ramp(col), t0 = T0[i], u = t - t0;
     if (u < 0) return;
     if (u < 18) { // 1) el goterón engorda
-      const q = u / 18, L = 4 + q * 9, r = 2 + q * 3.5; g.fillStyle = rp.out; g.fillRect(x - 1, lbase - 2, 3, L + 2); g.fillStyle = rp.base; g.fillRect(x, lbase - 2, 1, L);
-      g.fillStyle = rp.out; g.beginPath(); g.ellipse(x + .5, lbase + L, r + 1, r + 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(x + .5, lbase + L, r, r + .5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(x - 1, lbase + L - 2, 1, 1); return; }
+      const q = u / 18, L = 4 + q * 9, r = 2 + q * 3.5; g.fillStyle = rp.out; g.fillRect(xl - 1, lbase - 2, 3, L + 2); g.fillStyle = rp.base; g.fillRect(xl, lbase - 2, 1, L);
+      g.fillStyle = rp.out; g.beginPath(); g.ellipse(xl + .5, lbase + L, r + 1, r + 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(xl + .5, lbase + L, r, r + .5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(xl - 1, lbase + L - 2, 1, 1); return; }
     if (u < 32) { // 2) se desprende y cae
-      const q = (u - 18) / 14, y = lerp(lbase + 14, gy, q * q); if (u === 18) Audio.sfx('slow_drip', { semi: [0, 4, 7][i] }); shadow(x, gy, Math.round(4 + q * 10)); drawDrop({ color: col, shape: 'tall', w: 12, h: 18 }, x, y, 'hop', 0); return; }
-    const s = u - 32; // 3) salpicón y charco · 4) el charco se levanta y toma forma · 5) vive
-    if (s === 0) { Audio.sfx('plop', { semi: [0, 4, 7][i] }); TITLE.spl = TITLE.spl || []; for (let j = 0; j < 12; j++) TITLE.spl.push({ x: x + R(-4, 4), y: gy - 2, vx: R(-2, 2), vy: -R(.8, 2.6), col, t: 0 }); }
-    if (s < 30) { const q = s / 30; g.strokeStyle = col; g.globalAlpha = 1 - q; g.lineWidth = 2; g.beginPath(); g.ellipse(x, gy, 6 + q * 44, 2 + q * 16, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }
-    shadow(x, gy, 14);
-    if (s < 12) { const q = s / 12; g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 8 + q * 8, 3 + q * 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(x - 1, gy - 1, 7 + q * 7, 2.5 + q, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(x - 6, gy - 2, 3, 1); return; }
-    const rise = clamp((s - 12) / 24, 0, 1), e = 1 - Math.pow(1 - rise, 3), over = rise < 1 ? Math.sin(rise * Math.PI) * .22 : 0, born = rise >= 1;
-    if (s === 12) Audio.sfx('grow', { semi: [0, 4, 7][i], vol: .6 }); if (rise >= 1 && s === 36) Audio.sfx('tinkle', { semi: [0, 4, 7][i] });
-    const hop = born && t > t0 + 100 ? Math.abs(Math.sin(t * .09 + i * 1.2)) * 4 : 0;
-    const eyes = !born ? 'blink' : ((t + i * 50) % 160) < 6 ? 'blink' : t > t0 + 130 ? 'happy' : 'normal';
-    const spr = buildSprite(`${p.id}_front`, col, null, { eyes }), sx = 1.3 * (1.7 - .7 * e + over * .6), sy = Math.max(.08, e * (1 + over));
-    if (!born) { g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 15 * (1 - e) + 3, 4 * (1 - e) + 1, 0, 0, 6.29); g.fill(); }
-    drawSprite(spr, x, Math.round(gy - hop), sx, false, sy); if (p.id === 'anil' && born) drawSatellites(x, gy - hop, t, col, .9 * clamp((t - t0 - 70) / 20, 0, 1));
+      const q = (u - 18) / 14, y = lerp(lbase + 14, gy, q * q); if (u === 18) Audio.sfx('slow_drip', { semi: [0, 4, 7][i] }); shadow(xl, gy, Math.round(4 + q * 10)); drawDrop({ color: col, shape: 'tall', w: 12, h: 18 }, xl, y, 'hop', 0); return; }
+    const s = u - 32; // 3) salpicón y charco · 4) el charco se levanta y toma forma · 5) al centro · 6) posan
+    if (s === 0) { Audio.sfx('plop', { semi: [0, 4, 7][i] }); TITLE.spl = TITLE.spl || []; for (let j = 0; j < 12; j++) TITLE.spl.push({ x: xl + R(-4, 4), y: gy - 2, vx: R(-2, 2), vy: -R(.8, 2.6), col, t: 0 }); }
+    if (s < 30) { const q = s / 30; g.strokeStyle = col; g.globalAlpha = 1 - q; g.lineWidth = 2; g.beginPath(); g.ellipse(xl, gy, 6 + q * 44, 2 + q * 16, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }
+    if (s < 12) { shadow(xl, gy, 14); const q = s / 12; g.fillStyle = rp.sh; g.beginPath(); g.ellipse(xl, gy, 8 + q * 10, 3 + q * 2, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(xl - 1, gy - 1, 7 + q * 9, 2.5 + q * 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(xl - 6, gy - 2, 3, 1); return; }
+    const rise = clamp((s - 12) / 26, 0, 1), e = 1 - Math.pow(1 - rise, 3), over = rise < 1 ? Math.sin(rise * Math.PI) * .22 : 0, born = rise >= 1;
+    if (s === 12) Audio.sfx('grow', { semi: [0, 4, 7][i], vol: .6 }); if (s === 38) Audio.sfx('tinkle', { semi: [0, 4, 7][i] });
+    // 5) al centro: dos saltos cuando han nacido las tres
+    const mk = clamp((t - TALL - i * 6) / 36, 0, 1), me = mk * mk * (3 - 2 * mk), x = Math.round(lerp(xl, CX[i], me)), hopM = mk > 0 && mk < 1 ? Math.abs(Math.sin(mk * Math.PI * 2)) * 10 : 0;
+    if (mk > 0 && mk < 1 && (t - TALL - i * 6) === 18) Audio.sfx('plop', { semi: [0, 4, 7][i], vol: .5 });
+    const posed = mk >= 1, breathe = posed ? 1 + Math.sin(t * .07 + i * 1.1) * .025 : 1, land = posed ? Math.max(0, 1 - (t - TALL - i * 6 - 36) / 10) : 0;
+    const eyes = !born ? 'blink' : ((t + i * 50) % 160) < 6 ? 'blink' : posed && t > TALL + 80 && ((t - TALL) % 400) < 60 ? 'happy' : 'normal';
+    const spr = buildSprite(`${p.id}_title`, col, null, { eyes }), sx = (1.7 - .7 * e + over * .6) * (1 + land * .18), sy = Math.max(.08, e * (1 + over)) * breathe * (1 - land * .16);
+    shadow(x, gy, Math.round((spr.width * .5) * (1 - hopM / 20)));
+    if (!born) { g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x, gy, 16 * (1 - e) + 3, 4 * (1 - e) + 1, 0, 0, 6.29); g.fill(); }
+    drawSprite(spr, x, Math.round(gy - hopM), sx, false, sy); if (p.id === 'anil' && born) drawSatellites(x, gy - hopM - 4, t, col, 1.1 * clamp((t - t0 - 70) / 20, 0, 1));
   });
   for (const q of TITLE.spl || []) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += .14; if (q.y > 140) { q.y = 140; q.vy *= -.3; q.vx *= .6; } g.fillStyle = q.t < 8 ? ramp(q.col).hi : ramp(q.col).base; g.fillRect(Math.round(q.x), Math.round(q.y), 2, 2); } TITLE.spl = (TITLE.spl || []).filter(q => q.t < 30);
-  if (t > 310) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 154, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 157, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#7a7694', null); }
+  if (t > 350) { if ((t / 30 | 0) % 2) { tape(W / 2 - 62, 158, 124, 14); ui('PULSA Z / ENTER', W / 2 - 56, 161, TXT); } txtC('PoC · Fable 5 · 320x180', W / 2, 173, '#7a7694', null); }
 }
 function drawDebug() {
   win(W - 124, 24, 120, 70, { solid: 'rgba(11,9,18,0.85)' }); txt('DEBUG', W - 114, 28, '#f2c93a');
