@@ -78,7 +78,8 @@ function drawBattleUI() {
     if (u.status.tiznado) smudgeIcon(300, y + 1); if (u.status.lento) ui('z', 306, y - 1, C('violeta')); if (u.status.contorno) { g.strokeStyle = '#4a4460'; g.setLineDash([1, 1]); g.strokeRect(299.5, y + .5, 8, 8); g.setLineDash([]); }
   });
   if (!m) { ui('...', 12, y0 + 8, TXT3); GUI.lastLevel = null; return; }
-  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item' || (m.level === 'target' && m.pending.type !== 'attack');
+  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item'; // al elegir objetivo, la lista se cierra: solo la ficha del objetivo y el campo despejado
+  if (m.level === 'target') { GUI.lastLevel = null; targetCard(m.targets[m.tidx], u, y0, m.pending); return; }
   const cmdSel = m.level === 'cmd' ? m.idx : (m.level === 'target' && m.pending.type === 'attack') ? 0 : (m.level === 'tech' || m.pending && m.pending.type === 'tech') ? 1 : 2;
   [[u.data.weapon, 'Atacar'], ['tech', 'Tech'], ['item', 'Objeto']].forEach(([ic, label], i) => {
     const y = y0 + 8 + i * 15, sel = cmdSel === i;
@@ -122,10 +123,23 @@ function drawBattleUI() {
   }
   if (!isTech && L[sel]) { tape(0, 3, W, 14); ui(L[sel].it.desc, 8, 6, TXT); }
 }
-// Etiqueta del objetivo: cinta de carrocero con nombre y HP
+// Ficha del objetivo en la página izquierda: la acción elegida, sprite, nombre, HP a lápiz y a qué color es débil (aviso si es el tuyo)
+function targetCard(t, u, y0, pending) {
+  const ucol = C(u.color), enemy = t.kind === 'enemy', weak = enemy ? DATA.complement[t.color] : null, mine = weak === u.color;
+  page(0, y0, 102, H - y0, { rings: true, tint: ucol });
+  const act = pending.type === 'attack' ? 'Atacar' : pending.type === 'tech' ? pending.tech.t.name : DATA.items[pending.item].short || DATA.items[pending.item].name;
+  swatch(10, y0 + 5, pending.type === 'tech' ? C(pending.tech.col) : ucol); ui(act.length > 9 ? act.slice(0, 9) : act, 20, y0 + 5, ramp(ucol).sh); ui('►', 88, y0 + 5, TXT3);
+  const spr = enemy ? buildSprite(t.id + '_mini', C('negro'), t.def.core, { eyes: t.hp < t.maxhp * .25 ? 'hurt' : 'normal' }) : buildSprite(t.id + '_front_mini', C(t.color), null, { eyes: t.hp <= 0 ? 'ko' : 'normal' });
+  shadow(19, y0 + 36, 12); drawSprite(spr, 19, y0 + 35 - (Math.abs(Math.sin(B.t * .12)) * 1.5 | 0), enemy && t.boss ? .8 : 1, false, 1);
+  ui(t.name.length > 8 ? t.name.slice(0, 8) : t.name, 32, y0 + 16, enemy ? TXT : ramp(C(t.color)).sh);
+  pencilBar(32, y0 + 26, 62, 5, t.hp / t.maxhp, enemy ? (t.color === 'negro' ? '#6a6480' : C(t.color)) : C(t.color)); ui('HP ' + t.hp + '/' + t.maxhp, 32, y0 + 33, TXT2);
+  if (enemy) { if (weak) { if (mine) hilite(8, y0 + 46, 96, 10, ucol, .3); ui('débil a', 10, y0 + 43, TXT3); swatch(66, y0 + 42, C(weak)); ui(mine ? '¡tuyo!' : DATA.colors[weak].name.slice(0, 3), 76, y0 + 43, mine ? GOLD : TXT); } else ui('tinta pura', 10, y0 + 43, TXT3); }
+  else ui('MP ' + t.mp + '/' + t.maxmp, 32, y0 + 43, TXT2);
+}
+// Etiqueta del objetivo (ya no se usa en batalla): cinta de carrocero con nombre y HP
 // Etiqueta del objetivo: cinta pegada justo encima del cursor; si no cabe arriba, bajo los pies del objetivo. Nunca tapa el cursor.
-function targetLabel(t, cursorY, top) { const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 22, x0 = clamp(t.x - w / 2, 2, W - w - 2) | 0;
-  let y = Math.round(cursorY - 16); if (y < 2) y = Math.min(112, Math.round(t.y + 6)); tape(x0, y, w, 14); swatch(x0 + 5, y + 3, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 15, y + 3, TXT); }
+function targetLabel(t, cursorY, top, below) { const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 22, x0 = clamp(t.x - w / 2, 2, W - w - 2) | 0;
+  let y = below != null ? Math.min(112, below) : Math.round(cursorY - 16); if (y < 2) y = Math.min(112, Math.round(t.y + 6)); tape(x0, y, w, 14); swatch(x0 + 5, y + 3, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 15, y + 3, TXT); }
 
 // =====================================================================
 // Menú de estado/equipo: el cuaderno del pintor. Se abre con rebote, fichas a la izquierda, retrato y equipo a la derecha.

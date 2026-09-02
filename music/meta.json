@@ -113,5 +113,29 @@
       "music box",
       "tam-tam"
     ]
+  },
+  "title": {
+    "bpm": 90,
+    "intro_s": 10.6667,
+    "loop_s": 64.0,
+    "loopStart": 74.6667,
+    "loopEnd": 138.6667,
+    "duration": 138.6667,
+    "loop": true,
+    "key": "D major",
+    "form": "intro(4) + [A(8) B(8) C(8)] x2",
+    "instruments": [
+      "flute",
+      "oboe",
+      "celesta",
+      "pizzicato",
+      "harp",
+      "string pad",
+      "strings",
+      "finger bass",
+      "timpani"
+    ],
+    "loopStartSample": 3292800,
+    "loopEndSample": 6115200
   }
 }

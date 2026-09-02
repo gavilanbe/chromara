@@ -95,7 +95,7 @@ function camRest(pc, ec) {
   const dx = ec[0] - pc[0], dy = ec[1] - pc[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
   const yaw = Math.atan2(uy, ux) + 0.7; // giro para la diagonal
   const cx = (pc[0] + ec[0]) / 2, cy = (pc[1] + ec[1]) / 2;
-  const back = 128; return { x: cx - Math.cos(yaw) * back - Math.sin(yaw) * 12, y: cy - Math.sin(yaw) * back + Math.cos(yaw) * 12, yaw, pitch: 0.62, h: 84, f: 180, hy: 58 };
+  const back = 128; return { x: cx - Math.cos(yaw) * back - Math.sin(yaw) * 12, y: cy - Math.sin(yaw) * back + Math.cos(yaw) * 12, yaw, pitch: 0.6, h: 86, f: 180, hy: 66 };
 }
 function camGo(goal, ease = .14) { SCENE.goal = Object.assign({}, SCENE.cam, goal); SCENE.ease = ease; }
 function camSet(pose) { Object.assign(SCENE.cam, pose); SCENE.goal = null; }

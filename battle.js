@@ -477,10 +477,14 @@ function drawBattle() {
   ents.sort((a, b) => b.z - a.z).forEach(e => e.d());
   drawMarks(false); for (const f of B.fx) if (!f.under) f.draw();
   for (const p of B.particles) { if (p.t < 0) continue; const c = project(p.wx, p.wy, p.wz); if (!c) continue; g.fillStyle = p.pal ? p.pal[Math.min(p.pal.length - 1, Math.floor(p.t / p.life * p.pal.length))] : p.col; const s = Math.max(1, Math.round((p.stream ? 2 : (p.t > p.life * .7 ? 1 : (p.size || 2))) * c[2])); g.fillRect(Math.round(c[0]), Math.round(c[1]), s, s); }
-  // cursor de objetivo
+  // cursor de objetivo: aro de pintura del color del atacante bajo los pies (siempre visible) y gotita que bota encima o debajo
   if (B.menu && B.menu.level === 'target') {
-    const TT = B.menu.targets, ucol = C(B.menu.unit.color); TT.forEach((t, i) => { if (i !== B.menu.tidx) return; const bob = Math.abs(Math.sin(B.t * .2)) * 3 | 0, sc = t.sc * B.unitScale * (t.kind === 'enemy' ? (t.boss ? 1.35 : 1.6) : 1), top = t.y - t.def.h * sc, cy = Math.round(top - 16 - bob);
-      targetLabel(t, cy - 4, top); g.drawImage(iconSprite('drop', ucol), Math.round(t.x - 6), cy); });
+    const TT = B.menu.targets, ucol = C(B.menu.unit.color); TT.forEach((t, i) => { if (i !== B.menu.tidx) return;
+      const bob = Math.abs(Math.sin(B.t * .2)) * 3 | 0, sc = t.sc * B.unitScale * (t.kind === 'enemy' ? (t.boss ? 1.35 : 1.6) : 1), top = t.y - t.def.h * sc, gp = project(t.wx, t.wy, 0);
+      if (gp) { const rw = t.def.w * .6 * sc + 4, rh = rw * .42; g.strokeStyle = ucol; g.lineWidth = 2; g.setLineDash([4, 3]); g.lineDashOffset = -(B.t >> 1); g.beginPath(); g.ellipse(gp[0], gp[1] + 1, rw + Math.sin(B.t * .15) * 1.5, rh + Math.sin(B.t * .15) * .6, 0, 0, 6.29); g.stroke(); g.setLineDash([]); g.strokeStyle = ramp(ucol).hi; g.lineWidth = 1; g.beginPath(); g.ellipse(gp[0], gp[1] + 1, rw - 2, rh - 1, 0, 0, 6.29); g.stroke(); }
+      const cy = Math.round(top - 16 - bob);
+      if (cy >= 2) g.drawImage(iconSprite('drop', ucol), Math.round(t.x - 6), cy);
+      else { const by = Math.round(t.y + 4 + bob); g.save(); g.translate(Math.round(t.x - 6), by + 12); g.scale(1, -1); g.drawImage(iconSprite('drop', ucol), 0, 0); g.restore(); } });
   }
   g.restore();
   if (T) drawTransitionFx();

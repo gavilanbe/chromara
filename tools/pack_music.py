@@ -5,7 +5,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MUS = os.path.join(ROOT, 'music'); OUT = os.path.join(ROOT, 'music_samples.js')
 meta_path = os.path.join(MUS, 'meta.json')
 meta = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
-pieces = ['map', 'battle', 'boss', 'victory', 'gameover']
+pieces = ['map', 'battle', 'boss', 'victory', 'gameover', 'title']
 kbps = sys.argv[1] if len(sys.argv) > 1 else '112'
 out = {}
 for name in pieces:
