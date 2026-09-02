@@ -62,36 +62,62 @@ function hilite(x0, y, x1, w, col, a = .3) { // banda de pincelada translúcida 
   g.globalAlpha = 1;
 }
 function smudgeIcon(x, y) { g.fillStyle = '#0b0912'; g.fillRect(x, y, 6, 3); g.fillRect(x + 1, y - 1, 4, 1); g.fillRect(x + 1, y + 3, 3, 1); g.fillStyle = '#7d7899'; g.fillRect(x + 1, y, 1, 1); }
-// ---- GUI de batalla: página izquierda = comandos, página derecha = estado del grupo; hoja que se pasa para techs/objetos
+// ---- GUI de batalla: página izquierda = comandos del que actúa, página derecha = fichas del grupo. Todo con el mismo papel:
+// pegatinas, pinceladas que se deslizan, HP a lápiz que salta al recibir daño, MP como tubo de pintura, ATB como pincelada.
+function tubeGauge(x, y, f, col, dry) { // tubo de pintura en miniatura: el cuerpo se vacía de derecha a izquierda
+  const rp = ramp(col); g.fillStyle = '#6a6480'; g.fillRect(x, y + 1, 2, 4); g.fillStyle = '#2a2438'; g.fillRect(x + 2, y, 14, 6); g.fillStyle = '#e9e1cc'; g.fillRect(x + 3, y + 1, 12, 4);
+  const n = Math.round(12 * clamp(f, 0, 1)); if (n) { g.fillStyle = dry ? '#9a90a8' : rp.base; g.fillRect(x + 15 - n, y + 1, n, 4); g.fillStyle = dry ? '#b8b0c0' : rp.hi; g.fillRect(x + 15 - n, y + 1, n, 1); }
+  g.fillStyle = '#2a2438'; g.fillRect(x + 16, y + 1, 3, 4); g.fillStyle = dry ? '#9a90a8' : rp.sh; g.fillRect(x + 16, y + 2, 2, 2); if (f < .999 && !dry) { g.fillStyle = '#9a90a8'; g.fillRect(x + 4, y + 2, 1, 1); g.fillRect(x + 6, y + 3, 1, 1); } // pliegues del tubo vacío
+}
 function drawBattleUI() {
   const y0 = 128, m = B.menu, act = m ? m.unit : null, tint = act ? C(act.color) : null;
-  page(104, y0, W - 104, H - y0); page(0, y0, 102, H - y0, { rings: true, tint });
+  GUI.swapT = (GUI.swapT ?? 99) + 1; const flipK = clamp(GUI.swapT / 8, 0, 1);
+  // ---- página derecha: fichas
+  page(104, y0, W - 104, H - y0);
   B.party.forEach((u, i) => {
-    const y = y0 + 8 + i * 15, active = act === u, col = C(u.color), fade = pigmentFade(u.mp, u.maxmp), full = u.atb >= 100 && u.alive && !u.acting, qi = B.queue.indexOf(u);
-    if (active) hilite(112, y + 5, 314, 12, col, .35);
-    sticker(118, y + 5, u, 6);
-    if (qi >= 0 && !active) { g.fillStyle = INK; g.beginPath(); g.arc(124, y - 1, 4, 0, 6.29); g.fill(); ui(String(qi + 1), 121, y - 4, GOLD); } // orden en la cola
-    const nm = !u.alive ? TXT3 : fade > 0 ? desat(ramp(col).sh, fade, .1) : ramp(col).sh; ui(u.name, 128, y - 1, nm);
-    // ATB: la brocha va pintando una pincelada bajo el nombre; llena, brilla y gotea
+    const y = y0 + 8 + i * 15, active = act === u, col = C(u.color), rp = ramp(col), fade = pigmentFade(u.mp, u.maxmp), full = u.atb >= 100 && u.alive && !u.acting && B.phase === 'fight', qi = B.queue.indexOf(u);
+    u.uiHit = Math.max(0, (u.uiHit || 0) - 1); u.uiHeal = Math.max(0, (u.uiHeal || 0) - 1); u.uiHp = u.uiHp == null ? u.hp : (Math.abs(u.uiHp - u.hp) < 1 ? u.hp : u.uiHp + (u.hp - u.uiHp) * .25); // el número de HP persigue al real
+    if (!u.uiFull && full) { u.uiFull = 1; u.uiPop = 10; Audio.sfx('tinkle', { semi: SEMI[u.id] || 0, vol: .2 }); } if (!full) u.uiFull = 0; u.uiPop = Math.max(0, (u.uiPop || 0) - 1);
+    const shake = u.uiHit > 6 ? ((u.uiHit & 1) ? 1 : -1) : 0, lift = active ? -1 : 0;
+    // resalte del activo, que se desliza entre filas
+    if (active) { GUI.hlY = GUI.hlY == null ? y : lerp(GUI.hlY, y, .35); hilite(112, Math.round(GUI.hlY) + 5, 314, 12, col, .35); dropCursor(106, Math.round(GUI.hlY) + 1, col); }
+    g.save(); g.translate(shake, lift);
+    const pop = u.uiPop > 0 ? 1 + Math.sin(u.uiPop / 10 * Math.PI) * .35 : 1; g.save(); g.translate(118, y + 5); g.scale(pop, pop); g.translate(-118, -y - 5); sticker(118, y + 5, u, 6); g.restore();
+    if (qi >= 0 && !active) { g.fillStyle = INK; g.beginPath(); g.arc(124, y - 1, 4, 0, 6.29); g.fill(); ui(String(qi + 1), 121, y - 4, GOLD); }
+    if (full && !active && (B.t >> 3) % 2) { g.fillStyle = '#ffffff'; g.fillRect(111, y - 1, 1, 3); g.fillRect(110, y, 3, 1); }
+    const nm = !u.alive ? TXT3 : fade > 0 ? desat(rp.sh, fade, .1) : rp.sh; ui(u.name, 128, y - 1, nm);
+    // ATB: pincelada que la brocha va pintando
     const ax = 128, aw = 56, f = u.alive ? clamp(u.atb / 100, 0, 1) : 0, fw = Math.round(aw * f);
-    g.fillStyle = '#e9e1cc'; g.fillRect(ax, y + 8, aw, 4); g.fillStyle = PENCIL; g.fillRect(ax, y + 12, aw, 1);
-    if (fw > 0) { const rp = ramp(col); g.fillStyle = rp.base; for (let k = 0; k < fw; k++) { const h = 4 - ((k * 7) % 3 === 0 ? 1 : 0); g.fillRect(ax + k, y + 8 + (4 - h), 1, h); } g.fillStyle = rp.hi; g.fillRect(ax, y + 8, Math.max(1, fw - 2), 1); g.fillStyle = rp.sh; g.fillRect(ax, y + 11, fw, 1);
-      if (!full) { g.fillStyle = '#5a4630'; g.fillRect(ax + fw - 1, y + 4, 2, 4); g.fillStyle = '#c9c4d4'; g.fillRect(ax + fw - 1, y + 7, 2, 1); g.fillStyle = rp.base; g.fillRect(ax + fw - 2, y + 8, 3, 2); } // punta de la brocha pintando
-      else { const k = (B.t >> 2) % 8; g.fillStyle = k < 4 ? '#ffffff' : rp.hi; g.fillRect(ax + aw - 3 + (k & 1), y + 7, 2, 1); g.fillRect(ax + (B.t * 3) % aw, y + 8, 3, 1); g.fillStyle = rp.base; g.fillRect(ax + aw - 2, y + 12 + (k >> 1), 2, 2); if (k === 0) g.fillRect(ax + aw - 2, y + 15, 2, 1); } } // llena: brillo que recorre la pincelada y gota que cae
-    ui('HP', 190, y - 1, TXT2); ui(String(u.hp).padStart(3), 208, y - 1, u.hp <= 0 ? TXT3 : u.hp < u.maxhp * .25 ? C('rojo') : TXT); pencilBar(190, y + 8, 42, 4, u.hp / u.maxhp, col);
-    ui('MP', 242, y - 1, fade >= 1 ? C('rojo') : TXT2); ui(String(u.mp).padStart(2), 260, y - 1, fade >= 1 ? C('rojo') : TXT); pencilBar(242, y + 8, 42, 4, u.mp / u.maxmp, fade >= 1 ? '#9a90a8' : desat(col, .4, .1));
-    if (fade >= 1 && (B.t >> 4) % 2) ui('seca', 268, y + 13, TXT3);
-    if (u.status.tiznado) smudgeIcon(300, y + 1); if (u.status.lento) ui('z', 306, y - 1, C('violeta')); if (u.status.contorno) { g.strokeStyle = '#4a4460'; g.setLineDash([1, 1]); g.strokeRect(299.5, y + .5, 8, 8); g.setLineDash([]); }
+    g.fillStyle = '#e9e1cc'; g.fillRect(ax, y + 8, aw, 4); g.fillStyle = PENCIL; g.fillRect(ax, y + 12, aw, 1); g.fillRect(ax - 1, y + 8, 1, 5); g.fillRect(ax + aw, y + 8, 1, 5);
+    if (fw > 0) { g.fillStyle = rp.base; for (let k = 0; k < fw; k++) { const h = 4 - ((k * 7) % 3 === 0 ? 1 : 0); g.fillRect(ax + k, y + 8 + (4 - h), 1, h); } g.fillStyle = rp.hi; g.fillRect(ax, y + 8, Math.max(1, fw - 2), 1); g.fillStyle = rp.sh; g.fillRect(ax, y + 11, fw, 1);
+      if (!full) { g.fillStyle = '#5a4630'; g.fillRect(ax + fw - 1, y + 4, 2, 4); g.fillStyle = '#c9c4d4'; g.fillRect(ax + fw - 1, y + 7, 2, 1); g.fillStyle = rp.base; g.fillRect(ax + fw - 2, y + 8, 3, 2); }
+      else { const k = (B.t >> 2) % 8; g.fillStyle = k < 4 ? '#ffffff' : rp.hi; g.fillRect(ax + aw - 3 + (k & 1), y + 7, 2, 1); g.fillRect(ax + (B.t * 3) % aw, y + 8, 3, 1); g.fillStyle = rp.base; g.fillRect(ax + aw - 2, y + 12 + (k >> 1), 2, 2); } }
+    // HP a lápiz: el número persigue al real, la barra salta y se pone roja al recibir daño, verde al curar
+    const hpCol = u.hp <= 0 ? TXT3 : u.uiHit > 0 ? (u.uiHit & 2 ? '#ffffff' : C('rojo')) : u.uiHeal > 0 ? '#2f9a48' : u.hp < u.maxhp * .25 ? ((B.t >> 3) & 1 ? C('rojo') : TXT) : TXT;
+    ui('HP', 190, y - 1, TXT2); ui(String(Math.round(u.uiHp)).padStart(3), 208, y - 1, hpCol); pencilBar(190, y + 8, 42, 4, u.uiHp / u.maxhp, u.uiHit > 0 ? C('rojo') : u.uiHeal > 0 ? C('verde') : col);
+    if (u.hp < u.maxhp * .25 && u.alive && (B.t >> 2) % 6 === 0) { g.fillStyle = rp.base; g.fillRect(190 + Math.round(40 * u.hp / u.maxhp), y + 12, 1, 2); } // la barra gotea cuando queda poca
+    // MP como tubo de pintura
+    ui('MP', 242, y - 1, fade >= 1 ? C('rojo') : TXT2); ui(String(u.mp).padStart(2), 260, y - 1, fade >= 1 ? C('rojo') : TXT); tubeGauge(240, y + 7, u.mp / u.maxmp, col, fade >= 1);
+    if (fade >= 1 && (B.t >> 4) % 2) ui('seca', 262, y + 6, TXT3);
+    // estados como pegatinas pequeñas
+    let sx = 286; if (u.status.tiznado) { smudgeIcon(sx, y + 1); sx += 9; } if (u.status.lento) { ui('z', sx, y - 1, C('violeta')); sx += 9; } if (u.status.contorno) { g.strokeStyle = '#4a4460'; g.setLineDash([1, 1]); g.strokeRect(sx + .5, y + .5, 7, 7); g.setLineDash([]); }
+    g.restore();
   });
-  if (!m) { ui('...', 12, y0 + 8, TXT3); GUI.lastLevel = null; return; }
-  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item'; // al elegir objetivo, la lista se cierra: solo la ficha del objetivo y el campo despejado
+  // ---- página izquierda: comandos del que actúa (o la ficha del objetivo)
+  if (!m) { page(0, y0, 102, H - y0, { rings: true }); ui('...', 12, y0 + 8, TXT3); GUI.lastLevel = null; GUI.cmdY = null; return; }
+  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item';
   if (m.level === 'target') { GUI.lastLevel = null; targetCard(m.targets[m.tidx], u, y0, m.pending); return; }
-  const cmdSel = m.level === 'cmd' ? m.idx : (m.level === 'target' && m.pending.type === 'attack') ? 0 : (m.level === 'tech' || m.pending && m.pending.type === 'tech') ? 1 : 2;
+  g.save(); g.translate(0, 0); g.scale(Math.max(.05, Math.sin(flipK * Math.PI / 2)), 1); // la página pasa hoja al cambiar de gota
+  page(0, y0, 102, H - y0, { rings: true, tint: ucol });
+  tape(8, y0 - 3, 86, 11); swatch(12, y0 - 1, ucol); ui(u.name, 22, y0 - 1, ramp(ucol).sh); if (B.queue.length > 1) ui('◄►', 74, y0 - 1, TXT3); // quién actúa, y que hay otros listos
+  const cmdSel = m.level === 'cmd' ? m.idx : (m.level === 'tech' || m.pending && m.pending.type === 'tech') ? 1 : 2;
+  const rowY = i => y0 + 10 + i * 14; GUI.cmdY = GUI.cmdY == null ? rowY(cmdSel) : lerp(GUI.cmdY, rowY(cmdSel), .4); // el resalte se desliza
+  hilite(12, Math.round(GUI.cmdY) + 5, 98, 12, ucol, listing ? .18 : .35); if (!listing) dropCursor(10, Math.round(GUI.cmdY) + 1, ucol);
   [[u.data.weapon, 'Atacar'], ['tech', 'Tech'], ['item', 'Objeto']].forEach(([ic, label], i) => {
-    const y = y0 + 8 + i * 15, sel = cmdSel === i;
-    if (sel) { hilite(12, y + 5, 98, 12, ucol, listing ? .18 : .35); if (!listing) dropCursor(10, y + 1, ucol); }
-    g.drawImage(iconSprite(ic, ucol), 22, y - 1); ui(label, 38, y + 1, sel ? TXT : TXT2);
+    const y = rowY(i), sel = cmdSel === i, wig = sel && !listing ? Math.sin(B.t * .25) * 1.5 : 0, bounce = sel && !listing ? -Math.abs(Math.sin(B.t * .12)) * 1 : 0;
+    g.save(); g.translate(28, y + 5 + bounce); g.rotate(wig * .06); g.drawImage(iconSprite(ic, ucol), -6, -6); g.restore(); ui(label, 40, y + 1, sel ? TXT : TXT2);
   });
+  g.restore();
   const lv = listing ? (m.pending && m.pending.type === 'item' || m.level === 'item' ? 'item' : 'tech') : null;
   if (lv !== GUI.lastLevel) { GUI.lastLevel = lv; GUI.flip = 0; } GUI.flip++;
   if (!listing) return;
@@ -99,17 +125,18 @@ function drawBattleUI() {
   const isTech = lv === 'tech', L = m.list;
   const sel = m.level === 'target' ? L.findIndex(e => e.id === (m.pending.tech ? m.pending.tech.id : m.pending.item)) : m.idx;
   const rows = Math.max(1, Math.min(4, L.length)), top = clamp(sel - 3, 0, Math.max(0, L.length - 4));
-  const ww = 160, wh = rows * 12 + 12, wy = y0 - wh - 2, k = clamp(GUI.flip / 7, 0, 1), sc = Math.sin(k * Math.PI / 2);
+  const ww = 160, wh = rows * 12 + 12, wy = y0 - wh - 4, k = clamp(GUI.flip / 7, 0, 1), sc = Math.sin(k * Math.PI / 2);
   g.save(); g.translate(4, 0); g.scale(Math.max(.05, sc), 1);
-  page(0, wy, ww, wh, { rings: true, tint });
+  page(0, wy, ww, wh, { rings: true, tint: ucol });
   if (!L.length) ui('Nada', 20, wy + 7, TXT3);
+  const selY = wy + 7 + (sel - top) * 12; GUI.listY = GUI.listY == null || GUI.flip < 2 ? selY : lerp(GUI.listY, selY, .4);
+  if (L.length) { hilite(14, Math.round(GUI.listY) + 3, ww - 6, 11, ucol, .35); dropCursor(10, Math.round(GUI.listY) - 1, ucol); }
   L.slice(top, top + 4).forEach((e, kk) => {
     const i = top + kk, y = wy + 7 + kk * 12;
-    if (i === sel) { hilite(14, y + 3, ww - 6, 11, ucol, .35); dropCursor(10, y - 1, ucol); }
     if (isTech) {
       swatch(20, y, C(e.col), !e.avail); ui(e.t.name, 31, y, e.avail ? TXT : TXT3);
-      e.users.filter(x => x !== u).forEach((x, q) => { g.globalAlpha = e.avail ? 1 : .4; g.drawImage(iconSprite('drop', C(x.color)), 122 + q * 9, y - 3); g.globalAlpha = 1; });
-      const cs = String(e.cost); ui(cs, ww - 8 - cs.length * 8, y, e.avail ? TXT2 : TXT3);
+      e.users.filter(x => x !== u).forEach((x, q) => { g.globalAlpha = e.avail ? 1 : .4; g.drawImage(iconSprite('drop', C(x.color)), 118 + q * 9, y - 3); g.globalAlpha = 1; });
+      const cs = String(e.cost); tubeGauge(ww - 44, y, 1, e.avail ? C(e.col) : '#9a90a8', !e.avail); ui(cs, ww - 8 - cs.length * 8, y, e.avail ? TXT2 : TXT3);
     } else {
       g.drawImage(iconSprite('item', e.it.kind === 'mp' ? C('azul') : e.it.kind === 'heal' ? C('verde') : '#e86a8a'), 20, y - 2); ui(e.it.short || e.it.name, 36, y, TXT);
       const ns = 'x' + e.n; ui(ns, ww - 8 - ns.length * 8, y, TXT2);
@@ -117,7 +144,6 @@ function drawBattleUI() {
   });
   if (L.length > 4) { ui(top > 0 ? '▲' : ' ', ww - 14, wy + 3, TXT2); ui(top + 4 < L.length ? '▼' : ' ', ww - 14, wy + wh - 9, TXT2); }
   g.restore();
-  // ---- arriba: cinta con la ecuación de color y la descripción
   if (isTech && L[sel]) {
     const e = L[sel]; tape(0, 3, W, 24);
     let x = 8; e.users.forEach((us, j) => { swatch(x, 7, C(us.color)); x += 8; if (j < e.users.length - 1) { ui('+', x, 7, TXT2); x += 9; } });

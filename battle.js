@@ -36,7 +36,7 @@ function num(u, v, col, big) { B.nums.push({ x: u.x + R(-4, 4), y: u.y - u.def.h
 function damage(target, raw, col, src) {
   if (!target.alive) return 0;
   const mult = colorMult(col, target.color), dmg = Math.max(1, Math.round(raw * mult * R(.92, 1.08) * (target.status.contorno ? .6 : 1)));
-  target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14;
+  target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14; target.uiHit = 12;
   num(target, dmg, mult >= 2 ? '#f2c93a' : mult < 1 ? '#8c8ab0' : '#f4f0ea', mult >= 2);
   impactFx(target, C(col), mult >= 2 ? 1.6 : mult < 1 ? .6 : 1);
   Audio.sfx(mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 10 : 6; B.shake = mult >= 2 ? 6 : 4; if (mult >= 2) B.slowmo = Math.max(B.slowmo, 8);
@@ -54,7 +54,7 @@ function impactFx(t, col, k = 1) {
 function heal(target, amount, isMp) {
   if (!target.alive) return;
   if (isMp) { target.mp = Math.min(target.maxmp, target.mp + amount); num(target, '+' + amount, '#3a6fe2'); }
-  else { const a = Math.min(amount, target.maxhp - target.hp); target.hp += a; num(target, '+' + a, '#4fb84a'); }
+  else { const a = Math.min(amount, target.maxhp - target.hp); target.hp += a; num(target, '+' + a, '#4fb84a'); target.uiHeal = 14; }
   burst(target.wx, target.wy, target.def.h * .4, isMp ? C('azul') : C('verde'), 10, 1, 28, -.03); Audio.sfx('heal');
 }
 function kill(u) {
@@ -333,7 +333,8 @@ function updateBattleMenu() {
   const m = B.menu, u = m.unit;
   if (m.level === 'cmd') {
     if (hit('down')) { m.idx = (m.idx + 1) % 3; Audio.sfx('cursor', semiOf(u)); } if (hit('up')) { m.idx = (m.idx + 2) % 3; Audio.sfx('cursor', semiOf(u)); }
-    if (hit('back') || hit('swap')) { if (B.queue.length > 1) { B.queue.push(B.queue.shift()); B.menu = null; Audio.sfx('page'); } return; }
+    if (hit('back') || hit('swap') || hit('right')) { if (B.queue.length > 1) { B.queue.push(B.queue.shift()); B.menu = null; GUI.swapT = 0; Audio.sfx('page'); } return; }
+    if (hit('left')) { if (B.queue.length > 1) { B.queue.unshift(B.queue.pop()); B.menu = null; GUI.swapT = 0; Audio.sfx('page'); } return; }
     if (hit('ok')) {
       Audio.sfx('confirm', semiOf(u));
       if (m.idx === 0) { m.level = 'target'; m.pending = { type: 'attack' }; m.targets = alive(B.enemies); m.tidx = 0; }
