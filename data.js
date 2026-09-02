@@ -87,7 +87,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  k tintero  R río de tinta  G goma empujable  W estante  E estuche  w semilla  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  H página rota  R río de tinta  G goma empujable  W estante  E estuche (invisible hasta Revelar)  w semilla  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -103,17 +103,17 @@ const DATA = {
     'T...~~~~~..=.....~~~~~~........TT......T',
     'T....~~~...=....~~~~~.....T....TT......T',
     'T..........=...~~~~..........TT........T',
-    'T...1......=...~~~~....r...............T',
-    'T..........=====~~~~=====...........TTTT',
-    'T........T.....~~~~.....=.G..k......T..T',
-    'T...S...TT......~~~~....=....RR....TTETT',
-    'T......TT........~~~~...=....RR....T..TT',
-    'T.....TT..........~~~~..=....RR....TWWTT',
-    'T.....T.V..........~~~~.=....RR.....w..T',
-    'T..P..T.............~~~~=....RR........T',
-    'T.....T.S............~~~=....RR........T',
-    'T.....T...............~~=..S.RR........T',
-    'T.....TT...............~=~~~...........T',
+    'T...1......=...~~~~....r...TTTTTTTTTTTTT',
+    'T..........=====~~~~=====..T........TTTT',
+    'T........T.....~~~~.....=..T........T..T',
+    'T...S...TT......~~~~....=..T.RR....TTETT',
+    'T......TT........~~~~...=..T.RR....T..TT',
+    'T.....TT..........~~~~..=..T.RR....TWWTT',
+    'T.....T.V..........~~~~.=.HH.RR.....G..T',
+    'T..P..T.............~~~~=SHH.RR........T',
+    'T.....T.S............~~~=..TwRR........T',
+    'T.....T...............~~=..T.RR........T',
+    'T.....TT...............~=~~~TTTTTTTTTTTT',
     'T......TT..............~=~~~~..........T',
     'T.......TTT...........~~=~~~~~.........T',
     'T.........TT.........~~~=~~~~~~........T',
@@ -121,7 +121,7 @@ const DATA = {
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
   ],
 
-  signs: { '27,23': ['Post-it del delineante:', 'Tapona el tintero, deja', 'secar, y une los puntos', '1→5. Dos se ven a oscuras.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
+  signs: { '25,21': ['Post-it del delineante:', 'Pinta lo roto. Riega junto', 'al río. Aparta la goma y', 'dibuja. Lo que no ves, revela.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
   // ---- Puzle del estuche: puntos a unir (coordenadas de tile con decimales), los ocultos solo se ven con Revelar
   puzzle: { dots: [{ n: 1, x: 28.4, y: 21.4 }, { n: 2, x: 29.5, y: 21.2, hidden: true }, { n: 3, x: 30.5, y: 20.4 }, { n: 4, x: 31.4, y: 21.6, hidden: true }, { n: 5, x: 32.4, y: 20.8 }], tries: 3 },
   // ---- Diálogo previo a la jefa (who: tinta | carmin | ambar | anil)

@@ -460,7 +460,7 @@ DATA.map.forEach((row, y) => {
     if (ch === 'P') { MAP.spawn = [x, y]; ch = '.'; }
     else if (ch === 'V') { MAP.jar = { x, y }; ch = '.'; }
     else if (ch === 'S') { (MAP.signs = MAP.signs || []).push({ x, y, lines: DATA.signs[x + ',' + y] || ['Post-it'] }); ch = '.'; }
-    else if ('kRGWEw'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], shelf: [] }; if (ch === 'k') P.tintero = [x, y]; else if (ch === 'R') P.river.push([x, y]); else if (ch === 'G') P.block0 = [x, y]; else if (ch === 'W') P.shelf.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; else if (ch === 'w') P.seed = [x, y]; ch = ch === 'R' ? ',' : '.'; }
+    else if ('HRGWEw'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], shelf: [], torn: [] }; if (ch === 'H') P.torn.push([x, y]); else if (ch === 'R') P.river.push([x, y]); else if (ch === 'G') P.block0 = [x, y]; else if (ch === 'W') P.shelf.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; else if (ch === 'w') P.seed = [x, y]; ch = ch === 'R' ? ',' : '.'; }
     else if (DATA.encounters[ch]) { MAP.spots.push({ key: ch, x, y }); ch = ch === 'B' ? ',' : (ch === '5' ? ',' : '.'); }
     out += ch;
   }
@@ -483,7 +483,7 @@ function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 
 // =====================================================================
 // 3. Estado global de partida
 // =====================================================================
-const PUZ0 = () => ({ block: MAP.pz ? [...MAP.pz.block0] : [0, 0], plugged: false, dry: 0, revealed: false, next: 1, drawn: [], tries: DATA.puzzle.tries, bridged: false, vine: 0, opened: false, wrong: null });
+const PUZ0 = () => ({ block: MAP.pz ? [...MAP.pz.block0] : [0, 0], painted: 0, strokes: [], sun: 0, sunBend: 0, ladder: 0, revealed: false, reveal: 0, opened: false });
 const Game = { state: 'cover', owned: {}, puzzle: null, t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), bossDown: false, intro: true, debug: false };
 function effStats(p) { // base + arma + accesorio
   const wpn = DATA.weapons[p.weapon] || {}, acc = DATA.accessories[p.acc] || {};
@@ -508,11 +508,11 @@ function initOverworld() {
 }
 function pzSolidTile(tx, ty) { // objetos del puzle que bloquean el paso
   const P = MAP.pz, Z = Game.puzzle; if (!P || !Z) return false;
-  if (P.tintero && tx === P.tintero[0] && ty === P.tintero[1]) return true;
+  if (P.torn.some(([x, y]) => x === tx && y === ty)) return Z.painted < 1; // página rota: agujero hasta que se pinta
   if (Z.block[0] === tx && Z.block[1] === ty) return true;
   if (P.estuche && tx === P.estuche[0] && ty === P.estuche[1]) return true;
-  if (P.shelf.some(([x, y]) => x === tx && y === ty)) return !(Z.vine >= 1 && P.seed && tx === P.seed[0] && ty === P.seed[1] - 1);
-  if (P.river.some(([x, y]) => x === tx && y === ty)) return !(Z.bridged || Z.drawn.some(sg => sg[2] >= 1 && (sg[1][0] / TILE | 0) === tx && (sg[1][1] / TILE | 0) === ty));
+  if (P.shelf.some(([x, y]) => x === tx && y === ty)) return !(Z.ladder >= 1 && P.ladderAt && tx === P.ladderAt[0] && ty === P.ladderAt[1]);
+  if (P.river.some(([x, y]) => x === tx && y === ty)) return !(Z.sunBend >= 1 && P.seed && ty === P.seed[1]); // el girasol doblado hace de puente en su fila
   return false;
 }
 function walkable(px, py) { // hitbox pies 8×6
@@ -542,7 +542,6 @@ function updateOverworld() {
   if (OW.menu) { updateMenu(); return; }
   if (hit('ok')) { if (MAP.pz && MAP.pz.estuche && !Game.puzzle.opened && Math.hypot(OW.x - MAP.pz.estuche[0] * TILE - 8, OW.y - MAP.pz.estuche[1] * TILE - 8) < 26) { OW.act = openEstucheGen(); return; } openMenu(); return; }
   if (hit('ring')) { openRing(); return; }
-  if (Game.puzzle.plugged && Game.puzzle.dry < 1) { Game.puzzle.dry = Math.min(1, Game.puzzle.dry + .0028); if (Game.puzzle.dry >= 1) { Audio.sfx('crumbs'); Audio.sfx('page', { vol: .4 }); } }
   // movimiento con aceleración y frenada; el líder bota al andar (es una gota)
   let dx = 0, dy = 0; if (keys.left) dx--; if (keys.right) dx++; if (keys.up) dy--; if (keys.down) dy++;
   if (dx && dy) { dx *= .707; dy *= .707; }
@@ -614,67 +613,92 @@ function* healGen() { // el grupo salta dentro del vaso, el agua se tiñe de sus
   J.glow = 0; yield* wait(10);
   OW.msg = { lines: ['Aclaráis las gotas en el vaso.', '', '¡HP y MP al máximo!'], t: 0 }; J.cd = 1;
 }
-// ---- Ruedita de utensilios (la psinergia de Chromara): cada arma da una habilidad de campo; el dueño se adelanta y la ejecuta
+// ---- Ruedita de utensilios (la psinergia de Chromara): cada arma da habilidades de campo que se lanzan hacia delante.
+// El dueño se adelanta, se concentra (aura y partículas de su color), la herramienta actúa y el escenario cambia.
 const FIELD = [
-  { id: 'empujar', name: 'Empujar', weapon: 'brocha', mp: 0, desc: 'Mueve gomas y trastos' },
-  { id: 'trazar', name: 'Trazar', weapon: 'lapiz', mp: 1, desc: 'Une los puntos' },
+  { id: 'pintar', name: 'Pintar', weapon: 'brocha', mp: 2, desc: 'Repara la página rota' },
+  { id: 'empujar', name: 'Empujar', weapon: 'brocha', mp: 0, desc: 'Aparta gomas y trastos' },
+  { id: 'trazar', name: 'Trazar', weapon: 'lapiz', mp: 2, desc: 'Dibuja una escalera' },
   { id: 'regar', name: 'Regar', weapon: 'pincel', mp: 2, desc: 'Hace brotar semillas' },
-  { id: 'revelar', name: 'Revelar', combo: ['carmin', 'anil'], mp: 3, desc: 'Muestra lo oculto' },
+  { id: 'revelar', name: 'Revelar', combo: ['carmin', 'anil'], mp: 3, desc: 'Destapa la tinta invisible' },
 ];
-function fieldOwner(f) { return f.weapon ? Party.find(p => p.weapon === f.weapon && p.cur.hp > 0) : null; }
+const DIRV = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+function fieldOwner(f) { return f.weapon ? Party.find(p => p.weapon === f.weapon && p.cur.hp > 0) : Party.find(q => q.id === f.combo[0]); }
 function fieldOk(f) { if (f.combo) return f.combo.every(id => { const p = Party.find(q => q.id === id); return p && p.cur.hp > 0 && p.cur.mp >= f.mp; }); const o = fieldOwner(f); return !!o && o.cur.mp >= f.mp; }
-function openRing() { OW.ring = { idx: 0, t: 0 }; Audio.sfx('book_open', { vol: .6 }); }
+function openRing() { OW.ring = { idx: 0, t: 0, rot: 0 }; Audio.sfx('book_open', { vol: .6 }); }
 function updateRing() {
-  const r = OW.ring; r.t++;
-  if (hit('left')) { r.idx = (r.idx + 3) % 4; Audio.sfx('cursor', { semi: r.idx * 2 }); } if (hit('right') || hit('down') || hit('up')) { r.idx = (r.idx + 1) % 4; Audio.sfx('cursor', { semi: r.idx * 2 }); }
+  const r = OW.ring; r.t++; const n = FIELD.length;
+  if (hit('left')) { r.idx = (r.idx + n - 1) % n; r.spin = 8; Audio.sfx('cursor', { semi: r.idx * 2 }); } if (hit('right')) { r.idx = (r.idx + 1) % n; r.spin = 8; Audio.sfx('cursor', { semi: r.idx * 2 }); }
   if (hit('back') || hit('ring')) { OW.ring = null; Audio.sfx('cancel'); return; }
-  if (hit('ok')) { const f = FIELD[r.idx]; if (!fieldOk(f)) { Audio.sfx('nope'); OW.msg = { lines: [f.name + ': ' + (f.combo ? 'hacen falta Carmín y Añil con MP.' : fieldOwner(f) ? 'sin pigmento suficiente.' : 'nadie lleva ' + DATA.weapons[f.weapon].name.toLowerCase() + '.')], t: 0 }; OW.ring = null; return; } OW.ring = null; Audio.sfx('confirm'); OW.act = fieldGen(f); }
+  if (hit('ok') || hit('up')) { const f = FIELD[r.idx]; if (!fieldOk(f)) { Audio.sfx('nope'); r.shake = 8; OW.msg = { lines: [f.name + ': ' + (f.combo ? 'hacen falta Carmín y Añil con MP.' : fieldOwner(f) ? 'sin pigmento suficiente.' : 'nadie lleva ' + DATA.weapons[f.weapon].name.toLowerCase() + '.')], t: 0 }; OW.ring = null; return; } OW.ring = null; Audio.sfx('confirm', { semi: SEMI[fieldOwner(f).id] || 0 }); OW.act = fieldGen(f); }
 }
-function drawRing() {
-  const r = OW.ring, cx = OW.x - Math.round(OW.cam.x), cy = OW.y - Math.round(OW.cam.y) - 6, k = clamp(r.t / 6, 0, 1), rad = 24 * k;
-  g.fillStyle = 'rgba(11,9,18,.25)'; g.fillRect(0, 0, W, H);
-  FIELD.forEach((f, i) => { const a = -Math.PI / 2 + i * Math.PI / 2 + (1 - k) * .6, x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad * .7, sel = i === r.idx, ok = fieldOk(f), owner = fieldOwner(f), col = owner ? C(owner.color) : f.combo ? C('violeta') : '#9a90a8';
-    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y, sel ? 10 : 8, 0, 6.29); g.fill(); g.fillStyle = ok ? col : '#c9c4d4'; g.beginPath(); g.arc(x, y, sel ? 8.5 : 6.5, 0, 6.29); g.fill();
-    g.globalAlpha = ok ? 1 : .45; g.drawImage(iconSprite(f.weapon || 'tech', col), Math.round(x - 6), Math.round(y - 6)); g.globalAlpha = 1;
-    if (sel) { const w = f.name.length * 8 + 16; tape(cx - w / 2, cy + 26, w, 14); ui(f.name, cx - w / 2 + 8, cy + 29, TXT); const d = f.desc + (f.mp ? ' · ' + f.mp + ' MP' : ''); ui(d, W / 2 - d.length * 4, H - 14, TXT2); } });
+function drawRing() { // rueda de pegatinas sobre el líder: la elegida arriba, grande, con la cara del dueño y su nombre en una cinta
+  const r = OW.ring, cx = OW.x - Math.round(OW.cam.x), cy = OW.y - Math.round(OW.cam.y) - 4, k = clamp(r.t / 7, 0, 1), e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2), n = FIELD.length;
+  g.fillStyle = 'rgba(11,9,18,.3)'; g.fillRect(0, 0, W, H);
+  r.rot = r.rot == null ? r.idx : r.rot + ((((r.idx - r.rot) % n) + n * 1.5) % n - n / 2) * .3; if (r.spin > 0) r.spin--;
+  FIELD.forEach((f, i) => { let rel = ((i - r.rot) % n + n) % n; if (rel > n / 2) rel -= n; const a = -Math.PI / 2 + rel * (Math.PI * 2 / n), rad = 30 * e, x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad * .6 - 6, sel = i === r.idx, ok = fieldOk(f), owner = fieldOwner(f), col = owner ? C(owner.color) : '#9a90a8', sc = (sel ? 1.35 : .85) * e, shk = sel && r.shake > 0 ? (r.shake-- & 1 ? 1.5 : -1.5) : 0;
+    g.save(); g.translate(Math.round(x + shk), Math.round(y)); g.scale(sc, sc); g.rotate(sel ? Math.sin(r.t * .12) * .06 : 0);
+    g.fillStyle = 'rgba(11,9,18,.35)'; g.beginPath(); g.arc(1, 2, 10, 0, 6.29); g.fill(); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(0, 0, 10, 0, 6.29); g.fill(); g.fillStyle = ok ? col : '#c9c4d4'; g.beginPath(); g.arc(0, 0, 8.5, 0, 6.29); g.fill(); g.fillStyle = ok ? ramp(col).hi : '#e8e6f0'; g.beginPath(); g.arc(-2, -3, 3, 0, 6.29); g.fill();
+    g.globalAlpha = ok ? 1 : .45; g.drawImage(iconSprite(f.weapon || 'tech', col), -6, -6); g.globalAlpha = 1;
+    if (owner && ok) { g.save(); g.beginPath(); g.arc(7, 6, 4.5, 0, 6.29); g.clip(); g.fillStyle = ramp(C(owner.color)).base; g.fillRect(2, 1, 10, 10); const m = buildSprite(`${owner.id}_front_mini`, C(owner.color), null, { eyes: 'normal' }); g.drawImage(m, 7 - m.width / 2, 6 - m.height / 2 + 2); g.restore(); g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.arc(7, 6, 4.5, 0, 6.29); g.stroke(); }
+    g.restore();
+    if (sel) { const label = f.name + (owner ? ' · ' + owner.name : ''), w = label.length * 8 + 16; tape(cx - w / 2, cy + 22, w, 14); ui(label, cx - w / 2 + 8, cy + 25, TXT); const d = f.desc + (f.mp ? ' · ' + f.mp + ' MP' : ''); ui(d, W / 2 - d.length * 4, H - 14, TXT2); } });
+  ui('◄►', cx - 8, cy + 38, TXT3);
 }
-function nearestDot(px, py) { // el siguiente punto si está al alcance; si no, el más cercano sin unir (que será un error)
-  const Z = Game.puzzle, vis = DATA.puzzle.dots.filter(d => !(d.hidden && !Z.revealed) && d.n >= Z.next), dist = d => Math.hypot(px - d.x * TILE, py - d.y * TILE); const nx = vis.find(d => d.n === Z.next); if (nx && dist(nx) < 28) return nx; let best = null, bd = 28; for (const d of vis) { const dd = dist(d); if (dd < bd) { bd = dd; best = d; } } return best; }
+// El que lanza se adelanta hacia donde mira, se concentra con un aura de su color y la cámara se acerca un poco
+function* castIntro(f, owner, dir) {
+  const col = C(owner.color); OW.cast = { p: owner, x: OW.x, y: OW.y, k: 0, col }; const tx = OW.x + dir[0] * 12, ty = OW.y + dir[1] * 8;
+  Audio.sfx('charge', { semi: SEMI[owner.id] || 0, vol: .6 });
+  for (let i = 1; i <= 10; i++) { const q = i / 10; OW.cast.x = lerp(OW.x, tx, q); OW.cast.y = lerp(OW.y, ty, q); OW.cast.k = q; OW.camNudge = [dir[0] * 10 * q, dir[1] * 6 * q]; yield; }
+  for (let i = 0; i < 14; i++) { OW.cast.aura = i / 14; if (i % 2 === 0) { const a = R(0, 6.28), d = 14; OW.dust.push({ x: OW.cast.x + Math.cos(a) * d, y: OW.cast.y + Math.sin(a) * d * .5, vx: -Math.cos(a) * 1.4, vy: -Math.sin(a) * .7 - .3, col, t: 0, life: 10 }); } yield; }
+  OW.flash = { col, a: .25 }; Audio.sfx('mix', { vol: .5 });
+}
+function* castOutro() { for (let i = 1; i <= 8; i++) { const q = 1 - i / 8; OW.cast.x = lerp(OW.x, OW.cast.x, q); OW.cast.y = lerp(OW.y, OW.cast.y, q); OW.cast.aura = 0; OW.camNudge = [OW.camNudge[0] * q, OW.camNudge[1] * q]; yield; } OW.cast = null; OW.camNudge = null; }
 function* fieldGen(f) {
-  const P = MAP.pz, Z = Game.puzzle, owner = f.combo ? Party.find(q => q.id === f.combo[0]) : fieldOwner(f), lx = OW.x / TILE | 0, ly = (OW.y + 2) / TILE | 0, dir = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }[OW.dir] || [0, 1];
-  const say2 = lines => { OW.msg = { lines, t: 0 }; };
-  if (f.id === 'empujar') {
-    const bx = Z.block[0], by = Z.block[1]; if (Math.abs(bx - lx) + Math.abs(by - ly) !== 1 || (bx - lx !== dir[0] || by - ly !== dir[1])) { say2(['No hay nada que empujar por ahí.']); return; }
+  const P = MAP.pz, Z = Game.puzzle, owner = fieldOwner(f), dir = DIRV[OW.dir] || [0, 1], lx = OW.x / TILE | 0, ly = (OW.y + 2) / TILE | 0, say2 = lines => { OW.msg = { lines, t: 0 }; };
+  const ahead = n => [lx + dir[0] * n, ly + dir[1] * n];
+  if (f.id === 'pintar') { // la brocha grande cae y pinta una banda de su color tres casillas hacia delante; sobre la página rota, la repara
+    const cells = [1, 2, 3].map(ahead), torn = cells.filter(([x, y]) => P.torn.some(([a, b]) => a === x && b === y)); if (!torn.length && !cells.some(([x, y]) => P.torn.some(([a, b]) => a === x && b === y))) { say2(['Aquí no hay nada roto que pintar.']); return; }
+    owner.cur.mp -= f.mp; yield* castIntro(f, owner, dir); const col = C(owner.color);
+    const img = propSprite('brocha', col), st = { k: 0, wz: 40 }, x0 = OW.cast.x + dir[0] * 10, y0 = OW.cast.y + dir[1] * 6, x1 = x0 + dir[0] * 52, y1 = y0 + dir[1] * 52;
+    OW.fx = () => { const x = lerp(x0, x1, st.k) - Math.round(OW.cam.x), y = lerp(y0, y1, st.k) - Math.round(OW.cam.y) - st.wz; drawProp(img, x, y, dir[0] ? (dir[0] > 0 ? .9 : -.9) : dir[1] > 0 ? 1.6 : .2, dir[0] < 0 ? -1 : 1, PROP.brocha.tip[0], PROP.brocha.tip[1], .9); };
+    Audio.sfx('brush_big'); for (let i = 1; i <= 8; i++) { st.wz = 40 * (1 - i / 8) * (1 - i / 8); yield; } OW.shake = 4; Audio.sfx('brush_sweep');
+    const stroke = { x0, y0, x1, y1, col, k: 0, w: 12 }; Z.strokes.push(stroke);
+    for (let i = 1; i <= 14; i++) { st.k = i / 14; stroke.k = i / 14; for (let j = 0; j < 2; j++) OW.dust.push({ x: lerp(x0, x1, st.k) + R(-6, 6), y: lerp(y0, y1, st.k) + R(-4, 4), vx: R(-.6, .6), vy: -R(.3, 1), col, t: 0, life: RI(8, 14) }); yield; }
+    for (let i = 1; i <= 6; i++) { st.wz = i * 6; yield; } OW.fx = null;
+    Z.painted = 1; Audio.sfx('page', { vol: .5 }); Audio.sfx('tinkle', { semi: 2, when: .1 }); yield* castOutro(); say2(['La pincelada tapa la rotura:', 'ya se puede pisar.']); return;
+  }
+  if (f.id === 'empujar') { // el mango de la brocha empuja la goma: se desliza una casilla
+    const bx = Z.block[0], by = Z.block[1]; if (bx - lx !== dir[0] || by - ly !== dir[1]) { say2(['No hay nada que empujar por ahí.']); return; }
     const tx = bx + dir[0], ty = by + dir[1]; if (solid(tileAt(tx, ty)) || pzSolidTile(tx, ty)) { Audio.sfx('nope'); say2(['La goma no pasa por ahí.']); return; }
-    Audio.sfx('rub'); Z.push = { from: [bx, by], to: [tx, ty], k: 0 }; for (let i = 1; i <= 14; i++) { Z.push.k = i / 14; if (i % 4 === 0) for (let j = 0; j < 3; j++) OW.dust.push({ x: bx * TILE + 8 + R(-6, 6), y: by * TILE + 14, vx: -dir[0] * R(.3, 1), vy: -R(.2, .6), col: '#e86a8a', t: 0, life: RI(8, 14) }); yield; }
-    Z.block = [tx, ty]; Z.push = null; Audio.sfx('impact_sub', { vol: .4 });
-    if (P.tintero && Math.abs(tx - P.tintero[0]) + Math.abs(ty - P.tintero[1]) === 1 && !Z.plugged) { Z.plugged = true; Audio.sfx('plop', { semi: -4 }); Audio.sfx('hum_down', { vol: .3 }); yield* wait(10); say2(['La goma tapona el tintero.', 'La tinta deja de manar:', 'el río empieza a secarse.']); }
-    return;
+    yield* castIntro(f, owner, dir); const img = propSprite('brocha', C(owner.color)), st = { k: 0 };
+    OW.fx = () => { const x = OW.cast.x - Math.round(OW.cam.x) + dir[0] * (6 + st.k * 10), y = OW.cast.y - Math.round(OW.cam.y) - 6 + dir[1] * (4 + st.k * 8); drawProp(img, x, y, dir[0] ? 0 : dir[1] > 0 ? 1.57 : -1.57, dir[0] < 0 ? -1 : 1, 4, 11, .7); };
+    for (let i = 1; i <= 6; i++) { st.k = i / 6; yield; } Audio.sfx('rub'); Z.push = { from: [bx, by], to: [tx, ty], k: 0 };
+    for (let i = 1; i <= 12; i++) { Z.push.k = i / 12; if (i % 3 === 0) for (let j = 0; j < 3; j++) OW.dust.push({ x: bx * TILE + 8 + R(-6, 6), y: by * TILE + 14, vx: -dir[0] * R(.3, 1), vy: -R(.2, .6), col: '#e86a8a', t: 0, life: RI(8, 14) }); yield; }
+    Z.block = [tx, ty]; Z.push = null; OW.shake = 3; Audio.sfx('impact_sub', { vol: .4 }); for (let i = 1; i <= 4; i++) { st.k = 1 - i / 4; yield; } OW.fx = null; yield* castOutro(); return;
   }
-  if (f.id === 'trazar') {
-    const d = nearestDot(OW.x, OW.y); if (!d) { say2(['No hay puntos que unir aquí.']); return; }
-    if (Z.bridged) { say2(['Ya está trazado.']); return; }
-    if (Z.dry < 1) { Audio.sfx('nope'); say2(['La tinta aún está húmeda:', 'el lápiz resbala.']); return; }
-    owner.cur.mp -= f.mp; const from = Z.next === 1 ? [d.x * TILE, d.y * TILE] : Z.drawn[Z.drawn.length - 1][1];
-    if (d.n !== Z.next) {
-      Audio.sfx('scratch_long'); const pts = []; for (let i = 0; i <= 8; i++) pts.push([lerp(from[0], d.x * TILE, i / 8) + R(-5, 5), lerp(from[1], d.y * TILE, i / 8) + R(-5, 5)]); Z.wrong = { pts, k: 0 }; for (let i = 1; i <= 12; i++) { Z.wrong.k = i / 12; yield; } yield* wait(10);
-      Audio.sfx('rub'); Audio.sfx('crumbs', { when: .2 }); for (let i = 1; i <= 12; i++) { Z.wrong.k = 1 - i / 12; for (let j = 0; j < 2; j++) OW.dust.push({ x: lerp(from[0], d.x * TILE, R(0, 1)), y: lerp(from[1], d.y * TILE, R(0, 1)), vx: R(-.5, .5), vy: -R(.3, .9), col: '#e86a8a', t: 0, life: RI(8, 14) }); yield; }
-      Z.wrong = null; Z.drawn = []; Z.next = 1; Z.tries = Math.max(0, Z.tries - 1); say2(['Ese no era el siguiente.', Z.tries > 0 ? 'La Goma lo borra. Quedan ' + Z.tries + '.' : 'La Goma está gastada… pero', 'un delineante nunca se rinde.']); if (Z.tries === 0) Z.tries = 3; return; }
-    Audio.sfx('scratch'); const seg = [from, [d.x * TILE, d.y * TILE], 0]; Z.drawn.push(seg); for (let i = 1; i <= 12; i++) { seg[2] = i / 12; yield; }
-    Z.next++; if (Z.next > DATA.puzzle.dots.length) { Z.bridged = true; Audio.sfx('tinkle', { semi: 7 }); Audio.sfx('confirm', { when: .1 }); yield* wait(8); say2(['Los puntos forman un puente', 'de rayas sobre la tinta seca.']); }
-    return;
+  if (f.id === 'trazar') { // frente al estante, el lápiz dibuja una escalera peldaño a peldaño
+    const [tx, ty] = ahead(1), sh = P.shelf.find(([x, y]) => x === tx && y === ty); if (!sh) { say2(['Aquí no hay dónde dibujar', 'una escalera.']); return; }
+    if (Z.block[0] === tx && Z.block[1] === ty + 1 && !(lx === tx && ly === ty + 1)) { say2(['La goma estorba.']); return; }
+    if (Z.ladder >= 1) { say2(['La escalera ya está dibujada.']); return; }
+    owner.cur.mp -= f.mp; yield* castIntro(f, owner, dir); P.ladderAt = [tx, ty]; const img = propSprite('lapiz', C(owner.color)), st = { k: 0 };
+    OW.fx = () => { const x = tx * TILE + 8 - Math.round(OW.cam.x) + Math.sin(st.k * 40) * 4, y = ty * TILE + 15 - st.k * 14 - Math.round(OW.cam.y); drawProp(img, x, y, -.95, 1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], .9); };
+    for (let i = 1; i <= 24; i++) { st.k = i / 24; Z.ladder = i / 24; if (i % 6 === 1) Audio.sfx('scratch', { vol: .4, semi: i }); if (i % 2 === 0) OW.dust.push({ x: tx * TILE + 8 + R(-4, 4), y: ty * TILE + 15 - st.k * 14, vx: R(-.4, .4), vy: -R(.2, .6), col: '#6a6480', t: 0, life: 10 }); yield; }
+    OW.fx = null; Z.ladder = 1; Audio.sfx('tinkle', { semi: 4 }); yield* castOutro(); say2(['Una escalera a lápiz', 'sube por el estante.']); return;
   }
-  if (f.id === 'regar') {
-    if (!P.seed || Math.hypot(OW.x - P.seed[0] * TILE - 8, OW.y - P.seed[1] * TILE - 8) > 30) { say2(['No hay nada que regar aquí.']); return; }
-    if (Z.vine >= 1) { say2(['La enredadera ya está crecida.']); return; }
-    owner.cur.mp -= f.mp; Audio.sfx('splash_clean'); for (let i = 0; i < 14; i++) { for (let j = 0; j < 2; j++) OW.dust.push({ x: P.seed[0] * TILE + 8 + R(-5, 5), y: P.seed[1] * TILE + 4, vx: R(-.4, .4), vy: -R(.5, 1.4), col: C('azul'), t: 0, life: RI(10, 16) }); yield; }
-    Audio.sfx('grow'); for (let i = 1; i <= 40; i++) { Z.vine = i / 40; if (i % 8 === 0) Audio.sfx('leaves', { vol: .5 }); if (i % 3 === 0) OW.dust.push({ x: P.seed[0] * TILE + 8 + R(-6, 6), y: P.seed[1] * TILE + 8 - Z.vine * 26, vx: R(-.3, .3), vy: -R(.2, .5), col: '#7ecb60', t: 0, life: 16 }); yield; }
-    Audio.sfx('tinkle', { semi: 4 }); say2(['Brota una enredadera', 'que trepa por el estante.']); return;
+  if (f.id === 'regar') { // el pincel se moja en Añil y riega la semilla: brota un girasol que crece, florece y se dobla sobre el río como puente
+    const [tx, ty] = ahead(1); if (!P.seed || !((tx === P.seed[0] && ty === P.seed[1]) || (lx === P.seed[0] && ly === P.seed[1]))) { say2(['Aquí no hay nada que regar.']); return; }
+    if (Z.sun >= 1) { say2(['El girasol ya hace de puente.']); return; }
+    owner.cur.mp -= f.mp; yield* castIntro(f, owner, dir); const sx = P.seed[0] * TILE + 8, sy = P.seed[1] * TILE + 12;
+    Audio.sfx('brush_hiss'); for (let i = 0; i < 16; i++) { for (let j = 0; j < 2; j++) OW.dust.push({ x: OW.cast.x + R(-3, 3), y: OW.cast.y - 8, vx: (sx - OW.cast.x) / 16 + R(-.3, .3), vy: -1.8 + R(-.3, .3), col: j ? C('azul') : ramp(C('azul')).hi, t: 0, life: 16 }); yield; }
+    Audio.sfx('splash_clean'); Audio.sfx('grow', { when: .2 }); for (let i = 1; i <= 36; i++) { Z.sun = i / 36; if (i % 9 === 0) Audio.sfx('leaves', { vol: .5 }); if (i % 3 === 0) OW.dust.push({ x: sx + R(-6, 6), y: sy - Z.sun * 30, vx: R(-.3, .3), vy: -R(.2, .5), col: '#7ecb60', t: 0, life: 14 }); yield; }
+    yield* wait(10); Audio.sfx('leaves'); Audio.sfx('hum_down', { vol: .3 }); for (let i = 1; i <= 24; i++) { Z.sunBend = i / 24; yield; } OW.shake = 3; Audio.sfx('plop', { semi: -2 }); for (let j = 0; j < 8; j++) OW.dust.push({ x: sx + 36 + R(-6, 6), y: sy + R(-2, 2), vx: R(-.6, .6), vy: -R(.3, .9), col: '#f2c93a', t: 0, life: 14 });
+    yield* castOutro(); say2(['El girasol se dobla sobre la', 'tinta y hace de puente.']); return;
   }
-  if (f.id === 'revelar') {
-    f.combo.forEach(id => { const q = Party.find(p => p.id === id); q.cur.mp -= f.mp; }); Audio.sfx('hum_down'); Audio.sfx('glass', { when: .3 });
-    Z.reveal = 0; for (let i = 1; i <= 90; i++) { Z.reveal = i < 15 ? i / 15 : i > 70 ? (90 - i) / 20 : 1; if (i === 20) { Z.revealed = true; Audio.sfx('tinkle', { semi: 2 }); } yield; }
-    Z.reveal = 0; return;
+  if (f.id === 'revelar') { // Carmín y Añil oscurecen la página: lo escrito con tinta invisible aparece
+    f.combo.forEach(id => { const q = Party.find(p => p.id === id); q.cur.mp -= f.mp; }); yield* castIntro(f, owner, dir); Audio.sfx('hum_down'); Audio.sfx('glass', { when: .3 });
+    for (let i = 1; i <= 90; i++) { Z.reveal = i < 15 ? i / 15 : i > 70 ? (90 - i) / 20 : 1; if (i === 24 && !Z.revealed) { Z.revealed = true; Audio.sfx('tinkle', { semi: 2 }); Audio.sfx('mix', { vol: .4 }); } if (i > 20 && i < 60 && i % 4 === 0 && P.estuche) OW.dust.push({ x: P.estuche[0] * TILE + 8 + R(-10, 10), y: P.estuche[1] * TILE + 8 + R(-6, 6), vx: 0, vy: -R(.2, .5), col: '#fff3c0', t: 0, life: 16 }); yield; }
+    Z.reveal = 0; yield* castOutro(); say2(P.estuche ? ['Con la página a oscuras aparece', 'algo escrito con tinta invisible:', 'un estuche en lo alto del estante.'] : ['No había nada oculto.']); return;
   }
 }
 function* openEstucheGen() {
@@ -713,7 +737,8 @@ function mapDrop(p, x, y, dir, bob, moving, t, idx) {
   if (p.id === 'anil') drawSatellites(x, y - wz, t + idx * 10, col, .4);
 }
 function drawOverworld() {
-  const cx = Math.round(OW.cam.x), cy = Math.round(OW.cam.y), wf = (OW.t / 9 | 0) % 4, pal = Game.palette;
+  const nud = OW.camNudge || [0, 0], shk = OW.shake > 0 ? [R(-OW.shake, OW.shake) | 0, R(-OW.shake, OW.shake) / 2 | 0] : [0, 0]; if (OW.shake > 0 && OW.t % 2 === 0) OW.shake--;
+  const cx = Math.round(OW.cam.x + nud[0]) + shk[0], cy = Math.round(OW.cam.y + nud[1]) + shk[1], wf = (OW.t / 9 | 0) % 4, pal = Game.palette;
   const ents = [];
   for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
     const ch = tileAt(tx, ty); g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
@@ -722,23 +747,31 @@ function drawOverworld() {
   for (const p of OW.puddles || []) { const x = p.x - cx, y = p.y - cy; if (x < -20 || y < -20 || x > W + 20 || y > H + 20) continue; g.fillStyle = ramp(p.col).sh; g.beginPath(); g.ellipse(x, y + 2, p.w, p.w * .45, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).base; g.beginPath(); g.ellipse(x - 1, y + 1, p.w - 2, p.w * .4 - 1, 0, 0, 6.29); g.fill(); g.fillStyle = ramp(p.col).hi; g.fillRect(x - p.w * .5 | 0, y - 1, 3, 1); }
   // grupo: líder y seguidores por la estela (estilo CT), cada uno mirando hacia donde avanza
   if (MAP.pz && Game.puzzle) { const P = MAP.pz, Z = Game.puzzle;
-    for (const [tx, ty] of P.river) { const x = tx * TILE - cx, y = ty * TILE - cy; if (x < -16 || y < -16 || x > W || y > H) continue; const dry = Z.dry;
-      if (dry < 1) { g.fillStyle = 'rgba(11,9,18,' + (.55 * (1 - dry)).toFixed(2) + ')'; g.fillRect(x, y, 16, 16); g.fillStyle = '#3a3652'; const fl = (OW.t + ty * 5) % 16; g.fillRect(x + 3, y + fl, 2, 3); g.fillRect(x + 11, y + (fl + 8) % 16, 2, 2); if (!Z.plugged || dry < .5) { g.fillStyle = '#5a5670'; g.fillRect(x + 6, y + (fl + 4) % 16, 1, 1); } }
-      if (dry > 0) { g.globalAlpha = dry; g.fillStyle = '#4a4655'; g.fillRect(x + 2, y + 5, 6, 1); g.fillRect(x + 8, y + 6, 1, 4); g.fillRect(x + 9, y + 10, 5, 1); g.fillRect(x + 3, y + 12, 1, 3); g.fillRect(x + 12, y + 2, 1, 3); g.globalAlpha = 1; } }
-    if (P.tintero) { const x = P.tintero[0] * TILE - cx, y = P.tintero[1] * TILE - cy; ents.push({ y: P.tintero[1] * TILE + 16, draw: () => { shadow(x + 12, y + 20, 14); g.drawImage(pzSprite('tintero', pal), x - 4, y - 6); if (!Z.plugged) { g.fillStyle = '#0b0912'; g.fillRect(x + 4, y + 12 + (OW.t >> 2) % 3, 8, 4); g.fillRect(x + 6, y + 16, 4, 4); } } }); }
+    // página rota: agujero con bordes desgarrados que deja ver el cartón de la tapa
+    for (const [tx, ty] of P.torn) { const x = tx * TILE - cx, y = ty * TILE - cy; if (x < -16 || y < -16 || x > W || y > H) continue; const rnd = seeded(tx * 7 + ty * 13); g.fillStyle = '#7a5a3a'; g.fillRect(x, y, 16, 16); g.fillStyle = '#5e4229'; for (let i = 0; i < 12; i++) g.fillRect(x + (rnd() * 16 | 0), y + (rnd() * 16 | 0), 1, 1); g.fillStyle = PAPER; for (let i = 0; i < 16; i++) { if (rnd() < .5) g.fillRect(x + i, y, 1, 1 + (rnd() * 2 | 0)); if (rnd() < .5) g.fillRect(x + i, y + 14 + (rnd() * 2 | 0), 1, 2); if (rnd() < .4) g.fillRect(x, y + i, 1 + (rnd() * 2 | 0), 1); if (rnd() < .4) g.fillRect(x + 14 + (rnd() * 2 | 0), y + i, 2, 1); } }
+    // pinceladas de reparación (permanentes)
+    for (const st of Z.strokes) { const x0 = st.x0 - cx, y0 = st.y0 - cy, x1 = lerp(st.x0, st.x1, st.k) - cx, y1 = lerp(st.y0, st.y1, st.k) - cy; pstroke(x0, y0, x1, y1, st.w, ramp(st.col).sh, 1, 1, false); pstroke(x0, y0, x1, y1, st.w - 4, st.col, 1, 0, false); pstroke(x0 - 2, y0 - 2, x1 - 2, y1 - 2, 2, ramp(st.col).hi, 1, 1, false); }
+    // río de tinta húmeda
+    for (const [tx, ty] of P.river) { const x = tx * TILE - cx, y = ty * TILE - cy; if (x < -16 || y < -16 || x > W || y > H) continue; g.fillStyle = 'rgba(11,9,18,.5)'; g.fillRect(x, y, 16, 16); g.fillStyle = '#3a3652'; const fl = (OW.t + ty * 5) % 16; g.fillRect(x + 3, y + fl, 2, 3); g.fillRect(x + 11, y + (fl + 8) % 16, 2, 2); g.fillStyle = '#5a5670'; g.fillRect(x + 6, y + (fl + 4) % 16, 1, 1); }
+    // goma empujable
     const bx = Z.push ? lerp(Z.push.from[0], Z.push.to[0], Z.push.k) : Z.block[0], by = Z.push ? lerp(Z.push.from[1], Z.push.to[1], Z.push.k) : Z.block[1];
     ents.push({ y: by * TILE + 15, draw: () => { shadow(bx * TILE + 8 - cx, by * TILE + 15 - cy, 16); g.drawImage(pzSprite('goma', pal), Math.round(bx * TILE - 4 - cx), Math.round(by * TILE - 6 - cy)); } });
-    for (const [tx, ty] of P.shelf) { const x = tx * TILE - cx, y = ty * TILE - cy; g.fillStyle = PAL[pal].ruler; g.fillRect(x, y + 4, 16, 12); g.fillStyle = PAL[pal].ruler2; g.fillRect(x, y + 4, 16, 2); g.fillRect(x, y + 14, 16, 2); g.fillStyle = PAL[pal].rulerInk; for (let i = 0; i < 16; i += 2) g.fillRect(x + i, y + 6, 1, i % 8 === 0 ? 4 : i % 4 === 0 ? 3 : 2); }
-    for (const d of DATA.puzzle.dots) { if (d.hidden && !Z.revealed && !(Z.reveal > 0)) continue; const x = d.x * TILE - cx, y = d.y * TILE - cy, a = d.hidden && !Z.revealed ? Z.reveal : 1; g.globalAlpha = a; g.fillStyle = d.n < Z.next ? '#4a4655' : INK; g.beginPath(); g.arc(x, y, 2.5, 0, 6.29); g.fill(); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, y - 1, 1, 1); txt(String(d.n), x + 3, y - 9, d.n === Z.next ? GOLD : '#c9c4d4', '#0b0912'); g.globalAlpha = 1; }
-    for (const seg of Z.drawn) pstroke(seg[0][0] - cx, seg[0][1] - cy, lerp(seg[0][0], seg[1][0], seg[2]) - cx, lerp(seg[0][1], seg[1][1], seg[2]) - cy, 2, INK, 1, 0, false);
-    if (Z.wrong) { const n = Math.round((Z.wrong.pts.length - 1) * Z.wrong.k); for (let i = 1; i <= n; i++) pstroke(Z.wrong.pts[i - 1][0] - cx, Z.wrong.pts[i - 1][1] - cy, Z.wrong.pts[i][0] - cx, Z.wrong.pts[i][1] - cy, 2, '#6a6480', 1, 1, false); }
-    if (Z.bridged) { g.fillStyle = '#f4f0ea'; for (const seg of Z.drawn) { const L = Math.hypot(seg[1][0] - seg[0][0], seg[1][1] - seg[0][1]); for (let i = 0; i < L; i += 4) g.fillRect(Math.round(lerp(seg[0][0], seg[1][0], i / L) - cx), Math.round(lerp(seg[0][1], seg[1][1], i / L) - cy), 2, 1); } }
-    if (P.seed) { const x = P.seed[0] * TILE - cx, y = P.seed[1] * TILE - cy; ents.push({ y: P.seed[1] * TILE + 12, draw: () => { if (Z.vine <= 0) g.drawImage(pzSprite('semilla', pal), x - 4, y - 4); else drawVine(x + 8, y + 12, Z.vine); } }); }
-    if (P.estuche) { const x = P.estuche[0] * TILE - cx, y = P.estuche[1] * TILE - cy; ents.push({ y: P.estuche[1] * TILE + 16, draw: () => { shadow(x + 8, y + 15, 18); const spr = pzSprite('estuche', pal); g.drawImage(spr, x - 4, y - 4);
+    // estante (regla tumbada) y escalera a lápiz
+    for (const [tx, ty] of P.shelf) { const x = tx * TILE - cx, y = ty * TILE - cy; g.fillStyle = PAL[pal].ruler; g.fillRect(x, y + 4, 16, 12); g.fillStyle = PAL[pal].ruler2; g.fillRect(x, y + 4, 16, 2); g.fillRect(x, y + 14, 16, 2); g.fillStyle = PAL[pal].rulerInk; for (let i = 0; i < 16; i += 2) g.fillRect(x + i, y + 6, 1, i % 8 === 0 ? 4 : i % 4 === 0 ? 3 : 2);
+      if (P.ladderAt && P.ladderAt[0] === tx && P.ladderAt[1] === ty && Z.ladder > 0) { const n = Math.round(Z.ladder * 5); g.fillStyle = INK; g.fillRect(x + 4, y + 16 - Math.round(Z.ladder * 16), 1, Math.round(Z.ladder * 16)); g.fillRect(x + 11, y + 16 - Math.round(Z.ladder * 16), 1, Math.round(Z.ladder * 16)); for (let i = 0; i < n; i++) g.fillRect(x + 5, y + 13 - i * 3, 6, 1); } }
+    // semilla y girasol (crece, florece y se dobla hacia el río)
+    if (P.seed) { const sx = P.seed[0] * TILE + 8, sy = P.seed[1] * TILE + 12; ents.push({ y: P.seed[1] * TILE + 12, draw: () => { const x = sx - cx, y = sy - cy; if (Z.sun <= 0) { g.drawImage(pzSprite('semilla', pal), x - 12, y - 16); return; }
+      const H2 = Z.sun * 34, bend = Z.sunBend, ang = -Math.PI / 2 + bend * Math.PI / 2; g.save(); g.translate(x, y); g.strokeStyle = '#2f9a48'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, 0); for (let i = 1; i <= 8; i++) { const q = i / 8, a = -Math.PI / 2 + (bend * Math.PI / 2) * q * q, L = H2 * q; g.lineTo(Math.cos(a) * L + Math.sin(q * 5) * (1 - bend) * 2, Math.sin(a) * L); } g.stroke(); g.strokeStyle = '#7ecb60'; g.lineWidth = 1; g.stroke();
+      for (let i = 1; i <= 3; i++) { const q = .25 * i, a = -Math.PI / 2 + (bend * Math.PI / 2) * q * q, L = H2 * q, lx2 = Math.cos(a) * L, ly2 = Math.sin(a) * L, dir = i % 2 ? 1 : -1; g.fillStyle = i % 2 ? '#4fb84a' : '#2f9a48'; g.beginPath(); g.ellipse(lx2 + Math.cos(a + dir * 1.2) * 5, ly2 + Math.sin(a + dir * 1.2) * 5, 5, 2.2, a + dir * 1.2, 0, 6.29); g.fill(); }
+      const hx = Math.cos(ang) * H2, hy = Math.sin(ang) * H2, rr = 4 + Z.sun * 4; if (Z.sun > .5) { for (let i = 0; i < 10; i++) { const a2 = i / 10 * 6.28 + OW.t * .01; g.fillStyle = C('amarillo'); g.beginPath(); g.ellipse(hx + Math.cos(a2) * rr, hy + Math.sin(a2) * rr, rr * .5, rr * .28, a2, 0, 6.29); g.fill(); } g.fillStyle = '#5e4229'; g.beginPath(); g.arc(hx, hy, rr * .6, 0, 6.29); g.fill(); g.fillStyle = '#8a6a48'; g.fillRect(hx - 1, hy - 1, 1, 1); }
+      g.restore(); } }); }
+    // estuche (tinta invisible hasta Revelar)
+    if (P.estuche) { const x = P.estuche[0] * TILE - cx, y = P.estuche[1] * TILE - cy, vis = Z.revealed ? 1 : Z.reveal; if (vis > 0) ents.push({ y: P.estuche[1] * TILE + 16, draw: () => { g.globalAlpha = vis; shadow(x + 8, y + 15, 18); const spr = pzSprite('estuche', pal); g.drawImage(spr, x - 4, y - 4);
+      if (!Z.revealed) { g.strokeStyle = '#f4f0ea'; g.setLineDash([2, 2]); g.strokeRect(x - 4.5, y + 3.5, 23, 12); g.setLineDash([]); }
       if (Z.zip != null && !Z.opened) { g.fillStyle = '#f4f0ea'; g.fillRect(x - 2 + Math.round(Z.zip * 18), y + 8, 2, 2); }
       if (Z.open != null && !Z.opened) { g.fillStyle = ramp(C('violeta')).sh; g.fillRect(x - 2, y + 5 - Math.round(Z.open * 6), 20, Math.round(Z.open * 6)); g.fillStyle = '#e9e1cc'; g.fillRect(x - 1, y + 5, 18, 3); }
       if (Z.rise > 0) { const ry = y + 4 - Z.rise * 26, img = propSprite('pluma', C('azul')); g.save(); g.translate(x + 8, ry); g.rotate(-1.2 + Math.sin(OW.t * .2) * .1); g.drawImage(img, -24, -8); g.restore(); if (Z.rise > .5) { const w = 'La Pluma'.length * 8 + 16; tape(x + 8 - w / 2, ry - 26, w, 14); ui('La Pluma', x + 8 - w / 2 + 8, ry - 23, TXT); } g.fillStyle = '#fff3c0'; g.globalAlpha = .6 * Math.sin(Z.rise * Math.PI); g.beginPath(); g.arc(x + 8, ry, 14, 0, 6.29); g.fill(); g.globalAlpha = 1; }
-      if (Z.opened) { g.fillStyle = ramp(C('violeta')).sh; g.fillRect(x - 2, y - 1, 20, 6); g.fillStyle = '#e9e1cc'; g.fillRect(x - 1, y + 5, 18, 3); } } }); }
+      if (Z.opened) { g.fillStyle = ramp(C('violeta')).sh; g.fillRect(x - 2, y - 1, 20, 6); g.fillStyle = '#e9e1cc'; g.fillRect(x - 1, y + 5, 18, 3); } g.globalAlpha = 1; } }); }
     if (Z.reveal > 0) { g.fillStyle = 'rgba(11,9,18,' + (.6 * Z.reveal).toFixed(2) + ')'; g.fillRect(0, 0, W, H); }
   }
   for (const sg of MAP.signs || []) ents.push({ y: sg.y * TILE + 14, draw: () => { shadow(sg.x * TILE + 8 - cx, sg.y * TILE + 14 - cy, 8); g.drawImage(signSprite(), sg.x * TILE + 1 - cx, sg.y * TILE - 2 - cy); } });
@@ -752,6 +785,7 @@ function drawOverworld() {
     g.restore(); } }); }
   if (!(OW.landT > 900)) Party.forEach((p, i) => {
     let x = OW.x, y = OW.y, dir = OW.dir || 'down';
+    if (OW.cast && OW.cast.p === p) { const cst = OW.cast; ents.push({ y: cst.y + 1, draw: () => { const x = cst.x - cx, y = cst.y - cy; if (cst.aura > 0) { g.strokeStyle = cst.col; g.globalAlpha = .7; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y + 1, 9 + Math.sin(OW.t * .4) * 1.5, 4, 0, 0, 6.29); g.stroke(); g.globalAlpha = .25; g.fillStyle = cst.col; g.fill(); g.globalAlpha = 1; } const sq = cst.aura > 0 ? [1.1, .9] : [1, 1]; shadow(x, y, 8); const spr = buildSprite(`${p.id}_${DIRVIEW[OW.dir] || 'front'}_mini`, C(p.color), null, { eyes: 'normal' }); drawSprite(spr, x, y - (cst.aura > 0 ? Math.abs(Math.sin(OW.t * .5)) * 1.5 : 0), sq[0], OW.dir === 'right', sq[1]); } }); return; }
     if (OW.heal) { const J = OW.jar; if (J.hidden[i]) return; if (J.jump[i]) { const jp = J.jump[i]; ents.push({ y: jp[1] + 1, draw: () => { shadow(jp[0] - cx, jp[1] - cy, 8); drawSprite(buildSprite(`${p.id}_front_mini`, C(p.color), null, { eyes: 'happy' }), jp[0] - cx, Math.round(jp[1] - jp[2] - cy), 1, false, 1.1); } }); return; } if (J.pos[i]) { x = J.pos[i][0]; y = J.pos[i][1]; ents.push({ y, draw: () => mapDrop(p, x - cx, y - cy, 'down', 0, false, OW.t, i) }); return; } }
     if (i > 0) { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)], h2 = OW.hist[Math.min(OW.hist.length - 1, i * 12 + 4)]; if (h) { x = h[0]; y = h[1]; if (h2) { const ddx = h[0] - h2[0], ddy = h[1] - h2[1]; if (Math.abs(ddx) + Math.abs(ddy) > .5) dir = Math.abs(ddx) >= Math.abs(ddy) ? (ddx < 0 ? 'left' : 'right') : (ddy < 0 ? 'up' : 'down'); else dir = OW.dir || 'down'; } } else { x = OW.x - i * 12; } }
     const moving = OW.moving && (i === 0 || OW.hist.length > i * 12);
@@ -764,6 +798,8 @@ function drawOverworld() {
   }
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }
+  if (OW.fx) OW.fx();
+  if (OW.flash) { g.fillStyle = OW.flash.col; g.globalAlpha = OW.flash.a; g.fillRect(0, 0, W, H); g.globalAlpha = 1; OW.flash.a -= .03; if (OW.flash.a <= 0) OW.flash = null; }
   for (const f of OW.floats || []) { if (f.t < 0) continue; txt(f.s, Math.round(f.x - cx - f.s.length * 4), Math.round(f.y - cy - f.t * .4), f.col); }
   // bocadillo del líder tras una batalla dura: piensa en el vaso
   if (OW.hint > 0 && MAP.jar && !OW.msg) { const lx = OW.x - cx, ly = OW.y - cy - 22, k = clamp(OW.hint / 10, 0, 1) * clamp((150 - OW.hint) / 8, 0, 1); g.globalAlpha = k; page(lx - 12, ly - 14, 26, 18); g.drawImage(jarSprite(pal), lx - 6, ly - 12, 12, 13); g.fillStyle = PAPER; g.fillRect(lx - 3, ly + 5, 2, 2); g.fillRect(lx - 1, ly + 8, 1, 1); g.globalAlpha = 1; }
