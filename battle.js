@@ -6,7 +6,7 @@
 const B = {};
 const SEMI = { carmin: 0, ambar: 4, anil: 7 }; // cada gota tiene su nota: acorde mayor Re-Fa#-La
 const semiOf = u => ({ semi: SEMI[u.id] ?? -5 });
-let ATB_ACTIVE = true; const ATB_RATE = .11; // modo Active (Chrono Trigger): el tiempo no se para al elegir
+let ATB_ACTIVE = true; const ATB_RATE = .055; // modo Active (Chrono Trigger): el tiempo corre con el menú de comandos abierto, pero se para al elegir tech/objeto/objetivo
 function colorMult(atkCol, defCol) {
   if (atkCol === 'blanco') return defCol === 'negro' ? 3 : 1.5;
   if (defCol === 'negro') return 1;
@@ -38,7 +38,7 @@ function damage(target, raw, col, src) {
   target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14;
   num(target, dmg, mult >= 2 ? '#f2c93a' : mult < 1 ? '#8c8ab0' : '#f4f0ea', mult >= 2);
   burst(target.wx, target.wy, target.def.h * .5, C(col), mult >= 2 ? 14 : 7, mult >= 2 ? 2.2 : 1.4);
-  Audio.sfx(mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 6 : 3; B.shake = mult >= 2 ? 4 : 2;
+  Audio.sfx(mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 9 : 5; B.shake = mult >= 2 ? 5 : 3;
   if (mult >= 2) say((src ? src + ': ' : '') + '¡Débil al ' + DATA.colors[col].name.toLowerCase() + '!', '#f2c93a');
   if (target.hp <= 0) kill(target);
   return dmg;
@@ -63,7 +63,7 @@ function kill(u) {
 // 2. Formación en el mundo, escena y arranque (la batalla ocurre donde te pillan)
 // =====================================================================
 function initBattle(foe) {
-  Object.assign(B, { foe, party: [], enemies: [], queue: [], menu: null, actions: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'trans', t: 0, msg: null, msgT: 0, result: null, rainbow: 0, tr: { overworld: true }, gen: null, paper: 0, dark: 0 });
+  Object.assign(B, { foe, party: [], enemies: [], queue: [], menu: null, actions: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'trans', t: 0, msg: null, msgT: 0, result: null, rainbow: 0, tr: { overworld: true }, gen: null, exiting: false, slowmo: 0, fightStart: 0 });
   B.party = Party.map(unitFromParty);
   const n = foe.enemies.length; B.enemies = foe.enemies.map((id, i) => unitFromEnemy(id, i, n, foe.enemies));
   B.units = [...B.enemies, ...B.party];
@@ -88,6 +88,9 @@ function initBattle(foe) {
     if (homes.some(([hx, hy]) => Math.hypot(hx - wx, hy - wy) < (ch === 'T' ? 30 : 22))) continue;
     B.props.push({ kind: ch, wx, wy, vr: hash2(tx, ty) & 7 });
   }
+  // árboles que taparían a alguien desde la cámara de reposo: fuera
+  const U = B.units.map(u => project(u.hx, u.hy, 0, SCENE.rest)).filter(Boolean);
+  B.props = B.props.filter(o => { if (o.kind !== 'T') return true; const p = project(o.wx, o.wy, 0, SCENE.rest); if (!p) return true; return !U.some(q => p[3] < q[3] && Math.abs(p[0] - q[0]) < 34 && p[1] > q[1] - 12 && p[1] < q[1] + 70); });
   const ec = homeC(B.enemies); B.puddle = { wx: ec[0], wy: ec[1], rx: n === 1 ? 26 : 46, ry: n === 1 ? 12 : 20, k: 0 };
   B.gen = transitionGen(foe);
   B.unitScale = .5;
@@ -127,7 +130,7 @@ function* transitionGen(foe) {
     yield;
   }
   B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); B.enemies.forEach(u => { u.wz = 0; });
-  B.tr = null; B.phase = 'fight'; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
+  B.tr = null; B.phase = 'fight'; B.fightStart = B.t; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
 }
 // Dibujo de la transición sobre el mapa cenital (fases 1-3) y de la mancha/gotas sobre la escena (4-5)
 function drawTransitionFx() {
@@ -342,6 +345,7 @@ function updateBattle() {
   for (const n of B.nums) { n.t++; n.y += n.vy; n.vy += .12; if (n.vy > 0 && n.t < 20) n.vy = -0.4; } B.nums = B.nums.filter(n => n.t < 44);
   for (const u of B.units) { if (u.poseT > 0 && --u.poseT === 0 && u.alive) u.pose = 'idle'; if (u.dead) u.dead += .04; if (u.goop) { const G = u.goop; G.t++; for (const d of G.drips) d.len = Math.min(d.max, d.len + d.speed); if (G.t > G.life || !u.alive) u.goop = null; } }
   if (B.hitstop > 0) { B.hitstop--; return; }
+  if (B.slowmo > 0) { B.slowmo--; if (B.t & 1) return; } // cámara lenta: el mundo avanza a la mitad
   for (const f of B.fx) f.t++; B.fx = B.fx.filter(f => f.t <= f.dur);
   for (const m of B.marks) m.t++; B.marks = B.marks.filter(m => m.t <= m.life);
   if (B.phase === 'trans') { if (B.gen && B.gen.next().done) B.gen = null; return; }
@@ -350,12 +354,13 @@ function updateBattle() {
   if (B.actions.length) { B.actions = B.actions.filter(a => !a.next().done); B.busy = B.actions.length > 0; }
   if (!alive(B.enemies).length || !alive(B.party).length) { if (!B.actions.length) checkEnd(); return; }
   if (B.menu) updateBattleMenu();
-  if (B.menu && !ATB_ACTIVE) return; // modo Wait: el ATB se detiene con el menú abierto
+  if (B.menu && (!ATB_ACTIVE || B.menu.level !== 'cmd')) return; // Wait: el ATB se detiene en los submenús (y del todo en modo Wait)
+  if (B.phase === 'fight' && B.t - (B.fightStart || 0) < 40) return; // respiro al empezar: que se lea el campo
   // tick ATB (modo Active: sigue corriendo mientras eliges)
   for (const u of alive(B.units)) { if (u.acting) continue; u.atb = Math.min(100, u.atb + u.spd * statusMult(u, 'lento') * ATB_RATE); if (u.atb >= 100 && u.kind === 'party' && !B.queue.includes(u)) { const other = B.party.some(p => p !== u && p.alive && p.atb >= 100 && !p.acting); B.queue.push(u); Audio.sfx(other ? 'combo_ready' : 'ready', semiOf(u)); }
     if (u.kind === 'enemy' && u.atb >= 82 && !u.warned) { u.warned = true; Audio.sfx('enemy_soon'); } }
   const e = alive(B.enemies).find(u => u.atb >= 100 && !u.acting);
-  if (e && B.actions.length < 3) { e.atb = 0; B.actions.push(tracked(e, actEnemy(e))); B.busy = true; }
+  if (e && B.actions.length < 2) { e.atb = 0; B.actions.push(tracked(e, actEnemy(e))); B.busy = true; }
   if (B.queue.length && !B.menu) openCmd(B.queue[0]);
 }
 // marca la unidad como "actuando" mientras dura su corrutina (no acumula ATB ni se le encola otra acción)
@@ -364,18 +369,47 @@ function projectUnits() { for (const u of B.units) { const p = project(u.wx, u.w
 const updateTransition = () => updateBattle(), drawTransition = () => drawBattle();
 function checkEnd() {
   B.menu = null; B.queue = [];
-  if (!alive(B.enemies).length) { B.phase = 'victory'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.victory) Audio.play('victory'); else Audio.sfx('victory'); B.party.forEach(u => { if (u.alive) u.pose = 'happy'; }); }
+  if (!alive(B.enemies).length) { B.phase = 'victory'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.victory) Audio.play('victory'); else Audio.sfx('victory'); B.gen = victoryGen(); }
   else if (!alive(B.party).length) { B.phase = 'defeat'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.gameover) Audio.play('gameover'); }
 }
 function updateEnd() {
-  if (B.phase === 'victory') {
-    if (B.t === 60) { const exp = B.enemies.reduce((s, u) => s + u.data.exp, 0); Game.pigmento += exp; B.result = exp; Audio.sfx('tinkle'); }
-    if (B.t > 70 && hit('ok')) {
-      B.party.forEach(u => { u.data.cur.hp = u.hp; u.data.cur.mp = u.mp; }); Game.defeated.add(B.foe.key);
-      if (B.foe.boss) { Game.bossDown = true; Game.palette = 'vivo'; Audio.sfx('saturate'); Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); OW.msg = { lines: DATA.texts.ending, t: 0 }; }
-      setState('overworld'); Audio.play('map');
-    }
-  } else if (B.t > 80 && hit('ok')) { resetGame(); }
+  if (B.phase === 'victory') { if (B.gen && B.gen.next().done) B.gen = null; }
+  else if (B.t > 80 && hit('ok')) { resetGame(); }
+}
+// Victoria: celebración por turnos (cada gota salta con su nota), conteo del pigmento, y salida: el grupo reparte su color
+// por el suelo mientras la cámara vuelve a cenital y ellos regresan a su sitio del mapa. Sin corte: el mapa ya está debajo.
+function* victoryGen() {
+  const pc = partyC(); camFocus(pc[0], pc[1], { dist: 66, turn: .4, h: 36, pitch: .5, ease: .08 }); B.showResult = false;
+  for (let i = 0; i < 64; i++) {
+    B.party.forEach((u, j) => { if (!u.alive) return; const k = (i - j * 8) / 26; if (k >= 0 && k < 1) { u.pose = 'happy'; u.wz = Math.abs(Math.sin(k * Math.PI * 2)) * (k < .5 ? 18 : 9); if (i - j * 8 === 0) { Audio.sfx('tinkle', semiOf(u)); sparkle(u.wx, u.wy, u.def.h + 8, C(u.color)); burst(u.wx, u.wy, u.def.h * .5, C(u.color), 8, 1.2, 22, .02); } } else if (k >= 1) u.wz = 0; });
+    if (i > 8) B.puddle.k = Math.max(0, B.puddle.k - .02); // el charco de tinta se seca
+    yield;
+  }
+  const exp = B.enemies.reduce((s, u) => s + u.data.exp, 0); B.result = 0; B.showResult = true; Audio.sfx('tinkle');
+  for (let i = 1; i <= 30; i++) { B.result = Math.round(exp * i / 30); if (i % 6 === 0) Audio.sfx('cursor', { semi: i }); yield; }
+  Game.pigmento += exp; B.result = exp;
+  while (!hit('ok')) yield;
+  Audio.sfx('page'); B.showResult = false; B.exiting = true;
+  // --- salida
+  B.party.forEach(u => { u.data.cur.hp = u.hp; u.data.cur.mp = u.mp; }); Game.defeated.add(B.foe.key);
+  for (const e of B.enemies) if (e.def.core) OW.puddles.push({ x: e.hx, y: e.hy, col: e.def.core, w: e.data.w * .5 }); // el color robado se queda en el mapa
+  const camX = clamp(Math.round(OW.x - W / 2), 0, MAP.w * TILE - W), camY = clamp(Math.round(OW.y - H / 2), 0, MAP.h * TILE - H);
+  const top = { x: camX + W / 2, y: camY + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 150, f: 150, hy: 90 }, from = Object.assign({}, SCENE.cam), start = B.party.map(u => [u.wx, u.wy]);
+  const dest = B.party.map((u, i) => { const h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; return i === 0 ? [OW.x, OW.y] : (h ? [h[0], h[1]] : [OW.x - i * 12, OW.y]); });
+  Audio.sfx('saturate', { vol: .5 });
+  const rings = B.party.filter(u => u.alive).map((u, j) => ({ u, t: -j * 6 }));
+  const rf = fx(999, () => { for (const r of rings) { if (r.t < 0) continue; const k = clamp(r.t / 44, 0, 1), c = project(r.u.wx, r.u.wy, 0); if (!c) continue; g.strokeStyle = C(r.u.color); g.lineWidth = 2; g.globalAlpha = (1 - k) * .9; g.beginPath(); g.ellipse(c[0], c[1], (4 + k * 90) * c[2], (2 + k * 40) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = (1 - k) * .25; g.fillStyle = C(r.u.color); g.fill(); g.globalAlpha = 1; } }, true);
+  SCENE.goal = null;
+  for (let i = 0; i < 56; i++) {
+    const k = i / 56, e = k * k * (3 - 2 * k); rings.forEach(r => r.t++);
+    if (i > 10) { const kk = clamp((i - 10) / 40, 0, 1), ee = kk * kk * (3 - 2 * kk); const c = SCENE.cam; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(from[key], top[key], ee); let d = top.yaw - from.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw = from.yaw + d * ee; B.unitScale = lerp(1, .5, ee); }
+    B.party.forEach((u, j) => { const kk = clamp((i - 6 - j * 4) / 30, 0, 1); u.wx = lerp(start[j][0], dest[j][0], kk); u.wy = lerp(start[j][1], dest[j][1], kk); u.wz = kk > 0 && kk < 1 ? Math.abs(Math.sin(kk * Math.PI * 3)) * 10 : 0; u.pose = kk < 1 ? 'hop' : 'idle'; });
+    B.puddle.k = Math.max(0, B.puddle.k - .04);
+    yield;
+  }
+  rf.dur = 0;
+  if (B.foe.boss) { Game.bossDown = true; Game.palette = 'vivo'; Audio.sfx('saturate'); Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); OW.msg = { lines: DATA.texts.ending, t: 0 }; }
+  setState('overworld'); Audio.play('map');
 }
 function resetGame() {
   Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false;
@@ -425,7 +459,10 @@ function drawBattle() {
   // entidades por profundidad (lejos primero): unidades y props del mapa
   const ents = [];
   for (const u of B.units) { if (u.z) ents.push({ z: u.z, d: () => drawUnit(u) }); }
-  for (const o of B.props) { const p = project(o.wx, o.wy, 0); if (!p || p[1] < -60 || p[0] < -60 || p[0] > W + 60) continue; ents.push({ z: p[3], d: () => { const s = p[2] * B.unitScale; if (o.kind === 'T') { shadow(p[0], p[1], Math.round(22 * s)); drawSprite(bigTree(pal, o.vr), p[0], p[1] + 2, s); } else { shadow(p[0], p[1] + 1, Math.round(24 * s)); drawSprite(bigRock(pal, o.vr & 3), p[0], p[1] + 2, s); } } }); }
+  for (const o of B.props) { const p = project(o.wx, o.wy, 0); if (!p || p[1] < -60 || p[0] < -60 || p[0] > W + 60) continue;
+    // si un árbol queda delante de alguien, se vuelve translúcido
+    const s = p[2] * B.unitScale, cover = o.kind === 'T' && B.units.some(u => u.z && p[3] < u.z && Math.abs(p[0] - u.x) < 17 * s + 14 && p[1] > u.y - 30 && p[1] < u.y + 50 * s);
+    ents.push({ z: p[3], d: () => { if (cover) g.globalAlpha = .38; if (o.kind === 'T') { shadow(p[0], p[1], Math.round(22 * s)); drawSprite(bigTree(pal, o.vr), p[0], p[1] + 2, s); } else { shadow(p[0], p[1] + 1, Math.round(24 * s)); drawSprite(bigRock(pal, o.vr & 3), p[0], p[1] + 2, s); } g.globalAlpha = 1; } }); }
   ents.sort((a, b) => b.z - a.z).forEach(e => e.d());
   drawMarks(false); for (const f of B.fx) if (!f.under) f.draw();
   for (const p of B.particles) { if (p.t < 0) continue; const c = project(p.wx, p.wy, p.wz); if (!c) continue; g.fillStyle = p.pal ? p.pal[Math.min(p.pal.length - 1, Math.floor(p.t / p.life * p.pal.length))] : p.col; const s = Math.max(1, Math.round((p.stream ? 2 : (p.t > p.life * .7 ? 1 : (p.size || 2))) * c[2])); g.fillRect(Math.round(c[0]), Math.round(c[1]), s, s); }
@@ -440,7 +477,7 @@ function drawBattle() {
   if (B.rainbow > 0) { const cols = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta']; cols.forEach((c, i) => { g.fillStyle = C(c); g.globalAlpha = .5 * B.rainbow / 40; const off = (40 - B.rainbow) * 12 + i * 10; g.fillRect(off - 200, 0, 8, H); g.fillRect(W - off + 200 - 8, 0, 8, H); }); g.globalAlpha = 1; }
   for (const n of B.nums) { g.font = FONT; if (n.big) { txt(n.v, Math.round(n.x) + 1, Math.round(n.y) + 1, n.col, null); } txt(n.v, Math.round(n.x), Math.round(n.y), n.col); }
   if (B.msg && !(B.menu && B.menu.level === 'target') && B.phase === 'fight') banner(B.msg.s, B.msg.col === '#f4f0ea' ? INK : B.msg.col);
-  if (B.phase !== 'trans') drawBattleUI();
-  if (B.phase === 'victory' && B.t > 60) { page(80, 56, 160, 46, { rings: true }); banner('¡VICTORIA!', C('amarillo'), 58); g.font = FONT; const rs = 'Pigmento +' + B.result; ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 80, TXT); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 90, TXT2); }
+  if (B.phase !== 'trans' && !B.exiting) drawBattleUI();
+  if (B.phase === 'victory' && B.showResult) { page(80, 50, 160, 50, { rings: true }); banner('¡VICTORIA!', C('amarillo'), 52); g.font = FONT; const rs = 'Pigmento +' + B.result; swatch(W / 2 - g.measureText(rs).width / 2 - 12 | 0, 77, C('amarillo')); ui(rs, W / 2 - g.measureText(rs).width / 2 | 0, 76, TXT); if ((B.t / 20 | 0) % 2) ui('▼', W / 2 - 4, 88, TXT2); }
   if (B.phase === 'defeat') { g.fillStyle = 'rgba(11,9,18,' + clamp(B.t / 60, 0, .8) + ')'; g.fillRect(0, 0, W, H); if (B.t > 40) DATA.texts.gameover.forEach((l, i) => txtC(l, W / 2, 70 + i * 12, i === 0 ? '#8c8ab0' : '#f4f0ea')); }
 }
