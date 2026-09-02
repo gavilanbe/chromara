@@ -23,7 +23,7 @@ const win = (x, y, w, h, opt = {}) => page(x, y, w, h, opt);
 function tape(x, y, w, h = 12) { g.globalAlpha = .9; g.fillStyle = '#e9dcb5'; g.fillRect(x + 2, y, w - 4, h); for (let j = 0; j < h; j++) { const l = (j * 7) % 3, r = (j * 5) % 3; g.fillRect(x + l, y + j, 2, 1); g.fillRect(x + w - 2 - r, y + j, 2, 1); } g.globalAlpha = .35; g.fillStyle = '#c9b98a'; for (let i = 0; i < w; i += 3) g.fillRect(x + i, y + (i % 2 ? 2 : h - 3), 1, 1); g.globalAlpha = 1; }
 // Pegatina-retrato: la cara del personaje dentro de un círculo blanco con borde
 function sticker(x, y, u, r = 7) { const col = C(u.color); g.fillStyle = '#ffffff'; g.beginPath(); g.arc(x, y, r + 1, 0, 6.29); g.fill(); g.fillStyle = ramp(col).base; g.beginPath(); g.arc(x, y, r, 0, 6.29); g.fill(); g.fillStyle = ramp(col).hi; g.fillRect(x - r + 2, y - r + 2, 3, 1); g.fillRect(x - r + 2, y - r + 3, 1, 2);
-  const spr = buildSprite(`${u.id}_front`, col, null, { eyes: !u.alive ? 'ko' : u.hp < u.maxhp * .25 ? 'hurt' : 'normal' }); g.save(); g.beginPath(); g.arc(x, y, r, 0, 6.29); g.clip(); g.drawImage(spr, Math.round(x - spr.width / 2), Math.round(y - spr.height / 2) + 2); g.restore(); if (!u.alive) { g.globalAlpha = .5; g.fillStyle = '#9a90a8'; g.beginPath(); g.arc(x, y, r, 0, 6.29); g.fill(); g.globalAlpha = 1; } }
+  const fade = pigmentFade(u.mp, u.maxmp), spr = desatSprite(buildSprite(`${u.id}_front`, col, null, { eyes: !u.alive ? 'ko' : u.hp < u.maxhp * .25 ? 'hurt' : 'normal' }), fade); if (fade) { g.fillStyle = desat(col, fade * .8, fade * .15); g.beginPath(); g.arc(x, y, r, 0, 6.29); g.fill(); } g.save(); g.beginPath(); g.arc(x, y, r, 0, 6.29); g.clip(); g.drawImage(spr, Math.round(x - spr.width / 2), Math.round(y - spr.height / 2) + 2); g.restore(); if (!u.alive) { g.globalAlpha = .5; g.fillStyle = '#9a90a8'; g.beginPath(); g.arc(x, y, r, 0, 6.29); g.fill(); g.globalAlpha = 1; } }
 // Rectángulo a lápiz relleno de pintura
 function pencilBar(x, y, w, h, f, col) { g.fillStyle = PENCIL; g.fillRect(x, y, w, 1); g.fillRect(x, y + h - 1, w, 1); g.fillRect(x, y, 1, h); g.fillRect(x + w - 1, y, 1, h); g.fillStyle = '#e9e1cc'; g.fillRect(x + 1, y + 1, w - 2, h - 2); const n = Math.round((w - 2) * clamp(f, 0, 1)); if (n) { g.fillStyle = ramp(col).base; g.fillRect(x + 1, y + 1, n, h - 2); g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, n, 1); g.fillStyle = ramp(col).sh; g.fillRect(x + n, y + 1, 1, h - 2); } }
 function iconSprite(name, color) {
@@ -67,14 +67,20 @@ function drawBattleUI() {
   const y0 = 128, m = B.menu, act = m ? m.unit : null, tint = act ? C(act.color) : null;
   page(104, y0, W - 104, H - y0); page(0, y0, 102, H - y0, { rings: true, tint });
   B.party.forEach((u, i) => {
-    const y = y0 + 8 + i * 15, active = act === u, col = C(u.color);
+    const y = y0 + 8 + i * 15, active = act === u, col = C(u.color), fade = pigmentFade(u.mp, u.maxmp), full = u.atb >= 100 && u.alive && !u.acting, qi = B.queue.indexOf(u);
     if (active) hilite(112, y + 5, 314, 12, col, .35);
     sticker(118, y + 5, u, 6);
-    ui(u.name, 128, y, u.alive ? ramp(col).sh : TXT3);
-    ui('HP', 186, y, TXT2); ui(String(u.hp).padStart(3), 202, y, u.hp <= 0 ? TXT3 : u.hp < u.maxhp * .25 ? C('rojo') : TXT); pencilBar(186, y + 9, 40, 4, u.hp / u.maxhp, col);
-    ui('MP', 232, y, TXT2); ui(String(u.mp).padStart(2), 248, y, TXT); pencilBar(232, y + 9, 32, 4, u.mp / u.maxmp, desat(col, .4, .1));
-    atbBrush(270, y + 3, u.alive ? u.atb / 100 : 0, col, B.t);
-    if (u.atb >= 100 && u.alive) { const k = (B.t >> 2) % 12; g.fillStyle = ramp(col).base; g.fillRect(290, y + 9 + (k < 6 ? k : 5), 1, 2); }
+    if (qi >= 0 && !active) { g.fillStyle = INK; g.beginPath(); g.arc(124, y - 1, 4, 0, 6.29); g.fill(); ui(String(qi + 1), 121, y - 4, GOLD); } // orden en la cola
+    const nm = !u.alive ? TXT3 : fade > 0 ? desat(ramp(col).sh, fade, .1) : ramp(col).sh; ui(u.name, 128, y - 1, nm);
+    // ATB: la brocha va pintando una pincelada bajo el nombre; llena, brilla y gotea
+    const ax = 128, aw = 56, f = u.alive ? clamp(u.atb / 100, 0, 1) : 0, fw = Math.round(aw * f);
+    g.fillStyle = '#e9e1cc'; g.fillRect(ax, y + 8, aw, 4); g.fillStyle = PENCIL; g.fillRect(ax, y + 12, aw, 1);
+    if (fw > 0) { const rp = ramp(col); g.fillStyle = rp.base; for (let k = 0; k < fw; k++) { const h = 4 - ((k * 7) % 3 === 0 ? 1 : 0); g.fillRect(ax + k, y + 8 + (4 - h), 1, h); } g.fillStyle = rp.hi; g.fillRect(ax, y + 8, Math.max(1, fw - 2), 1); g.fillStyle = rp.sh; g.fillRect(ax, y + 11, fw, 1);
+      if (!full) { g.fillStyle = '#5a4630'; g.fillRect(ax + fw - 1, y + 4, 2, 4); g.fillStyle = '#c9c4d4'; g.fillRect(ax + fw - 1, y + 7, 2, 1); g.fillStyle = rp.base; g.fillRect(ax + fw - 2, y + 8, 3, 2); } // punta de la brocha pintando
+      else { const k = (B.t >> 2) % 8; g.fillStyle = k < 4 ? '#ffffff' : rp.hi; g.fillRect(ax + aw - 3 + (k & 1), y + 7, 2, 1); g.fillRect(ax + (B.t * 3) % aw, y + 8, 3, 1); g.fillStyle = rp.base; g.fillRect(ax + aw - 2, y + 12 + (k >> 1), 2, 2); if (k === 0) g.fillRect(ax + aw - 2, y + 15, 2, 1); } } // llena: brillo que recorre la pincelada y gota que cae
+    ui('HP', 190, y - 1, TXT2); ui(String(u.hp).padStart(3), 208, y - 1, u.hp <= 0 ? TXT3 : u.hp < u.maxhp * .25 ? C('rojo') : TXT); pencilBar(190, y + 8, 42, 4, u.hp / u.maxhp, col);
+    ui('MP', 242, y - 1, fade >= 1 ? C('rojo') : TXT2); ui(String(u.mp).padStart(2), 260, y - 1, fade >= 1 ? C('rojo') : TXT); pencilBar(242, y + 8, 42, 4, u.mp / u.maxmp, fade >= 1 ? '#9a90a8' : desat(col, .4, .1));
+    if (fade >= 1 && (B.t >> 4) % 2) ui('seca', 268, y + 13, TXT3);
     if (u.status.tiznado) smudgeIcon(300, y + 1); if (u.status.lento) ui('z', 306, y - 1, C('violeta')); if (u.status.contorno) { g.strokeStyle = '#4a4460'; g.setLineDash([1, 1]); g.strokeRect(299.5, y + .5, 8, 8); g.setLineDash([]); }
   });
   if (!m) { ui('...', 12, y0 + 8, TXT3); GUI.lastLevel = null; return; }

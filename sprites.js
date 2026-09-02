@@ -674,3 +674,10 @@ function unitSpriteInfo(u, frame) {
   const sq = (SQ[pose] || SQ.idle), [sx, sy] = sq[frame % sq.length];
   return { spr, sx, sy };
 }
+
+// Versión descolorida de un sprite (sin pigmento): desaturación real, conservando la silueta
+function desatSprite(spr, amount) {
+  const q = Math.round(clamp(amount, 0, 1) * 4) / 4; if (q <= 0) return spr;
+  return cached(`${spr.__key}|desat|${q}`, () => { const c = document.createElement('canvas'); c.width = spr.width; c.height = spr.height; const x = c.getContext('2d'); x.drawImage(spr, 0, 0); x.globalCompositeOperation = 'saturation'; x.globalAlpha = q; x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height); x.globalAlpha = 1; x.globalCompositeOperation = 'destination-in'; x.drawImage(spr, 0, 0); x.globalCompositeOperation = 'source-over'; if (q >= 1) { x.globalAlpha = .25; x.globalCompositeOperation = 'source-atop'; x.fillStyle = '#c9c4d4'; x.fillRect(0, 0, c.width, c.height); } c.__key = `${spr.__key}|desat|${q}`; return c; });
+}
+const pigmentFade = (mp, maxmp) => { const r = maxmp ? mp / maxmp : 1; return r <= 0 ? 1 : r < .35 ? (1 - r / .35) * .8 : 0; }; // cuánto se descolora una gota según su pigmento

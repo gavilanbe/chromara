@@ -600,7 +600,7 @@ function* healGen() { // el grupo salta dentro del vaso, el agua se tiñe de sus
 const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
 function mapDrop(p, x, y, dir, bob, moving, t, idx) {
   const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : DIRVIEW[dir] || 'back';
-  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' });
+  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = desatSprite(buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' }), pigmentFade(p.cur.mp, effStats(p).mp));
   const lz = OW.landZ ? OW.landZ[idx] || 0 : 0;
   const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3 + lz, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
   shadow(x, y, Math.max(2, Math.round((p.w * .42) * (1 - hop * .3) * (1 - lz / 160))));

@@ -59,10 +59,8 @@ function heal(target, amount, isMp) {
 }
 function kill(u) {
   u.alive = false; u.pose = 'ko'; u.atb = 0; Audio.sfx(u.kind === 'enemy' ? 'die' : 'ko');
-  if (u.kind === 'enemy') { // se disuelve en tinta y deja un charquito del color que había robado
-    burst(u.wx, u.wy, u.def.h * .4, C('negro'), 18, 2, 30, .12);
-    if (u.def.core) { B.puddles.push({ wx: u.wx, wy: u.wy, col: u.def.core, w: u.data.w }); burst(u.wx, u.wy, u.def.h * .4, u.def.core, 10, 1.4, 34, .05); }
-    u.dead = 1;
+  if (u.kind === 'enemy') { // outro: la gota negra se derrite en un charco de tinta, el color robado se eleva como un orbe y cae al suelo, devuelto al mundo
+    burst(u.wx, u.wy, u.def.h * .4, C('negro'), 10, 1.4, 26, .12); u.dead = 1; u.deathT = 0; B.slowmo = Math.max(B.slowmo, 8);
   }
   B.queue = B.queue.filter(q => q !== u); if (B.menu && B.menu.unit === u) B.menu = null;
 }
@@ -390,7 +388,12 @@ function updateBattle() {
   }
   B.particles = B.particles.filter(p => !p.dead);
   for (const n of B.nums) { n.t++; if (n.t > 6) { n.y += n.vy; n.vy += .1; if (n.vy > 0 && n.t < 24) n.vy = -0.3; } } B.nums = B.nums.filter(n => n.t < 56);
-  for (const u of B.units) { if (u.poseT > 0 && --u.poseT === 0 && u.alive) u.pose = 'idle'; if (u.dead) u.dead += .04; if (u.goop) { const G = u.goop; G.t++; for (const d of G.drips) d.len = Math.min(d.max, d.len + d.speed); if (G.t > G.life || !u.alive) u.goop = null; } }
+  for (const u of B.units) { if (u.poseT > 0 && --u.poseT === 0 && u.alive) u.pose = 'idle';
+    if (u.dead) { const was = u.dead; u.dead += u.boss ? .02 : .03; const q = u.dead - 1;
+      if (q < .5 && B.t % 2 === 0) B.particles.push({ wx: u.wx + R(-u.def.w * .4, u.def.w * .4), wy: u.wy + R(-4, 4), wz: R(2, u.def.h * (1 - q * 1.6)), vx: 0, vy: 0, vz: -R(.2, .8), g: .05, col: C('negro'), t: 0, life: 18, size: 2 }); // chorrea
+      if (q > .2 && q < 1.2 && B.t % 3 === 0) B.particles.push({ wx: u.wx + R(-u.def.w * .5, u.def.w * .5), wy: u.wy + R(-6, 6), wz: R(0, 6), vx: R(-.2, .2), vy: 0, vz: R(.4, 1), g: -.02, col: '#4a4660', t: 0, life: 26, size: 2 }); // vahos
+      if (u.def.core && was - 1 < 1.4 && q >= 1.4) { B.puddles.push({ wx: u.wx, wy: u.wy, col: u.def.core, w: u.data.w }); burst(u.wx, u.wy, 2, u.def.core, 14, 1.8, 30, .06); Audio.sfx('splash_clean', { vol: .6 }); Audio.sfx('tinkle', { when: .1, semi: 5 }); }
+      if (u.def.core && was - 1 < .5 && q >= .5) Audio.sfx('grow', { vol: .5, semi: 7 }); } if (u.goop) { const G = u.goop; G.t++; for (const d of G.drips) d.len = Math.min(d.max, d.len + d.speed); if (G.t > G.life || !u.alive) u.goop = null; } }
   if (B.hitstop > 0) { B.hitstop--; return; }
   if (B.slowmo > 0) { B.slowmo--; if (B.t & 1) return; } // cámara lenta: el mundo avanza a la mitad
   for (const f of B.fx) f.t++; B.fx = B.fx.filter(f => f.t <= f.dur);
@@ -428,6 +431,7 @@ function updateEnd() {
 // Victoria: celebración por turnos (cada gota salta con su nota), conteo del pigmento, y salida: el grupo reparte su color
 // por el suelo mientras la cámara vuelve a cenital y ellos regresan a su sitio del mapa. Sin corte: el mapa ya está debajo.
 function* victoryGen() {
+  while (B.enemies.some(u => u.dead && u.dead < 2.4)) yield; // que el último enemigo termine de disolverse
   const pc = partyC(); camFocus(pc[0], pc[1], { dist: 66, turn: .4, h: 36, pitch: .5, ease: .08 }); B.showResult = false;
   for (let i = 0; i < 64; i++) {
     B.party.forEach((u, j) => { if (!u.alive) return; const k = (i - j * 8) / 26; if (k >= 0 && k < 1) { u.pose = 'happy'; u.wz = Math.abs(Math.sin(k * Math.PI * 2)) * (k < .5 ? 18 : 9); if (i - j * 8 === 0) { Audio.sfx('tinkle', semiOf(u)); sparkle(u.wx, u.wy, u.def.h + 8, C(u.color)); burst(u.wx, u.wy, u.def.h * .5, C(u.color), 8, 1.2, 22, .02); } } else if (k >= 1) u.wz = 0; });
@@ -472,14 +476,19 @@ function drawSprite(s, x, y, sc = 1, flip = false, sy = 1) { const w = s.width *
 function unitSprite(u, frame) { return unitSpriteInfo(u, frame).spr; }
 function drawUnit(u) {
   const s = u.sc * B.unitScale * (u.kind === 'enemy' ? (u.boss ? 1.35 : 1.6) : 1), frame = (B.t / 9 + u.idx * 2 | 0) % 4, ready = u.kind === 'party' && u.atb >= 100 && u.alive && !u.acting && B.phase === 'fight';
-  if (u.dead && u.dead > 1.6) return;
-  if (u.dead) g.globalAlpha = clamp(1.6 - u.dead, 0, 1);
+  if (u.dead) { // outro de muerte: derretirse (0-.5), el color sube (.5-1), cae y salpica (1-1.4), el charco de tinta se evapora (1.4-2)
+    const q = u.dead - 1, gp = project(u.wx, u.wy, 0); if (!gp || q > 2) return; const sc = gp[2] * B.unitScale * (u.boss ? 1.35 : 1.6);
+    const pw = u.def.w * .6 * sc; g.fillStyle = '#0b0912'; g.globalAlpha = q < 1.4 ? 1 : clamp((2 - q) / .6, 0, 1); g.beginPath(); g.ellipse(gp[0], gp[1] + 1, pw * (.6 + Math.min(q, .6)), pw * .38 * (.6 + Math.min(q, .6)), 0, 0, 6.29); g.fill(); g.fillStyle = '#2a2438'; g.fillRect(Math.round(gp[0] - pw * .3), gp[1] - 1, Math.max(2, pw * .25 | 0), 1); g.globalAlpha = 1;
+    if (q < .5) { const k = q / .5, info = unitSpriteInfo(u, frame); drawSprite(info.spr, u.x, gp[1], sc * (1 + k * 1.1), false, Math.max(.06, 1 - k * 1.7)); }
+    if (u.def.core && q >= .5 && q < 1.4) { const k = q < 1 ? (q - .5) / .5 : 1, fall = q >= 1 ? (q - 1) / .4 : 0, wz = q < 1 ? 34 * (1 - Math.pow(1 - k, 2)) : 34 * (1 - fall * fall), c = project(u.wx, u.wy, wz); if (c) { const r = (4 + Math.sin(B.t * .4) * .8) * c[2], rp = ramp(u.def.core); g.fillStyle = rp.hi; g.globalAlpha = .35; g.beginPath(); g.arc(c[0], c[1], r * 2.2, 0, 6.29); g.fill(); g.globalAlpha = 1; g.fillStyle = rp.out; g.beginPath(); g.arc(c[0], c[1], r + 1, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.arc(c[0], c[1], r, 0, 6.29); g.fill(); g.fillStyle = '#ffffff'; g.fillRect(c[0] - r * .4, c[1] - r * .5, 2, 1); if ((B.t >> 1) % 3 === 0) { g.fillStyle = rp.hi; g.fillRect(c[0] + R(-8, 8) | 0, c[1] + R(-8, 8) | 0, 1, 1); } } }
+    return;
+  }
   if (u.erasing && (B.t >> 1) & 1) g.globalAlpha = .35;
   const gp = project(u.wx, u.wy, 0); if (!u.dead && gp && u.wz > -u.def.h * .9) shadow(gp[0], gp[1], Math.max(3, Math.round(u.shadowW * gp[2] * B.unitScale * (1 - clamp(u.wz / 120, 0, .6)))));
   // emergiendo del charco: se recorta por debajo del suelo
   let clip = false; if (u.wz < 0 && gp) { g.save(); g.beginPath(); g.rect(0, 0, W, gp[1] + 1); g.clip(); clip = true; }
   const G = u.goop, ga = G ? (G.t > G.life - 20 ? (G.life - G.t) / 20 : 1) : 0;
-  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (G) spr = tintSprite(spr, G.col, .55 * ga); if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
+  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (u.kind === 'party') spr = desatSprite(spr, pigmentFade(u.mp, u.maxmp)); if (G) spr = tintSprite(spr, G.col, .55 * ga); if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
   drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx, flip, info.sy);
   if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);

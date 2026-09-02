@@ -44,7 +44,8 @@ Página de bloc con renglones; cae una gota de tinta, salpica y la mancha abre u
 
 ## GUI: cuaderno de pintor (`gui.js`)
 - Páginas de bloc (`page`) con grano, borde rasgado, línea a lápiz y anillas; cinta de carrocero (`tape`) para el objetivo y la ecuación de color; pegatinas-retrato (`sticker`).
-- Batalla: página izquierda de comandos teñida del color del personaje activo (cursor = gota de su color, resalte = pincelada translúcida), página derecha con nombre en su color, HP y MP en rectángulos a lápiz rellenos de pintura y brocha que se carga de pintura como ATB (gotea al estar lista). La lista de techs/objetos es una **hoja que se pasa** sobre el campo con el coste de MP y las gotas de los compañeros necesarios; arriba, cinta con `■+■=■ Llamarada · 6 MP · con Ámbar` y la descripción.
+- Batalla: página izquierda de comandos teñida del color del personaje activo (cursor = gota de su color, resalte = pincelada translúcida), página derecha con nombre en su color y, debajo, el **ATB como pincelada** que la punta de una brocha va pintando; llena, un brillo la recorre y gotea; la pegatina muestra el número de orden en la cola. HP y MP en rectángulos a lápiz rellenos de pintura. Sin pigmento (MP a cero) la gota **se descolora** de verdad (desaturación) en batalla, en el mapa y en su pegatina, y el MP parpadea "seca".
+- Muerte de una Gota Negra: se derrite en un charco de tinta que chorrea y echa vahos, el color robado se eleva como un orbe brillante y cae al suelo, donde se queda como charco: el color vuelve al mundo. La victoria espera a que termine. La lista de techs/objetos es una **hoja que se pasa** sobre el campo con el coste de MP y las gotas de los compañeros necesarios; arriba, cinta con `■+■=■ Llamarada · 6 MP · con Ámbar` y la descripción.
 - Mapa: HUD de pigmento, aviso a página completa y menú de estado/equipo con el mismo papel.
 
 ## Overworld (`game.js`): la página del pintor
