@@ -36,6 +36,7 @@ addEventListener('keydown', e => {
   Audio.init();
 });
 addEventListener('keyup', e => { const k = KEYMAP[e.key] || KEYMAP[e.key.toLowerCase()]; if (k) keys[k] = false; });
+let ANYKEY = false; addEventListener('keydown', e => { if (e.repeat) return; ANYKEY = true; Audio.init(); }); // cualquier tecla (portada)
 const hit = k => { const v = pressed[k]; pressed[k] = false; return !!v; };
 
 // --- Color utils (hue-shifting: sombras hacia azul, luces hacia amarillo)
@@ -740,18 +741,24 @@ function drawLogo(t, x0, y0) {
 const COVER = { t: 0, open: 0 };
 function updateCover() {
   COVER.t++;
-  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; COVER.snap = null; Audio.play((typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES.title) ? 'title' : 'map'); } return; }
-  if (Object.keys(pressed).some(k => pressed[k])) { COVER.open = COVER.t; Audio.sfx('page'); for (const k in pressed) pressed[k] = false; }
+  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; COVER.snap = null; Audio.play((typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES.title) ? 'title' : 'map'); } ANYKEY = false; return; }
+  const done = COVER.t >= 150;
+  if (COVER.t > 20 && COVER.t <= 110 && (COVER.t - 20) % 10 === 1) Audio.sfx('scratch', { vol: .35, semi: RI(-2, 4) }); // el lápiz escribe
+  if (COVER.t === 124) Audio.sfx('plop', { semi: 2 }); if (COVER.t === 128) Audio.sfx('page', { vol: .4 });
+  if (ANYKEY) { ANYKEY = false; if (!done) { COVER.t = 150; Audio.sfx('page', { vol: .4 }); } else { COVER.open = COVER.t; Audio.sfx('page'); for (const k in pressed) pressed[k] = false; } }
 }
-function drawCoverArt(t) { // tapa de cartón con grano, anillas y una etiqueta de papel: "nahuelgabe presenta"
+function drawCoverArt(t) { // tapa de cartón con anillas y una etiqueta de papel donde un lápiz escribe "gavilanbe"; luego se pega un sticker de "presenta"
   g.fillStyle = '#7a5a3a'; g.fillRect(0, 0, W, H); const rnd = seeded(21); g.fillStyle = '#8a6a48'; for (let i = 0; i < 1800; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1); g.fillStyle = '#5e4229'; for (let i = 0; i < 500; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
   g.fillStyle = '#5e4229'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.fillRect(W - 2, 0, 2, H);
   for (let y = 10; y < H - 6; y += 12) { g.fillStyle = '#2a1a10'; g.fillRect(6, y, 5, 4); g.fillStyle = '#8c8ab0'; g.fillRect(2, y - 2, 9, 2); g.fillRect(2, y - 2, 2, 6); g.fillStyle = '#e8e6f0'; g.fillRect(3, y - 2, 5, 1); }
-  page(70, 52, 180, 80); tape(64, 48, 40, 9); tape(216, 48, 40, 9);
-  g.save(); g.translate(W / 2 - 80, 62); g.scale(2, 2); txt('NAHUELGABE', 0, 0, INK, '#c9bd9c'); g.restore();
-  ui('presenta', W / 2 - 32, 84, TXT2);
-  DATA.party.forEach((p, i) => { const x = W / 2 - 36 + i * 36, hop = Math.abs(Math.sin(t * .08 + i * 1.2)) * 2; shadow(x, 122, 10); drawSprite(buildSprite(`${p.id}_front_mini`, C(p.color), null, { eyes: ((t + i * 50) % 160) < 6 ? 'blink' : 'normal' }), x, 122 - hop, 1.5, false, 1); });
-  if ((t / 30 | 0) % 2 && !COVER.open) { tape(W / 2 - 66, 146, 132, 14); ui('PULSA UNA TECLA', W / 2 - 60, 149, TXT); }
+  page(66, 56, 188, 66); tape(60, 52, 40, 9); tape(220, 52, 40, 9);
+  // el lápiz escribe letra a letra
+  const word = 'gavilanbe', cw = 16, x0 = W / 2 - word.length * cw / 2, ty = 74, prog = clamp((t - 20) / 90, 0, 1), px0 = x0 + prog * word.length * cw;
+  g.save(); g.beginPath(); g.rect(x0 - 2, ty - 4, Math.round(prog * word.length * cw) + 2, 24); g.clip(); g.save(); g.translate(x0, ty); g.scale(2, 2); txt(word, 0, 0, INK, '#c9bd9c'); g.restore(); g.restore();
+  if (prog > 0 && prog < 1) { const img = propSprite('lapiz', C('amarillo')), P = PROP.lapiz, jit = Math.sin(t * 1.3) * .8; drawProp(img, px0 + jit, ty + 14 + Math.sin(t * .9) * 1.2, -.95, 1, P.tip[0], P.tip[1], 1); if (t % 3 === 0) { g.fillStyle = '#6a6480'; g.fillRect(px0 + R(-3, 3) | 0, ty + 12 + R(0, 4) | 0, 1, 1); } }
+  // sticker de "presenta" que se pega con golpe
+  if (t > 118) { const k = clamp((t - 118) / 10, 0, 1), e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2), sc = lerp(2.2, 1, e); g.save(); g.translate(W / 2 + 44, 104); g.rotate(-.14); g.scale(sc, sc); g.fillStyle = 'rgba(11,9,18,.35)'; g.fillRect(-40, -7, 82, 18); g.fillStyle = '#ffffff'; g.fillRect(-42, -10, 82, 18); g.fillStyle = C('violeta'); g.fillRect(-40, -8, 78, 14); g.fillStyle = ramp(C('violeta')).hi; g.fillRect(-40, -8, 78, 2); txt('presenta', -33, -5, '#f4f0ea', '#4a2a6a'); g.restore(); }
+  if (t > 150 && !COVER.open && (t / 30 | 0) % 2) { tape(W / 2 - 88, 146, 176, 14); ui('PULSA CUALQUIER TECLA', W / 2 - 80, 149, TXT); }
   txtC('PoC · Fable 5 · 320x180', W / 2, 172, '#c9a878', null);
 }
 function drawCover() {
