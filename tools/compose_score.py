@@ -41,6 +41,12 @@ PALETTE = {
 }
 
 
+def voice_settings(score, voice):
+    settings = getattr(score, 'palette', {}).get(voice)
+    if settings is None: settings = PALETTE[voice]
+    return (*settings, 0) if len(settings) == 4 else settings
+
+
 class Score:
     def __init__(self, name, title, bpm, meter, intro, bars, key):
         self.name, self.title, self.bpm, self.meter = name, title, bpm, meter
@@ -83,9 +89,10 @@ class Score:
                           mido.MetaMessage('time_signature', numerator=self.meter, denominator=4)])
         for index, (voice, notes) in enumerate(self.voices.items()):
             ch = index if index < 9 else index + 1 # CT drum presets are pitched bank-0 instruments, not GM channel 10
-            program, level, pan, send = PALETTE[voice]
+            program, level, pan, send, bank = voice_settings(self, voice)
             track = mido.MidiTrack(); mf.tracks.append(track)
             track.append(mido.MetaMessage('track_name', name=voice))
+            track.append(mido.Message('control_change', channel=ch, control=0, value=bank))
             track.append(mido.Message('program_change', channel=ch, program=program))
             for control, value in [(7, round(level * 110)), (10, pan), (91, round(send * 127))]:
                 track.append(mido.Message('control_change', channel=ch, control=control, value=value))
@@ -243,10 +250,10 @@ class Synth:
         self.sf=self.lib.fluid_synth_sfload(self.synth,str(sf).encode(),0)
         if self.sf<0: raise RuntimeError('Could not load soundfont')
 
-    def render(self, notes, program, pan, seconds, beat):
+    def render(self, notes, program, pan, seconds, beat, bank=0):
         lib, synth = self.lib, self.synth
         lib.fluid_synth_all_sounds_off(synth,0)
-        if lib.fluid_synth_program_select(synth,0,self.sf,0,program)<0: raise RuntimeError(f'Missing program {program}')
+        if lib.fluid_synth_program_select(synth,0,self.sf,bank,program)<0: raise RuntimeError(f'Missing program {bank}:{program}')
         lib.fluid_synth_cc(synth,0,7,100);lib.fluid_synth_cc(synth,0,10,pan)
         events=[]
         for t,d,p,v in notes:
@@ -278,9 +285,18 @@ def wav_bytes(data):
 def render_score(score, synth, output):
     meta=score.metadata(); seconds=meta['duration']; beat=60/score.bpm
     mix=np.zeros((round(seconds*SR),2),dtype=np.float32)
+    stems = {}
     for voice,notes in score.voices.items():
-        program,level,pan,send=PALETTE[voice]
-        dry=synth.render(notes,program,pan,seconds,beat)*level
+        program,level,pan,send,bank=voice_settings(score,voice)
+        dry=synth.render(notes,program,pan,seconds,beat,bank)*level
+        if getattr(score, 'record_stems', False):
+            rms=np.sqrt(np.mean(dry**2,axis=1));active=rms[rms>.0001]
+            stems[voice]={'program':program,'bank':bank,'gain':level,'pan':pan,'echoSend':send,
+                          'activeRMSDB':round(float(20*np.log10(np.sqrt(np.mean(active**2)))),2),
+                          'peakDB':round(float(20*np.log10(np.max(np.abs(dry)))),2)}
+            blocks=[dry[round((score.intro+k)*score.meter*beat*SR):round((score.intro+min(k+8,score.bars))*score.meter*beat*SR)]
+                    for k in range(0,score.bars,8)]
+            stems[voice]['eightBarRMSDB']=[round(float(20*np.log10(max(1e-9,np.sqrt(np.mean(block**2))))),2) for block in blocks]
         mix+=dry
         for tap in range(1,5):
             delay=round(beat/4*tap*SR)
@@ -304,6 +320,7 @@ def render_score(score, synth, output):
     for t,delta in sorted(edges):active+=delta;maximum=max(maximum,active)
     meta['maxWrittenPolyphony']=maximum
     meta['source']='Chrono Trigger.sf2 (2011), Xouman / William Kage archive'
+    if stems:meta['stemBalance']=stems
     return meta
 
 

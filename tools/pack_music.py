@@ -31,9 +31,20 @@ def run(*args):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--render-dir',type=Path,default=MUSIC)
-    parser.add_argument('--kbps',type=int,default=96);args=parser.parse_args()
+    parser.add_argument('--kbps',type=int,default=96)
+    parser.add_argument('--cues',nargs='+',help='Re-encode only these cues; retain the other published files.')
+    args=parser.parse_args()
     meta=json.loads((MUSIC/'meta.json').read_text()); embedded={}; cues={}; report={}
+    if args.cues:
+        if set(args.cues)-set(meta):raise ValueError('Unknown cue selection')
+        report=json.loads((MUSIC/'score/mastering.json').read_text())
     for name,m in meta.items():
+        if args.cues and name not in args.cues:
+            entry={key:m[key] for key in ['title','loop','loopStart','loopEnd','duration']}
+            data=(MUSIC/(name+'.opus.ogg')).read_bytes()
+            entry['revision']=hashlib.sha256(data).hexdigest()[:12]
+            cues[name]=entry;embedded[name]={**entry,'data':base64.b64encode(data).decode()}
+            continue
         source=args.render_dir/(name+'.wav')
         if not source.exists(): source=MUSIC/(name+'.wav')
         if not source.exists(): raise FileNotFoundError(f'Missing master for {name}: run compose_score.py first')

@@ -16,20 +16,20 @@
     "bytes": 1597424
   },
   "battle": {
-    "inputLUFS": -16.31,
-    "inputTruePeakDB": -2.87,
-    "gainDB": -2.69,
+    "inputLUFS": -16.54,
+    "inputTruePeakDB": -2.96,
+    "gainDB": -2.46,
     "estimatedOutputLUFS": -19.0,
-    "estimatedTruePeakDB": -5.56,
-    "bytes": 1426113
+    "estimatedTruePeakDB": -5.42,
+    "bytes": 1708027
   },
   "boss": {
-    "inputLUFS": -18.57,
-    "inputTruePeakDB": -2.91,
-    "gainDB": -0.43,
+    "inputLUFS": -17.33,
+    "inputTruePeakDB": -2.61,
+    "gainDB": -1.67,
     "estimatedOutputLUFS": -19.0,
-    "estimatedTruePeakDB": -3.34,
-    "bytes": 1466410
+    "estimatedTruePeakDB": -4.28,
+    "bytes": 1908117
   },
   "victory": {
     "inputLUFS": -14.52,

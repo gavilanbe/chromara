@@ -26,9 +26,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   await page.waitForFunction(()=>__chromara.Audio.src?.name==='map'); await delay(650);
   await page.evaluate(()=>__chromara.battle('1'));
   await page.waitForFunction(()=>__chromara.Game.state==='battle' && __chromara.Audio.src?.name==='battle',null,{timeout:20000});
-  assert.equal(await page.evaluate(()=>MUSIC_CUES.battle.title),'Tres trazos contra la tinta');
-  assert.equal(await page.evaluate(()=>MUSIC_FALLBACK.battle.bpm),160);
-  assert(requests.some(x=>/battle\.opus\.ogg\?v=[a-f0-9]{12}$/.test(x)), 'new composition bypasses cached v3 audio');
+  assert.equal(await page.evaluate(()=>MUSIC_CUES.battle.title),'A pulso y a color');
+  assert.equal(await page.evaluate(()=>MUSIC_FALLBACK.battle.bpm),156);
+  assert(requests.some(x=>/battle\.opus\.ogg\?v=[a-f0-9]{12}$/.test(x)), 'new composition bypasses cached combat audio');
   const choreography = await page.evaluate(()=>{
    const A=__chromara.Audio, original=A.sfx, calls=[];__chromara.pause(true);
    A.sfx=function(name,options){calls.push({name,options});return original.call(this,name,options);};
@@ -113,10 +113,12 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
    await new Promise(r=>setTimeout(r,350));return A.cur;
   });
   assert.equal(current,'restored');
-  // A failed fetch/decode must start the actual written fallback instead of silence.
-  await page.route('**/music/atelier.opus.ogg*',route=>route.abort());
-  await page.evaluate(()=>{delete __chromara.Audio.buffers.atelier;__chromara.Audio.play('atelier',{restart:true});});
-  await page.waitForFunction(()=>__chromara.Audio.cur==='atelier' && !!__chromara.Audio.seq);
+  // A failed fetch/decode must preserve both a world cue and the revised battle score.
+  for(const name of ['atelier','battle']) {
+   await page.route('**/music/'+name+'.opus.ogg*',route=>route.abort());
+   await page.evaluate(name=>{delete __chromara.Audio.buffers[name];__chromara.Audio.play(name,{restart:true});},name);
+   await page.waitForFunction(name=>__chromara.Audio.cur===name && !!__chromara.Audio.seq,name);
+  }
   await page.evaluate(()=>__chromara.Audio.stop());
   assert.equal(await page.evaluate(()=>__chromara.Audio.seq),null);
   console.log('PASS cancellation race and failed-fetch fallback');

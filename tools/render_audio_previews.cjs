@@ -23,11 +23,12 @@ const groups = [
  [43, 'La Tinta: carga y Marea negra', [E(0,'hum_down',{vol:.6}),E(.7,'impact_sub',{vol:.4}),E(1.1,'ink_tide'),E(1.15,'ink_hit')]],
  [48, 'La Pluma: descubrimiento', [E(0,'discovery')]],
 ];
+const meta = JSON.parse(fs.readFileSync(path.join(root,'music/meta.json'),'utf8'));
 const excerpts = [
  ['title',0,8,'La promesa: faltaba el salto; aparecen los tres colores'],
  ['map',9.6,9.6,'El papel gris: Re–Fa–Mi–La'],
  ['battle',0,12,'El mismo gesto convertido en impulso'],
- ['boss',6.666667,8,'La Tinta: La–Fa–Mi♭–Re'],
+ ['boss',meta.boss.intro_s,8,'La Tinta: La–Fa–Mi♭–Re'],
  ['restored',9.6,9.6,'El mapa recuperado: Re–Fa♯–Mi–La'],
  ['victory',0,7.7,'La resolución'],
 ];
@@ -54,7 +55,7 @@ const ffmpeg = (...args) => execFileSync('ffmpeg',['-hide_banner','-loglevel','e
    return {data:btoa(encoded),peak};
   },{groups,source:fs.readFileSync(path.join(root,'sfx.js'),'utf8')});
   const raw=path.join(tmp,'sfx.pcm');fs.writeFileSync(raw,Buffer.from(pcm.data,'base64'));
-  ffmpeg('-f','s16le','-ar','32000','-ac','2','-i',raw,'-c:a','libmp3lame','-q:a','3',path.join(root,'music/sfx-demo.mp3'));
+  if (!process.argv.includes('--music-only')) ffmpeg('-f','s16le','-ar','32000','-ac','2','-i',raw,'-c:a','libmp3lame','-q:a','3',path.join(root,'music/sfx-demo.mp3'));
   const segments=[],cueSheet=[];let start=0;
   for(const [name,offset,duration,meaning] of excerpts){
    const segment=path.join(tmp,name+'.wav');
@@ -65,9 +66,9 @@ const ffmpeg = (...args) => execFileSync('ffmpeg',['-hide_banner','-loglevel','e
   const list=path.join(tmp,'list.txt');fs.writeFileSync(list,segments.map(s=>`file '${s.replace(/'/g,"'\\''")}'`).join('\n'));
   ffmpeg('-f','concat','-safe','0','-i',list,'-c:a','libmp3lame','-q:a','3',path.join(root,'music/leitmotif-demo.mp3'));
   fs.writeFileSync(path.join(root,'music/score/preview-cues.json'),JSON.stringify({
-   leitmotif:cueSheet,sfx:groups.map(([at,title,events])=>({at,title,events})),sfxPeak:pcm.peak,
+   leitmotif:cueSheet,sfx:groups.map(([at,title,events])=>({at,title,events})),sfxPeak:process.argv.includes('--music-only') ? JSON.parse(fs.readFileSync(path.join(root,'music/score/preview-cues.json'),'utf8')).sfxPeak : pcm.peak,
    note:'Extractos y efectos del juego; no son dos composiciones nuevas. SFX sin música, con los niveles del bus del juego.'
   },null,2)+'\n');
-  console.log('Created leitmotif-demo.mp3 and sfx-demo.mp3. SFX peak:',pcm.peak.toFixed(4));
+  console.log(process.argv.includes('--music-only') ? 'Updated leitmotif-demo.mp3.' : 'Created leitmotif-demo.mp3 and sfx-demo.mp3.');
  } finally {await browser.close();fs.rmSync(tmp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e);process.exitCode=1;});

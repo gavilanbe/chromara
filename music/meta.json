@@ -60,72 +60,527 @@
     "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive"
   },
   "battle": {
-    "title": "Tres trazos contra la tinta",
-    "bpm": 160,
+    "title": "A pulso y a color",
+    "bpm": 156,
     "meter": "4/4",
     "key": "D minor / F major",
-    "intro_s": 3.0,
-    "loop_s": 48.0,
+    "intro_s": 3.076923076923077,
+    "loop_s": 61.53846153846154,
     "loop": true,
-    "loopStart": 51.0,
-    "loopEnd": 99.0,
-    "duration": 99.0,
-    "loopStartSample": 1632000,
-    "loopEndSample": 3168000,
+    "loopStart": 64.615375,
+    "loopEnd": 126.15384375,
+    "duration": 126.15384375,
+    "loopStartSample": 2067692,
+    "loopEndSample": 4036923,
     "sampleRate": 32000,
-    "form": "pickup:2; A:8 guitar, A′:8 brass & counterpoint, B:8 colour, C:8 united; loop",
+    "form": "pickup:2; A:8 hook; A′:8 answer; B:8 open sky; C:8 three strokes; A″:8 return & turnaround",
     "instruments": [
+      "lead",
       "guitar",
-      "horn",
-      "synthbass",
+      "bass",
+      "keys",
       "kick",
       "snare",
       "hat",
+      "crash",
       "tom",
+      "open_hat",
       "strings",
-      "marimba",
-      "trumpet",
       "flute",
-      "harp"
+      "marimba"
     ],
-    "edition": "suite-v4",
-    "maxWrittenPolyphony": 7,
-    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive"
+    "edition": "combat-v5",
+    "drumTiming": "Durations in seconds preserve the recorded drum decay.",
+    "mixIntent": "Melody leads; bass supports; chord thirds/sevenths define the harmony.",
+    "maxWrittenPolyphony": 10,
+    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive",
+    "stemBalance": {
+      "lead": {
+        "program": 56,
+        "bank": 0,
+        "gain": 0.98,
+        "pan": 62,
+        "echoSend": 0.17,
+        "activeRMSDB": -29.56,
+        "peakDB": -14.85,
+        "eightBarRMSDB": [
+          -30.33,
+          -30.35,
+          -119.31,
+          -37.02,
+          -29.53
+        ]
+      },
+      "guitar": {
+        "program": 30,
+        "bank": 0,
+        "gain": 0.96,
+        "pan": 82,
+        "echoSend": 0.1,
+        "activeRMSDB": -32.52,
+        "peakDB": -18.41,
+        "eightBarRMSDB": [
+          -45.76,
+          -43.99,
+          -47.72,
+          -33.4,
+          -44.0
+        ]
+      },
+      "bass": {
+        "program": 34,
+        "bank": 0,
+        "gain": 0.75,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -32.21,
+        "peakDB": -19.08,
+        "eightBarRMSDB": [
+          -34.34,
+          -34.35,
+          -33.8,
+          -34.91,
+          -34.34
+        ]
+      },
+      "keys": {
+        "program": 4,
+        "bank": 0,
+        "gain": 0.55,
+        "pan": 39,
+        "echoSend": 0.12,
+        "activeRMSDB": -36.54,
+        "peakDB": -25.4,
+        "eightBarRMSDB": [
+          -40.03,
+          -40.03,
+          -42.2,
+          -40.04,
+          -40.04
+        ]
+      },
+      "kick": {
+        "program": 125,
+        "bank": 0,
+        "gain": 0.76,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -28.46,
+        "peakDB": -16.35,
+        "eightBarRMSDB": [
+          -35.04,
+          -35.04,
+          -37.68,
+          -36.81,
+          -35.04
+        ]
+      },
+      "snare": {
+        "program": 124,
+        "bank": 0,
+        "gain": 0.7,
+        "pan": 65,
+        "echoSend": 0.055,
+        "activeRMSDB": -30.91,
+        "peakDB": -15.88,
+        "eightBarRMSDB": [
+          -35.29,
+          -35.29,
+          -37.89,
+          -37.09,
+          -35.28
+        ]
+      },
+      "hat": {
+        "program": 127,
+        "bank": 0,
+        "gain": 0.75,
+        "pan": 81,
+        "echoSend": 0.015,
+        "activeRMSDB": -45.18,
+        "peakDB": -26.5,
+        "eightBarRMSDB": [
+          -48.41,
+          -48.41,
+          -51.06,
+          -50.29,
+          -48.49
+        ]
+      },
+      "crash": {
+        "program": 123,
+        "bank": 1,
+        "gain": 0.91,
+        "pan": 47,
+        "echoSend": 0.08,
+        "activeRMSDB": -38.46,
+        "peakDB": -18.84,
+        "eightBarRMSDB": [
+          -47.14,
+          -47.14,
+          -49.74,
+          -48.94,
+          -47.14
+        ]
+      },
+      "tom": {
+        "program": 116,
+        "bank": 0,
+        "gain": 0.5,
+        "pan": 51,
+        "echoSend": 0.09,
+        "activeRMSDB": -28.31,
+        "peakDB": -14.82,
+        "eightBarRMSDB": [
+          -41.94,
+          -41.94,
+          -43.55,
+          -44.55,
+          -39.03
+        ]
+      },
+      "open_hat": {
+        "program": 126,
+        "bank": 0,
+        "gain": 0.46,
+        "pan": 81,
+        "echoSend": 0.025,
+        "activeRMSDB": -44.47,
+        "peakDB": -24.27,
+        "eightBarRMSDB": [
+          -58.86,
+          -58.86,
+          -61.56,
+          -60.66,
+          -60.62
+        ]
+      },
+      "strings": {
+        "program": 48,
+        "bank": 0,
+        "gain": 0.57,
+        "pan": 77,
+        "echoSend": 0.18,
+        "activeRMSDB": -39.41,
+        "peakDB": -24.64,
+        "eightBarRMSDB": [
+          -180.0,
+          -50.8,
+          -39.11,
+          -180.0,
+          -48.4
+        ]
+      },
+      "flute": {
+        "program": 73,
+        "bank": 0,
+        "gain": 0.65,
+        "pan": 61,
+        "echoSend": 0.21,
+        "activeRMSDB": -28.56,
+        "peakDB": -20.93,
+        "eightBarRMSDB": [
+          -180.0,
+          -180.0,
+          -28.57,
+          -91.3,
+          -47.42
+        ]
+      },
+      "marimba": {
+        "program": 12,
+        "bank": 0,
+        "gain": 0.43,
+        "pan": 36,
+        "echoSend": 0.07,
+        "activeRMSDB": -38.88,
+        "peakDB": -25.87,
+        "eightBarRMSDB": [
+          -180.0,
+          -180.0,
+          -180.0,
+          -48.41,
+          -180.0
+        ]
+      }
+    }
   },
   "boss": {
-    "title": "El contorno reclama la página",
-    "bpm": 144,
+    "title": "La página se resiste",
+    "bpm": 152,
     "meter": "4/4",
-    "key": "D phrygian / A dominant",
-    "intro_s": 6.666666666666667,
-    "loop_s": 53.333333333333336,
+    "key": "D minor / phrygian; C minor sequence",
+    "intro_s": 6.315789473684211,
+    "loop_s": 75.78947368421052,
     "loop": true,
-    "loopStart": 60.0,
-    "loopEnd": 113.33334375,
-    "duration": 113.33334375,
-    "loopStartSample": 1920000,
-    "loopEndSample": 3626667,
+    "loopStart": 82.10525,
+    "loopEnd": 157.89475,
+    "duration": 157.89475,
+    "loopStartSample": 2627368,
+    "loopEndSample": 5052632,
     "sampleRate": 32000,
-    "form": "intro:4; A:8 ink, B:8 confrontation, C:8 remembered page, D:8 struggle; loop",
+    "form": "summons:4; A:8 Ink; A′:8 pursuit; B:8 rising tide; C:8 memory in motion; D:8 duel; A″:8 reckoning",
     "instruments": [
-      "piano",
-      "bass",
-      "timpani",
-      "choir",
       "horn",
-      "pizz",
-      "synthbass",
-      "strings",
+      "bass",
+      "choir",
       "kick",
       "snare",
       "hat",
+      "crash",
+      "open_hat",
       "tom",
       "organ",
-      "trumpet"
+      "piano",
+      "string_lead",
+      "lead",
+      "strings"
     ],
-    "edition": "suite-v4",
-    "maxWrittenPolyphony": 7,
-    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive"
+    "edition": "combat-v5",
+    "drumTiming": "Durations in seconds preserve the recorded drum decay.",
+    "mixIntent": "Melody leads; bass supports; chord thirds/sevenths define the harmony.",
+    "maxWrittenPolyphony": 10,
+    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive",
+    "stemBalance": {
+      "horn": {
+        "program": 60,
+        "bank": 0,
+        "gain": 0.6,
+        "pan": 60,
+        "echoSend": 0.17,
+        "activeRMSDB": -30.74,
+        "peakDB": -20.71,
+        "eightBarRMSDB": [
+          -31.47,
+          -115.83,
+          -180.0,
+          -52.03,
+          -35.97,
+          -30.2
+        ]
+      },
+      "bass": {
+        "program": 38,
+        "bank": 0,
+        "gain": 0.32,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -34.04,
+        "peakDB": -24.35,
+        "eightBarRMSDB": [
+          -35.89,
+          -35.89,
+          -35.89,
+          -37.93,
+          -35.89,
+          -35.89
+        ]
+      },
+      "choir": {
+        "program": 52,
+        "bank": 0,
+        "gain": 0.41,
+        "pan": 80,
+        "echoSend": 0.23,
+        "activeRMSDB": -42.18,
+        "peakDB": -27.55,
+        "eightBarRMSDB": [
+          -50.7,
+          -50.7,
+          -180.0,
+          -180.0,
+          -180.0,
+          -50.7
+        ]
+      },
+      "kick": {
+        "program": 125,
+        "bank": 0,
+        "gain": 0.76,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -28.56,
+        "peakDB": -15.65,
+        "eightBarRMSDB": [
+          -38.04,
+          -36.08,
+          -36.08,
+          -44.14,
+          -36.08,
+          -34.46
+        ]
+      },
+      "snare": {
+        "program": 124,
+        "bank": 0,
+        "gain": 0.75,
+        "pan": 65,
+        "echoSend": 0.075,
+        "activeRMSDB": -30.47,
+        "peakDB": -14.91,
+        "eightBarRMSDB": [
+          -38.44,
+          -35.71,
+          -35.71,
+          -44.53,
+          -35.7,
+          -34.19
+        ]
+      },
+      "hat": {
+        "program": 127,
+        "bank": 0,
+        "gain": 0.75,
+        "pan": 81,
+        "echoSend": 0.015,
+        "activeRMSDB": -45.52,
+        "peakDB": -25.9,
+        "eightBarRMSDB": [
+          -49.42,
+          -49.42,
+          -49.42,
+          -55.39,
+          -49.42,
+          -47.92
+        ]
+      },
+      "crash": {
+        "program": 123,
+        "bank": 1,
+        "gain": 0.91,
+        "pan": 47,
+        "echoSend": 0.08,
+        "activeRMSDB": -38.87,
+        "peakDB": -18.14,
+        "eightBarRMSDB": [
+          -48.15,
+          -48.15,
+          -48.15,
+          -54.15,
+          -48.15,
+          -46.55
+        ]
+      },
+      "open_hat": {
+        "program": 126,
+        "bank": 0,
+        "gain": 0.46,
+        "pan": 81,
+        "echoSend": 0.025,
+        "activeRMSDB": -45.04,
+        "peakDB": -25.16,
+        "eightBarRMSDB": [
+          -59.97,
+          -59.97,
+          -59.97,
+          -65.77,
+          -59.97,
+          -60.03
+        ]
+      },
+      "tom": {
+        "program": 116,
+        "bank": 0,
+        "gain": 0.5,
+        "pan": 51,
+        "echoSend": 0.09,
+        "activeRMSDB": -29.04,
+        "peakDB": -14.18,
+        "eightBarRMSDB": [
+          -43.58,
+          -43.69,
+          -43.1,
+          -46.16,
+          -44.06,
+          -38.96
+        ]
+      },
+      "organ": {
+        "program": 17,
+        "bank": 0,
+        "gain": 0.35,
+        "pan": 39,
+        "echoSend": 0.11,
+        "activeRMSDB": -39.71,
+        "peakDB": -24.53,
+        "eightBarRMSDB": [
+          -43.62,
+          -43.63,
+          -43.54,
+          -180.0,
+          -47.79,
+          -43.62
+        ]
+      },
+      "piano": {
+        "program": 0,
+        "bank": 0,
+        "gain": 0.65,
+        "pan": 59,
+        "echoSend": 0.17,
+        "activeRMSDB": -30.36,
+        "peakDB": -18.11,
+        "eightBarRMSDB": [
+          -35.89,
+          -35.89,
+          -180.0,
+          -31.33,
+          -36.17,
+          -35.89
+        ]
+      },
+      "string_lead": {
+        "program": 48,
+        "bank": 1,
+        "gain": 0.84,
+        "pan": 65,
+        "echoSend": 0.19,
+        "activeRMSDB": -31.54,
+        "peakDB": -19.59,
+        "eightBarRMSDB": [
+          -180.0,
+          -31.62,
+          -116.49,
+          -180.0,
+          -180.0,
+          -41.9
+        ]
+      },
+      "lead": {
+        "program": 56,
+        "bank": 0,
+        "gain": 0.98,
+        "pan": 62,
+        "echoSend": 0.17,
+        "activeRMSDB": -29.02,
+        "peakDB": -14.75,
+        "eightBarRMSDB": [
+          -180.0,
+          -180.0,
+          -29.41,
+          -180.0,
+          -32.77,
+          -42.74
+        ]
+      },
+      "strings": {
+        "program": 48,
+        "bank": 0,
+        "gain": 0.57,
+        "pan": 77,
+        "echoSend": 0.18,
+        "activeRMSDB": -39.54,
+        "peakDB": -25.24,
+        "eightBarRMSDB": [
+          -180.0,
+          -180.0,
+          -40.12,
+          -39.64,
+          -180.0,
+          -180.0
+        ]
+      }
+    }
   },
   "victory": {
     "title": "El color encuentra su sitio",

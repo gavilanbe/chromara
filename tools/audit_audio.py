@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import math
 from pathlib import Path
 import subprocess
 import numpy as np
@@ -37,8 +38,9 @@ def main():
             entry.update(loopStart=m['loopStart'],loopEnd=m['loopEnd'],seamJump=round(jump,6),localDerivativeRMS=round(typical,6))
             assert jump<max(.012,typical*4),(name,'loop discontinuity',entry)
             # The variation across musical sections remains in the exported file.
-            beat=60/m['bpm'];barbeats=int(m.get('meter','4/4').split('/')[0]);section=round(8*barbeats*beat*RATE)
-            entry['eightBarRMSDB']=[round(20*np.log10(max(1e-9,float(np.sqrt(np.mean(pcm[i:min(i+section,b)]**2))))),1) for i in range(a,b,section)]
+            beat=60/m['bpm'];barbeats=int(m.get('meter','4/4').split('/')[0]);section=8*barbeats*beat*RATE
+            sections=math.ceil((b-a)/section-1e-5)
+            entry['eightBarRMSDB']=[round(20*np.log10(max(1e-9,float(np.sqrt(np.mean(pcm[round(a+k*section):min(round(a+(k+1)*section),b)]**2))))),1) for k in range(sections)]
         report[name]=entry
         print(name,entry,flush=True)
     (MUSIC/'score/audio-audit.json').write_text(json.dumps(report,indent=2)+'\n')

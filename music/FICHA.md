@@ -1,4 +1,4 @@
-# CHROMARA — una partitura para el cuaderno (v4)
+# CHROMARA — una partitura para el cuaderno (v4, combates v5)
 
 El color necesita una línea que lo sostenga. Carmín, Ámbar y Añil devuelven vida a una página; La Tinta teme que olviden quién dibujó sus contornos. Esta suite desarrolla esa relación entre exploración, lucha y reconciliación.
 
@@ -10,13 +10,15 @@ El color necesita una línea que lo sostenga. Carmín, Ámbar y Añil devuelven 
 
 Los dos demos son montajes de escucha, no piezas adicionales. Los MP3 de esta carpeta se abren directamente en el ordenador. La secuencia exacta de los demos está en [score/preview-cues.json](score/preview-cues.json).
 
+Los dos combates se han vuelto a componer en **v5**: [dirección musical y guía de escucha](COMBATES.md).
+
 ## La idea musical
 
 La célula del Prisma es **Re–Fa–Mi–La**: partir, abrirse, retroceder un paso y saltar. En el mapa su ritmo largo–corto deja respirar la frase; en la batalla se comprime y desplaza contra el bajo. No se repite igual en cada escena.
 
 El color abre **Fa a Fa♯**. El mapa gris y el mundo recuperado comparten pulso, arquitectura y contorno melódico: el final permite reconocer el lugar que se ha salvado. Carmín, Ámbar y Añil aportan **Re, Fa♯ y La**. En los efectos de carga son pizzicato, marimba y arpa; al mezclarse suenan las notas de los participantes y una respuesta Mi–La.
 
-La Tinta pliega la célula en **La–Fa–Mi♭–Re**. Su tema recuerda literalmente una frase del mapa en piano antes de teñir el Mi de Mi♭. El preludio permite escuchar a la persona que hay dentro de la amenaza. El final conserva un pasaje de armonía menor: recuperar el color no borra la línea.
+La Tinta pliega la célula en **La–Fa–Mi♭–Re**. Su tema desarrolla el recuerdo del mapa en piano antes de teñir el Mi de Mi♭, conservando el pulso del combate. El preludio permite escuchar a la persona que hay dentro de la amenaza. El final conserva un pasaje de armonía menor: recuperar el color no borra la línea.
 
 ## Las nueve escenas
 
@@ -27,14 +29,14 @@ Se han **recompuesto los seis temas principales**, incluida la batalla. Estuche,
 | Título | [Antes de la primera pincelada](title.mp3) | 84 bpm; entrada incompleta en piano, presentación de las tres voces, recuerdo de la Tinta y promesa en flauta |
 | Mapa gris | [Donde el papel respira](map.mp3) | 100 bpm; Re dorio, ventanas a Fa lidio, retirada a piano y regreso con respuesta de oboe |
 | Estuche | [Lo que duerme en el estuche](atelier.mp3) | 108 bpm, 3/4; marimba curiosa, oboe que contesta, arpa y pizzicato |
-| Batalla | [Tres trazos contra la tinta](battle.mp3) | 160 bpm; motivo inmediato, guitarra, respuesta de metales, puente de flauta y reunión final; bajo sincopado y percusión con remates |
+| Batalla | [A pulso y a color](battle.mp3) | 156 bpm; estribillo de trompeta que vuelve, respuestas de guitarra, acordes de Rhodes, sección abierta de flauta y diálogo rítmico antes del regreso |
 | Diálogo | [Debajo del color](prelude.mp3) | 72 bpm; oboe cercano, pedal, silencios y segunda bemol; espacio para leer |
-| La Tinta | [El contorno reclama la página](boss.mp3) | 144 bpm; célula plegada, ostinato 3+3+2, cuerda, recuerdo del mapa sin batería y último enfrentamiento con metales |
+| La Tinta | [La página se resiste](boss.mp3) | 152 bpm; declaración de trompa, persecución de cuerda, secuencia ascendente, recuerdo del mapa con pulso, duelo de motivos y regreso reforzado |
 | Victoria | [El color encuentra su sitio](victory.mp3) | 160 bpm; cuatro compases que resuelven el gesto de batalla en Re mayor; comienza tras la disolución |
 | Derrota | [Una página sin terminar](gameover.mp3) | 76 bpm; la frase pierde el salto, el Mi desciende a Mi♭ y queda sobre Re |
 | Mundo recuperado | [La línea también es color](restored.mp3) | 100 bpm; la melodía del mapa abre su tercera, las voces cantan juntas y permanece un recuerdo menor |
 
-Las piezas cíclicas contienen una introducción y dos vueltas. El reproductor repite la segunda para conservar las colas asentadas. Victoria y derrota terminan. Los puntos de bucle, instrumentos y formas están en [meta.json](meta.json). La polifonía escrita va de 4 a 9 notas; las colas de muestras son adicionales. Es una estética de muestras SNES reproducida en Web Audio, no una emulación del SPC700.
+Las piezas cíclicas contienen una introducción y dos vueltas. El reproductor repite la segunda para conservar las colas asentadas. Victoria y derrota terminan. Los puntos de bucle, instrumentos y formas están en [meta.json](meta.json). La polifonía escrita va de 4 a 10 notas; las colas de muestras son adicionales. Es una estética de muestras SNES reproducida en Web Audio, no una emulación del SPC700.
 
 ## Tacto y respuesta
 
@@ -53,7 +55,7 @@ Al aterrizar el pigmento liberado por un enemigo, la animación dispara la célu
 
 ## Mezcla e integración
 
-La masterización aplica una ganancia constante por tema, corte suave a 7,8 kHz y reducción en 2,9 kHz. Mantiene los contrastes entre secciones. Referencias: mapa/título −21 LUFS, batalla/jefa −19, estuche −22, diálogo −24, mundo recuperado −20. Los nueve Opus decodificados conservan margen de pico; el máximo medido es −3,33 dBTP.
+La masterización aplica una ganancia constante por tema, corte suave a 7,8 kHz y reducción en 2,9 kHz. Mantiene los contrastes entre secciones. Referencias: mapa/título −21 LUFS, batalla/jefa −19, estuche −22, diálogo −24, mundo recuperado −20. Los nueve Opus decodificados conservan margen de pico; los dos combates v5 miden −5,60 y −4,00 dBTP.
 
 Los impactos atenúan brevemente la música y regresan a un nivel fijo. El mapa recuerda su posición después del combate. Los fundidos, el precargado de escenas y el cambio del estuche evitan reinicios continuos. El manifiesto incluye una revisión por archivo para que la caché no reproduzca la antigua batalla. La edición `file://` incluye exactamente los mismos bytes Opus. Si falla la carga, el sintetizador sigue las partituras nuevas y reproduce la introducción una sola vez.
 
@@ -70,7 +72,7 @@ python tools/pack_music.py --render-dir /tmp/chromara-renders
 python tools/audit_audio.py
 ```
 
-`compose_suite.py` contiene la nueva escritura principal; `compose_score.py` aporta el renderizador y las tres escenas incorporadas en v3. Se exportan nueve MIDI. Los seis WAV principales también están actualizados para escucharlos directamente; los otros tres WAV son intermediarios regenerables. Los informes y gráficos v2 están archivados en `archive/v2/`.
+`combat_score.py` contiene las dos nuevas composiciones de combate y sus balances instrumentales; `compose_suite.py` reúne la suite; `compose_score.py` aporta el renderizador y las tres escenas incorporadas en v3. Se exportan nueve MIDI. Los seis WAV principales también están actualizados para escucharlos directamente; los otros tres WAV son intermediarios regenerables. Los informes y gráficos v2 están archivados en `archive/v2/`.
 
 Para las comprobaciones del navegador y los demos, con Playwright instalado y un servidor local en el puerto 8765:
 

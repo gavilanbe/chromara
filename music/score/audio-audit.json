@@ -34,39 +34,42 @@
     ]
   },
   "battle": {
-    "duration": 99.0,
-    "peakDBFS": -5.67,
+    "duration": 126.153854,
+    "peakDBFS": -5.65,
     "integratedLUFS": -18.99,
-    "truePeakDBTP": -5.65,
-    "loudnessRangeLU": 2.6,
-    "sha256": "8c232ec06ef7eeb3e2a5d5feaf859e9e057135c0352461a0835277fb3b776eb5",
-    "loopStart": 51.0,
-    "loopEnd": 99.0,
-    "seamJump": 0.003712,
-    "localDerivativeRMS": 0.022708,
+    "truePeakDBTP": -5.6,
+    "loudnessRangeLU": 2.1,
+    "sha256": "6462e2030d31d41921d1b9b2d8dd12d441aab3c69a81f8ae71f23a4b17c20656",
+    "loopStart": 64.615375,
+    "loopEnd": 126.15384375,
+    "seamJump": 0.008716,
+    "localDerivativeRMS": 0.019844,
     "eightBarRMSDB": [
-      -21.9,
+      -22.5,
+      -22.5,
       -21.4,
-      -20.4,
-      -21.4
+      -23.8,
+      -22.0
     ]
   },
   "boss": {
-    "duration": 113.333354,
-    "peakDBFS": -3.33,
+    "duration": 157.89475,
+    "peakDBFS": -4.0,
     "integratedLUFS": -18.98,
-    "truePeakDBTP": -3.33,
-    "loudnessRangeLU": 8.1,
-    "sha256": "30a29eb318c613d67b1590b7255591bcd438d80494a8b3a90bf2f78882edee67",
-    "loopStart": 60.0,
-    "loopEnd": 113.33334375,
-    "seamJump": 0.003881,
-    "localDerivativeRMS": 0.01799,
+    "truePeakDBTP": -4.0,
+    "loudnessRangeLU": 3.8,
+    "sha256": "fae0558949c0ce02ddb9f89f65c8351515507d343482d20c6c88a63587cb6483",
+    "loopStart": 82.10525,
+    "loopEnd": 157.89475,
+    "seamJump": 0.015638,
+    "localDerivativeRMS": 0.021615,
     "eightBarRMSDB": [
-      -20.5,
-      -21.1,
-      -26.7,
-      -19.4
+      -22.0,
+      -21.7,
+      -21.6,
+      -24.0,
+      -21.8,
+      -20.1
     ]
   },
   "victory": {
