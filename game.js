@@ -924,67 +924,167 @@ function titlePaper() {
   });
 }
 const TITLE_DROPS = [
-  { at: 99, from: [67, 64], to: [84, 113], col: 'rojo', sound: 0 },
+  { at: 99, from: [67, 64], to: [87, 113], col: 'rojo', sound: 0 },
   { at: 132, from: [177, 64], to: [176, 151], col: 'azul', sound: 7 },
-  { at: 165, from: [120, 64], to: [244, 120], col: 'amarillo', sound: 4 },
-  { at: 183, from: [177, 64], to: [244, 120], col: 'azul', sound: 7 },
+  { at: 165, from: [120, 64], to: [229, 145], col: 'amarillo', sound: 4 },
+  { at: 183, from: [177, 64], to: [229, 145], col: 'azul', sound: 7 },
 ];
 const titleProgress = (t, at, duration = 42) => clamp((t - at) / duration, 0, 1);
+// Hand-pixelled art supplies: the landscape is built from actual drawing tools.
+// The same sprite produces its graphite underdrawing and its painted reveal.
+function titleObject(kind, col, paint, x, y, scale = 1, tilt = 0) {
+  const spr = cached('title-object|' + kind + '|' + col, () => {
+    const c = document.createElement('canvas'); c.width = 48; c.height = 58;
+    const q = c.getContext('2d'), rp = ramp(col), out = '#534451';
+    const F = (colour, a, b, w = 1, h = 1) => { q.fillStyle = colour; q.fillRect(a, b, w, h); };
+    const poly = (points, colour) => { q.fillStyle = colour; q.beginPath(); points.forEach(([a, b], i) => i ? q.lineTo(a, b) : q.moveTo(a, b)); q.closePath(); q.fill(); };
+    const oval = (cx, cy, rx, ry, colour) => { for (let row = -ry; row <= ry; row++) { const half = Math.round(rx * Math.sqrt(Math.max(0, 1 - row * row / (ry * ry)))); F(colour, cx - half, cy + row, half * 2 + 1, 1); } };
+    if (kind === 'brush') {
+      // Lacquered handle, silver ferrule and individual loaded bristles.
+      F(out, 20, 25, 7, 33); F('#aa7048', 21, 25, 5, 32); F('#e1b57a', 21, 29, 2, 25); F('#77503d', 25, 27, 1, 29);
+      F(out, 13, 19, 21, 13); F('#8092a0', 14, 20, 19, 10); F('#dce3dc', 15, 21, 16, 2); F('#b7c3c2', 16, 24, 13, 4); F('#f8f3df', 15, 22, 2, 7); F('#596776', 30, 21, 2, 9); F('#ede9d4', 14, 30, 19, 1);
+      poly([[12,20],[11,7],[14,3],[15,7],[17,1],[19,5],[21,0],[24,5],[28,2],[30,5],[33,3],[35,8],[34,20]], out);
+      poly([[14,19],[13,8],[15,5],[17,8],[19,4],[21,7],[23,4],[26,8],[29,5],[32,7],[33,10],[32,20]], rp.base);
+      for (let i = 0; i < 9; i++) { const a = 14 + i * 2, start = 7 + (i * 3) % 5; F(i % 3 ? rp.hi : rp.sh, a, start, 1, 18 - start); }
+      F(rp.dk, 14, 17, 18, 3); F(rp.hi, 15, 6, 2, 3); F(rp.spec, 19, 5, 1, 3);
+    } else if (kind === 'pencil') {
+      poly([[17,57],[17,13],[23,0],[30,13],[30,57]], out);
+      poly([[18,14],[23,2],[29,14]], '#dfb780'); poly([[21,6],[23,1],[26,7]], '#4b4654');
+      F(rp.sh, 18, 14, 11, 37); F(rp.base, 19, 14, 6, 37); F(rp.hi, 20, 15, 2, 36); F(rp.dk, 27, 14, 2, 37);
+      F('#7b8a99', 18, 50, 11, 4); F('#d1d6cb', 19, 51, 9, 1); F('#c5848b', 18, 54, 11, 3); F('#f0b3af', 19, 54, 8, 1);
+      for (let b = 23; b < 42; b += 4) F('#f4dc89', 23, b, 1, 2);
+    } else if (kind === 'jar') {
+      // A home in a pigment jar: threaded lid, glass shoulders, paper label,
+      // a little door cut in the label and a brush propped through the lid.
+      poly([[33,21],[36,3],[39,2],[36,22]], '#544654'); poly([[34,20],[37,4],[38,4],[35,21]], '#c3935a');
+      F('#e8e3d1', 35, 3, 5, 4); F(rp.dk, 35, 0, 5, 4); F(rp.base, 36, 0, 3, 3);
+      oval(24, 54, 19, 3, out);
+      poly([[8,52],[6,31],[10,23],[38,23],[42,31],[40,53],[34,57],[14,57]], out);
+      poly([[10,51],[8,31],[12,25],[36,25],[40,31],[38,52],[32,55],[15,55]], '#b3c2b6');
+      poly([[12,50],[10,32],[14,27],[34,27],[38,32],[36,52],[17,53]], rp.sh);
+      F(rp.base, 12, 34, 24, 17); F(rp.hi, 13, 32, 8, 16); F(rp.dk, 34, 35, 3, 16);
+      oval(24, 35, 12, 3, rp.base); F(rp.hi, 16, 33, 13, 1);
+      F('#edf0dc', 9, 30, 2, 17); F('#f9f5e2', 10, 30, 1, 10); F('#d3ddc9', 37, 30, 1, 8);
+      poly([[13,38],[33,37],[33,51],[13,52]], '#eee1b8'); F('#d0be91', 31, 38, 2, 13); F('#fff2ca', 14, 38, 16, 1);
+      F('#73605b', 21, 44, 7, 10); F('#3f3544', 22, 45, 5, 9); F('#d4a459', 22, 45, 1, 8);
+      F('#7c6b61', 15, 42, 4, 4); F('#f5c650', 16, 43, 2, 2); F('#7c6b61', 28, 41, 3, 4); F('#f5c650', 29, 42, 1, 2);
+      oval(24, 23, 17, 4, out); F('#6f7a86', 7, 18, 35, 6); oval(24, 18, 17, 4, '#abb5b4'); oval(24, 17, 14, 2, '#e2e2cb');
+      for (let a = 10; a < 40; a += 4) { F('#485360', a, 21, 1, 3); F('#d4d8cb', a + 1, 20, 1, 3); }
+      oval(25, 17, 8, 1, rp.base); F(rp.hi, 21, 16, 5, 1);
+    } else if (kind === 'tube') {
+      poly([[3,40],[11,34],[33,44],[36,50],[29,55],[8,48]], out);
+      poly([[5,40],[12,36],[32,45],[33,49],[28,52],[10,47]], '#c2c3b6');
+      poly([[8,39],[12,37],[29,44],[24,48],[10,44]], '#f1edda');
+      poly([[16,39],[24,42],[20,48],[13,45]], rp.base); poly([[18,40],[21,41],[18,46],[16,45]], rp.hi);
+      for (let i = 0; i < 3; i++) F('#858c8d', 5 + i, 40 + i * 2, 2, 1);
+      F('#655665', 32, 47, 6, 6); F(rp.base, 37, 49, 4, 3); F(rp.hi, 38, 49, 2, 1);
+    } else if (kind === 'eraser') {
+      poly([[8,46],[19,40],[40,46],[40,53],[29,58],[8,52]], out);
+      poly([[10,46],[19,42],[37,46],[28,51]], '#f0b8b5'); poly([[10,47],[28,52],[28,56],[10,51]], '#bc788b'); poly([[29,52],[38,48],[38,52],[29,56]], '#d5909e');
+      poly([[17,45],[24,43],[32,45],[24,50]], '#eee9d1'); poly([[17,48],[24,50],[24,55],[17,53]], '#aab8b4'); F('#597f94', 19, 50, 3, 1);
+    }
+    c.__key = 'title-object|' + kind + '|' + col;
+    return c;
+  });
+  const sketch = cached(spr.__key + '|sketch', () => {
+    const c = document.createElement('canvas'); c.width = spr.width; c.height = spr.height;
+    const q = c.getContext('2d'), src = spr.getContext('2d').getImageData(0, 0, c.width, c.height), dest = q.createImageData(c.width, c.height), s = src.data, d = dest.data;
+    for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) {
+      const i = (yy * c.width + xx) * 4; if (s[i + 3] < 80) continue;
+      const edge = xx === 0 || yy === 0 || xx === c.width - 1 || yy === c.height - 1 || !s[i - 4 + 3] || !s[i + 4 + 3] || !s[i - c.width * 4 + 3] || !s[i + c.width * 4 + 3];
+      const dark = s[i] + s[i + 1] + s[i + 2] < 300, hatch = dark && (xx + yy * 2) % 4 === 0;
+      const color = edge || hatch ? [151, 137, 115] : [236, 225, 199];
+      d[i] = color[0]; d[i + 1] = color[1]; d[i + 2] = color[2]; d[i + 3] = 255;
+    }
+    q.putImageData(dest, 0, 0); return c;
+  });
+  if (paint > 0) {
+    g.save(); g.globalAlpha = paint * .17; g.fillStyle = '#514354'; g.beginPath();
+    g.ellipse(x + 2, y + 1, (kind === 'jar' ? 17 : kind === 'eraser' || kind === 'tube' ? 14 : 6) * scale, 2 * scale, 0, 0, Math.PI * 2); g.fill(); g.restore();
+  }
+  g.save(); g.translate(Math.round(x), Math.round(y)); g.rotate(tilt); g.scale(scale, scale);
+  g.drawImage(sketch, -24, -58);
+  if (paint > 0) { g.save(); if (paint < 1) { g.beginPath(); g.arc(0, kind === 'jar' || kind === 'brush' ? -41 : -22, paint * 85, 0, Math.PI * 2); g.clip(); } g.drawImage(spr, -24, -58); g.restore(); }
+  g.restore();
+}
+function titleInkPool(x, y, w, t, eyes = false) {
+  g.fillStyle = '#3d344e'; g.beginPath(); g.ellipse(x, y, w, w * .27, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#241f36'; g.beginPath(); g.ellipse(x - 1, y - 1, w * .75, w * .19, -.1, 0, Math.PI * 2); g.fill();
+  titleLine([[x - w * .5, y - 2], [x - w * .15, y - 3]], '#6b597d');
+  if (eyes && t % 270 > 9) { g.fillStyle = '#efe4bf'; g.fillRect(x + 1, y - 3, 2, 2); g.fillRect(x + 6, y - 3, 2, 2); }
+}
 function titleLandscape(t) {
   const red = titleProgress(t, 127), blue = titleProgress(t, 160), gold = titleProgress(t, 193), green = titleProgress(t, 211, 56);
-  // Faint construction lines survive behind the washes.
-  titleLine([[34, 133], [53, 122], [63, 124], [105, 110], [122, 113], [138, 107], [151, 114]], '#c9c0ab');
-  titleLine([[205, 119], [221, 105], [238, 115], [260, 107], [287, 127]], '#c9c0ab');
-  titleLine([[56, 130], [82, 116], [96, 120]], '#ded4be');
-  const left = [[31, 146], [44, 134], [65, 132], [81, 128], [108, 129], [128, 123], [163, 125], [171, 138], [155, 155], [135, 166], [66, 165], [40, 157]];
-  const right = [[180, 126], [207, 125], [230, 127], [253, 125], [279, 136], [295, 152], [277, 165], [166, 167], [177, 153], [191, 138]];
-  titleWash(left, '#afbf76', green, [244, 120], '#aaa28b');
-  titleWash(right, '#adc67d', green, [244, 120], '#aaa28b');
-  // A meandering strip of blue runs underneath the ruler bridge.
-  const river = [[177, 110], [183, 113], [184, 123], [198, 133], [195, 143], [178, 156], [168, 169], [139, 169], [156, 152], [174, 141], [178, 133], [171, 123]];
-  titleWash(river, '#6eafd0', blue, [176, 151], '#a0a394');
+  // Light abandoned construction lines make the unfinished parts legible.
+  titleLine([[30, 143], [44, 124], [58, 129], [73, 113], [103, 117], [130, 130]], '#d3c4a7');
+  titleLine([[226, 126], [240, 100], [273, 109], [293, 131]], '#d3c4a7');
+  // The left shore is a painter's wooden palette; the right shore is a torn leaf.
+  const palette = [[30,150],[36,140],[55,133],[78,129],[107,132],[131,143],[137,151],[128,162],[108,168],[54,168],[35,159]];
+  titlePath(palette.map(([x,y]) => [x + 1,y + 3])); g.fillStyle = '#b5a68a'; g.fill();
+  titleWash(palette, '#c2945e', red, [83,123], '#978163');
+  if (red > 0) { g.save(); titlePath(palette); g.clip(); g.globalAlpha = red * .4;
+    for (let y = 135; y < 172; y += 4) titleLine([[29,y],[57,y - 1],[104,y + 2],[134,y - 1]], '#97683f'); g.restore(); }
+  g.fillStyle = '#78634f'; g.beginPath(); g.ellipse(46,150,7,4,-.4,0,6.29); g.fill();
+  g.fillStyle = '#efe4c9'; g.beginPath(); g.ellipse(47,149,5,3,-.4,0,6.29); g.fill();
+  const sheet = [[146,134],[173,124],[192,126],[206,121],[223,125],[243,122],[269,128],[289,141],[300,154],[291,161],[282,160],[272,167],[261,165],[249,169],[232,166],[211,170],[198,168],[181,170],[171,165],[151,162],[155,155],[149,151],[153,146],[146,142]];
+  titlePath(sheet.map(([x,y]) => [x + 1,y + 3])); g.fillStyle = '#a99b82'; g.fill();
+  titleWash(sheet, '#f0dbaa', gold, [175,140], '#baaa88', '#f1e7d0');
+  titleLine([[166,165],[180,168],[196,166],[211,168],[230,164],[248,167],[262,163],[271,165],[282,158]], '#fff2d5');
+  // A ragged ink-filled tear divides the paper. Carmín repairs the missing path.
+  titleInkPool(142,153,17,t);
+  for (let i = 0; i < 6; i++) { g.fillStyle = '#b6a789'; g.fillRect(127 + i * 5, 155 + (i % 3), 2, 1); }
+  if (red > 0) {
+    const repair = titleProgress(t,153,60), pts = [[114,151],[130,151],[140,148],[153,150],[163,147]];
+    g.save(); g.beginPath(); g.rect(112,141,55 * repair,18); g.clip();
+    titleLine(pts,'#994653',7); titleLine(pts,'#df6b62',5); titleLine(pts,'#f39a77',2); g.restore();
+  }
+  // Blue paint curls across the paper and drips over its torn edge.
+  const stream = [[195,121],[199,128],[194,134],[183,139],[180,145],[187,151],[189,157],[179,168],[164,169],[174,158],[172,151],[167,145],[169,137],[182,131],[186,124]];
+  titleWash(stream,'#539dcc',blue,[176,151],'#958a87');
   if (blue > 0) {
     g.save(); g.globalAlpha = blue;
-    for (let i = 0; i < 9; i++) { const y = 122 + i * 5, x = y < 140 ? 180 : 185 - (y - 140) * 1.05; titleLine([[x - 4 + Math.sin(t * .022 + i), y], [x + 3, y]], '#dce8d5'); }
+    titleLine([[189,128],[185,134],[175,140],[176,147],[182,155],[174,165]],'#93d0db',2);
+    titleLine([[194,132],[180,140],[182,147]],'#327eaf',2);
+    for (let i = 0; i < 5; i++) { const shift = Math.sin(t * .025 + i) * 2; titleLine([[174 + shift,139 + i * 6],[178 + shift,139 + i * 6]],'#d2eadb'); }
+    const fall = t % 75; if (fall < 40) { g.fillStyle = '#4a8bbb'; g.fillRect(169,169 + fall * .08 | 0,2,2); }
     g.restore();
   }
-  // Cottage: pencil walls, red roof, a window lit by the yellow pigment.
-  titleWash([[65, 121], [103, 122], [103, 143], [65, 142]], '#e4c88f', red, [84, 113]);
-  titleWash([[65, 121], [85, 106], [108, 122]], '#ce6557', red, [84, 113], '#817768');
-  titleWash([[96, 107], [101, 107], [101, 117], [96, 113]], '#bd7866', red, [84, 113]);
-  titleLine([[61, 122], [84, 103], [111, 123]], '#9c8f7d');
-  titleLine([[66, 144], [104, 145]], '#b1a48a');
-  titleLine([[80, 142], [80, 130], [88, 130], [88, 143]], '#897c68');
-  titleWash([[70, 126], [76, 126], [76, 132], [70, 132]], '#ecc55c', gold, [73, 129]);
-  titleWash([[93, 126], [99, 126], [99, 132], [93, 132]], '#ecc55c', gold, [96, 129]);
-  titleLine([[73, 126], [73, 132]], '#a09275'); titleLine([[96, 126], [96, 132]], '#a09275');
-  titleLine([[82, 145], [88, 149], [122, 151], [139, 144]], '#b9a487', 2);
-  if (red > 0) for (let i = 0; i < 3; i++) {
-    const age = (t + i * 34) % 110; g.save(); g.globalAlpha = red * (1 - age / 110) * .4;
-    g.fillStyle = '#aba38f'; g.fillRect(98 + Math.sin(age * .06) * 2 | 0, 104 - age * .12 | 0, 2, 1); g.restore();
+  // Back-to-front prop order gives the tiny tableau depth and recognisable scale.
+  titleObject('pencil',C('violeta'),blue,48,141,.58,-.14);
+  titleObject('pencil',C('amarillo'),gold,60,139,.74,.1);
+  titleObject('jar',C('rojo'),red,87,143,.8);
+  // Steps into the label-door are stacked squares of an eraser.
+  titleLine([[83,145],[96,145]],'#827583',3); titleLine([[81,148],[96,148]],'#e1b0a7',3); titleLine([[81,147],[95,147]],'#f5d1b6');
+  titleObject('brush','#5b9995',green,252,139,.58,.2);
+  titleObject('brush','#71a04b',green,233,148,.79,-.13);
+  titleObject('pencil',C('azul'),blue,271,149,.68,.2);
+  titleObject('brush','#d49445',gold,285,150,.5,.08);
+  // A ruler is cantilevered between the two shores. Ámbar adds its last marks.
+  titleWash([[124,137],[185,133],[191,140],[129,145]],'#dcab53',gold,[160,140],'#82715b');
+  titleLine([[129,145],[191,140],[191,143],[129,148],[129,145]],'#816340');
+  if (gold > 0) { g.save(); g.globalAlpha = gold; titleLine([[129,144],[189,139]],'#f8d78b');
+    for (let x = 131; x < 187; x += 4) { const y = 137 - (x - 131) * .065; titleLine([[x,y],[x + 1,y + ((x - 131) % 12 ? 2 : 4)]],'#705b45'); }
+    g.restore(); }
+  // Pigment pools on the palette are thick dabs with a wet highlight.
+  [[64,159,'rojo',red],[77,163,'amarillo',gold],[94,161,'azul',blue]].forEach(([x,y,col,k]) => {
+    if (!k) return; g.save(); g.globalAlpha = k; g.fillStyle = ramp(C(col)).sh;
+    g.beginPath(); g.ellipse(x,y,6,2.5,0,0,6.29); g.fill(); g.fillStyle = C(col); g.fillRect(x - 4,y - 2,7,2); g.fillStyle = ramp(C(col)).hi; g.fillRect(x - 3,y - 2,3,1); g.restore();
+  });
+  titleObject('tube',C('rojo'),red,47,164,.65,-.08);
+  titleObject('eraser',C('rojo'),gold,263,166,.66,-.08);
+  // The ink has not disappeared: two quiet eyes watch from an unfinished corner.
+  titleInkPool(287,158,10,t,true);
+  for (const [x,y] of [[209,137],[200,157],[242,162],[291,144]]) {
+    titleLine([[x,y],[x + 3,y - 2],[x + 2,y + 1],[x + 5,y - 1]],'#bdac8b');
   }
-  // Trees resemble planted paintbrushes, tying this vignette to the actual world.
-  for (const [x, y, size] of [[242, 142, 1], [267, 154, .8], [221, 136, .62]]) {
-    titleWash([[x - 2, y - 20 * size], [x + 2, y - 20 * size], [x + 2, y], [x - 2, y]], '#b28a63', gold, [244, 120]);
-    const crown = [[x - 12 * size, y - 18 * size], [x - 13 * size, y - 27 * size], [x - 9 * size, y - 31 * size], [x - 5 * size, y - 34 * size], [x, y - 31 * size], [x + 5 * size, y - 35 * size], [x + 10 * size, y - 30 * size], [x + 13 * size, y - 24 * size], [x + 10 * size, y - 17 * size]];
-    titleWash(crown, green > 0 ? '#79aa69' : '#d4bc66', green > 0 ? green : gold, [244, 120], '#8d8879', green > 0 ? '#ddcc91' : '#ebe4d2');
-    titleLine([[x - 8 * size, y - 18 * size], [x + 9 * size, y - 18 * size]], green > 0 ? '#52794f' : '#ada58e', 2);
-    titleLine([[x - 7 * size, y - 29 * size], [x - 6 * size, y - 23 * size]], '#bbc397');
-  }
-  // The bridge is a tiny wooden ruler with pencilled graduations.
-  titleWash([[137, 139], [196, 136], [199, 143], [138, 147]], '#d7b36f', gold, [167, 141]);
-  titleLine([[138, 148], [198, 144]], '#a08c6a');
-  for (let x = 143; x < 196; x += 5) { const y = 139 - (x - 143) * .052; titleLine([[x, y], [x, y + (x % 2 ? 2 : 4)]], '#a08c6a'); }
-  // Sparse hatching stays visible when the drawing fills with colour.
-  for (const [x, y] of [[43, 148], [52, 154], [70, 157], [115, 136], [128, 156], [205, 155], [229, 149], [250, 160], [281, 151]]) {
-    titleLine([[x - 2, y], [x, y - 2], [x + 1, y]], green > 0 ? '#7d925b' : '#b9b09b');
-  }
+  // Añil's water and the yellow pigment make a plant grow out of a pencil shaving.
+  titleLine([[221,151],[229,150],[231,153],[224,156],[219,154],[221,151]],'#a68051');
   if (green > 0) {
-    g.save(); g.globalAlpha = green;
-    for (const [x, y, col] of [[52, 143, '#d38370'], [116, 160, '#d38370'], [253, 149, '#e1bc58'], [279, 158, '#e1bc58']]) {
-      titleLine([[x, y], [x, y - 4]], '#729360'); g.fillStyle = col; g.fillRect(x - 1, y - 6, 3, 3); g.fillStyle = '#fff1c6'; g.fillRect(x, y - 5, 1, 1);
-    }
-    g.restore();
+    const tipY = 153 - green * 18;
+    titleLine([[225,154],[226,145],[230,tipY]],'#537e47',2);
+    titleLine([[226,147],[220,143],[218,143],[222,147],[226,147]],'#7ba450',2);
+    titleLine([[228,142],[234,140],[236,141],[231,144]],'#94b960',2);
+    if (green > .65) { g.fillStyle = '#eac35b'; g.fillRect(228,tipY - 3,5,5); g.fillStyle = '#8b693e'; g.fillRect(230,tipY - 1,2,2); g.fillStyle = '#ffeb97'; g.fillRect(228,tipY - 3,2,1); }
   }
 }
 function titleDroplets(t) {
@@ -1002,20 +1102,38 @@ function titleDroplets(t) {
   });
 }
 function titleResidents(t) {
-  if (t < 165) return;
-  const appear = titleProgress(t, 165, 35), walk = (t % 600) / 600, carX = 98 + Math.sin(walk * Math.PI * 2) * 10;
-  g.save(); g.globalAlpha = appear;
-  // Carmín walks a short stretch of path, leaving little red footprints.
-  for (let i = 0; i < 5; i++) { g.fillStyle = '#cf8e76'; g.fillRect(Math.round(carX - 4 - i * 4), 150 + (i & 1), 2, 1); }
-  drawSprite(buildSprite('carmin_side_mini', C('rojo'), null, { eyes: t % 210 < 6 ? 'blink' : 'normal' }), Math.round(carX), 150 - (Math.abs(Math.sin(t * .06)) > .8 ? 1 : 0), 1, Math.cos(walk * Math.PI * 2) < 0);
-  // Ámbar cautiously crosses the ruler, then looks back before returning.
-  const cycle = t % 720, crossing = clamp((cycle - 200) / 180, 0, 1), back = clamp((cycle - 470) / 180, 0, 1), amX = 147 + (crossing - back) * 38;
-  drawSprite(buildSprite('ambar_side_mini', C('amarillo'), null, { eyes: cycle < 160 ? 'wide' : 'normal' }), Math.round(amX), Math.round(139 - (amX - 147) * .05) - (crossing > 0 && crossing < 1 || back > 0 && back < 1 ? Math.abs(Math.sin(t * .08)) > .75 ? 2 : 0 : 0), 1, back > 0);
-  // Añil plays with a single bead of water on the bank.
-  drawSprite(buildSprite('anil_front_mini', C('azul'), null, { eyes: t % 260 < 8 ? 'blink' : 'normal' }), 205, 161, 1);
-  const bead = (t % 260) / 260, by = 154 - Math.sin(bead * Math.PI) * 9;
-  g.fillStyle = '#377dc0'; g.fillRect(195, Math.round(by), 2, 3); g.fillStyle = '#e4f0dd'; g.fillRect(195, Math.round(by), 1, 1);
-  g.restore();
+  // Each protagonist uses their own tool on the world, then settles into a quiet
+  // working pose. Their gestures are staggered so they do not compete with the logo.
+  const actor = (id, col, x, y, appear, flip = true) => {
+    if (appear <= 0) return;
+    g.save(); g.globalAlpha = appear;
+    drawSprite(buildSprite(id + '_side_mini', C(col), null, { eyes: t % 240 < 7 ? 'blink' : 'normal' }), x, y, 1, flip);
+    g.restore();
+  };
+  const red = titleProgress(t,127,25), blue = titleProgress(t,160,25), gold = titleProgress(t,193,25);
+  if (red > 0) {
+    const painting = titleProgress(t,153,60), idle = t % 600, working = t < 230 || idle > 480;
+    const x = 108 + painting * 12, tip = [x + 15, 151 + (working ? Math.sin(t * .1) : 0)];
+    actor('carmin','rojo',Math.round(x),158,red);
+    g.save(); g.globalAlpha = red;
+    const P = PROP.brocha; drawProp(propSprite('brocha',C('rojo')),tip[0],tip[1],-.1 + (working ? Math.sin(t * .08) * .12 : 0),1,P.tip[0],P.tip[1],.3);
+    if (working && t % 32 < 12) { g.fillStyle = '#e16f68'; g.fillRect(tip[0] + 2,tip[1] + 2,2,1); }
+    g.restore();
+  }
+  if (gold > 0) {
+    const cycle = t % 720, travel = clamp((cycle - 280) / 150,0,1) - clamp((cycle - 580) / 100,0,1), x = 147 + travel * 22, y = 137 - travel * 2;
+    actor('ambar','amarillo',Math.round(x),Math.round(y),gold,cycle <= 580);
+    if (cycle < 270 || cycle > 695) { g.save(); g.globalAlpha = gold;
+      const P = PROP.lapiz; drawProp(propSprite('lapiz',C('amarillo')),x + 10,y + 2,-.6 + Math.sin(t * .12) * .08,1,P.tip[0],P.tip[1],.38); g.restore(); }
+  }
+  if (blue > 0) {
+    actor('anil','azul',207,165,blue);
+    g.save(); g.globalAlpha = blue;
+    const P = PROP.pincel, watering = t < 270 || t % 480 < 100;
+    drawProp(propSprite('pincel',C('azul')),221,150,-.72 + (watering ? Math.sin(t * .06) * .12 : 0),1,P.tip[0],P.tip[1],.36);
+    if (watering) { const fall = (t % 32) / 32; g.fillStyle = '#438dbd'; g.fillRect(222 + fall * 2 | 0,150 + fall * 5 | 0,1,2); }
+    g.restore();
+  }
 }
 // The transparent native button supplies pointer, keyboard focus and an accessible
 // name while its visible lettering belongs to the same pixel-art canvas.
