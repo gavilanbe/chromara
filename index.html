@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>CHROMARA — PoC</title>
+<title>CHROMARA</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
 </head>
 <body>
 <canvas id="c" width="320" height="180"></canvas>
-<div id="hint">Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás · Enter en el mapa: menú · M sonido · F1 debug</div>
+<div id="hint" hidden>Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás · Enter en el mapa: menú · M sonido · F1 debug</div>
 <script>
 // The hosted game loads small manifests, then the cue it needs. The offline
 // edition embeds identical Opus bytes so double-clicking index.html still works.
@@ -23,7 +23,7 @@
   const scripts = ['data.js', 'music.js', 'music_cues.js', 'music_fallback.js'];
   if (location.protocol === 'file:') scripts.push('music_samples.js');
   scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'sprites.js', 'scene.js', 'gui.js', 'battle.js', 'attacks.js', 'game.js');
-  const version = location.protocol === 'file:' ? Date.now() : 'audio5';
+  const version = location.protocol === 'file:' ? Date.now() : 'title1';
   for (const src of scripts) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
 })();
 </script>
