@@ -452,7 +452,11 @@ function* actEnemy(u) {
     u.pose = 'idle'; yield* wait(10); camReset(); return;
   }
   if (u.ai === 'boss' && u.acts % 3 === 0) { // marea negra: la página se inunda desde La Tinta hacia el grupo
-    say('La Tinta: Marea negra', '#8c8ab0'); u.pose = 'hurt'; u.poseT = 30; Audio.sfx('ink_jet'); Audio.sfx('hum_down', { vol: .6 }); const pc = partyC(); camFocus(lerp(u.wx, pc[0], .4), lerp(u.wy, pc[1], .4), { dist: 120, turn: .1, h: 70, pitch: .7 }); yield* wait(8);
+    say('La Tinta: Marea negra', '#8c8ab0'); Audio.sfx('hum_down', { vol: .6 }); const pc = partyC(); camFocus(lerp(u.wx, pc[0], .4), lerp(u.wy, pc[1], .4), { dist: 120, turn: .1, h: 70, pitch: .7 });
+    // anticipación: se encoge cargando mientras la tinta del charco sube hacia ella en hilos y el suelo retumba; solo entonces suelta la marea
+    u.pose = 'charge'; u.poseT = 0;
+    for (let i = 0; i < 28; i++) { for (let j = 0; j < 2; j++) B.particles.push({ wx: u.wx + R(-44, 44), wy: u.wy + R(-16, 16), wz: 0, vx: 0, vy: 0, vz: R(.9, 2), g: -.03, col: i % 3 ? C('negro') : '#4a4460', t: 0, life: 20, size: 2 }); if (i === 18) { B.shake = 3; Audio.sfx('impact_sub', { vol: .4 }); } yield; }
+    u.pose = 'hurt'; u.poseT = 30; Audio.sfx('ink_jet'); yield* wait(6);
     const wv = fx(999, () => { const k = clamp(wv.t / 24, 0, 1), c = PJ([lerp(u.wx, pc[0], k), lerp(u.wy, pc[1], k), 0]); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(c[0], c[1], (40 + k * 60) * c[2], (10 + k * 8) * c[2], 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4460'; g.beginPath(); g.ellipse(c[0], c[1] - 6 * c[2], (30 + k * 50) * c[2], 3 * c[2], 0, 0, 6.29); g.fill(); }, true);
     for (let i = 0; i < 24; i++) { for (let j = 0; j < 3; j++) B.particles.push({ wx: lerp(u.wx, pc[0], i / 24) + R(-30, 30), wy: lerp(u.wy, pc[1], i / 24) + R(-10, 10), wz: R(0, 10), vx: 0, vy: 0, vz: R(.8, 2), g: .08, col: C('negro'), t: 0, life: 24, size: 2 }); yield; }
     wv.dur = 0; B.flash = { col: '#0b0912', a: .6 }; B.shake = 6; Audio.sfx('splash');

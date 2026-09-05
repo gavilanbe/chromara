@@ -205,8 +205,10 @@ const Audio = {
       }
     }, 40);
   },
-  stop() { if (this.seq) clearInterval(this.seq); this.seq = null; this.cur = null; this.pending = null; this.token = (this.token || 0) + 1;
-    if (this.src) { const { src, gn } = this.src, t = this.ctx.currentTime; gn.gain.setValueAtTime(gn.gain.value, t); gn.gain.linearRampToValueAtTime(0, t + .12); try { src.stop(t + .13); } catch (e) {} this.src = null; } },
+  stop(fade = .12) { if (this.seq) clearInterval(this.seq); this.seq = null; this.cur = null; this.pending = null; this.token = (this.token || 0) + 1;
+    if (this.src) { const { src, gn } = this.src, t = this.ctx.currentTime; gn.gain.setValueAtTime(gn.gain.value, t); gn.gain.linearRampToValueAtTime(0, t + fade); try { src.stop(t + fade + .01); } catch (e) {} this.src = null; } },
+  // Hunde (o recupera) el tono de la música actual: rate 1 = normal, .5 = una octava abajo. Solo con música muestreada.
+  bend(rate, secs = .5) { if (!this.ctx || !this.src) return; const pr = this.src.src.playbackRate, t = this.ctx.currentTime; pr.cancelScheduledValues(t); pr.setValueAtTime(pr.value, t); pr.linearRampToValueAtTime(rate, t + secs); },
 };
 const P = s => s.trim().split(/\s+/);
 const SONGS = {
@@ -484,7 +486,7 @@ function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 
 // 3. Estado global de partida
 // =====================================================================
 const PUZ0 = () => ({ block: MAP.pz ? [...MAP.pz.block0] : [0, 0], painted: 0, strokes: [], sun: 0, sunBend: 0, ladder: 0, revealed: false, reveal: 0, opened: false });
-const Game = { state: 'cover', owned: {}, puzzle: null, t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), bossDown: false, intro: true, debug: false };
+const Game = { state: 'cover', owned: {}, puzzle: null, t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, defeated: new Set(), met: new Set(), bossDown: false, intro: true, debug: false }; // met: grupos de enemigos ya vistos (transición corta)
 function effStats(p) { // base + arma + accesorio
   const wpn = DATA.weapons[p.weapon] || {}, acc = DATA.accessories[p.acc] || {};
   const s = { hp: p.hp, mp: p.mp, atk: p.atk, def: p.def, spd: p.spd };
@@ -727,10 +729,13 @@ function drawVine(x, y, k) {
 // Sprite de un miembro del grupo en el mapa: vista según dirección (espaldas al subir, frente al bajar, perfil a los lados)
 const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
 function mapDrop(p, x, y, dir, bob, moving, t, idx) {
-  const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : DIRVIEW[dir] || 'back';
-  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = desatSprite(buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : blink ? 'blink' : 'normal' }), pigmentFade(p.cur.mp, effStats(p).mp));
+  const sc = OW.scare, sk = sc ? clamp(sc.k - idx * .12, 0, 1) : 0; // sobresalto durante la transición (el líder primero, los demás en cadena)
+  const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : sk > 0 ? 'front' : DIRVIEW[dir] || 'back';
+  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = desatSprite(buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : sk > 0 ? 'wide' : blink ? 'blink' : 'normal' }), pigmentFade(p.cur.mp, effStats(p).mp));
   const lz = OW.landZ ? OW.landZ[idx] || 0 : 0;
-  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3 + lz, sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
+  const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3 + lz; let sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
+  // reacción: en 'detect' se giran hacia la sombra con los ojos como platos y tiemblan; en 'fall' se van encogiendo; en el salpicón quedan aplastados
+  if (sk > 0 && !dead) { if (sc.stage === 'detect') { if (sk > .4) x += ((Game.t >> 1) & 1) ? 1 : -1; sq = [1 + sk * .08, 1 - sk * .08]; } else if (sc.stage === 'fall') sq = [1.06 + sk * .18, .94 - sk * .18]; else sq = [1.3, .6]; }
   shadow(x, y, Math.max(2, Math.round((p.w * .42) * (1 - hop * .3) * (1 - lz / 160))));
   if (dead) { drawSprite(spr, x, y, 1, false, .45); return; }
   drawSprite(spr, x, Math.round(y - wz), lz > 0 ? .9 : sq[0], dir === 'right', lz > 0 ? 1.15 : sq[1]);
@@ -792,7 +797,7 @@ function drawOverworld() {
     ents.push({ y, draw: () => mapDrop(p, x - cx, y - cy, dir, (OW.bob || 0) + i * .33, moving, OW.t, i) });
   });
   for (const f of OW.foes) {
-    if (Game.defeated.has(f.key)) continue;
+    if (Game.defeated.has(f.key) || OW.hideFoe === f) continue; // hideFoe: la transición lo dibuja ella (se agazapa y salta)
     const e = DATA.enemies[f.enemies[0]], core = e.color === 'negro' ? null : C(e.color);
     ents.push({ y: f.y, draw: () => { const hop = Math.abs(Math.sin((OW.t + f.seed * 7) * (f.seen ? .25 : .12))) * (f.seen ? 4 : 2), x = f.x - cx, y = f.y - cy; shadow(x, y, f.boss ? 18 : 8); const spr = buildSprite(f.enemies[0] + '_mini', C('negro'), core, { eyes: f.alert > 0 ? 'happy' : 'normal' }); drawSprite(spr, x, Math.round(y - hop), 1, f.dirLeft); if (f.alert > 0) { const by = y - spr.height - 10 + (f.alert > 24 ? (30 - f.alert) : 0); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, by, 2, 6); g.fillRect(x - 1, by + 8, 2, 2); } } });
   }

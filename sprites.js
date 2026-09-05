@@ -622,6 +622,7 @@ function drawEyesMini(x, def, mode, kind, rp) {
     if (mode === 'ko' || mode === 'hurt') { F(eyeCol, ex - 1, ey - 1); F(eyeCol, ex, ey); F(eyeCol, ex + 1, ey - 1); F(eyeCol, ex + 1, ey + 1); F(eyeCol, ex - 1, ey + 1); return; }
     if (mode === 'happy') { F(eyeCol, ex - 1, ey); F(eyeCol, ex, ey - 1); F(eyeCol, ex + 1, ey); return; }
     if (mode === 'blink') { F(eyeCol, ex, ey, 2, 1); return; }
+    if (mode === 'wide') { F(eyeCol, ex - (i ? 0 : 1), ey - 2, 2, 3); F('#ffffff', ex - (i ? 0 : 1), ey - 2); return; } // ojos como platos (sobresalto)
     if (ink) { F(eyeCol, ex, ey - 1, def.big ? 2 : 1, def.big ? 3 : 2); if (def.big) F('#14121c', ex + 1, ey); return; }
     F(eyeCol, ex, ey - 1, 1, 2); F('#ffffff', ex, ey - 1);
     if (def.brow === 'angry') F('#14121c', ex + (i ? 1 : -1), ey - 2);

@@ -129,6 +129,8 @@ const SFX = {
       case 'step_wood': this.tone({ f0: 180, f1: 120, dur: .07, wave: 'triangle', vol: .12 * v, when: w }); this.noise({ kind: 'pink', type: 'lowpass', f0: 700, dur: .04, vol: .08 * v, when: w }); break;
       case 'detect': this.bubble(110, .25 * v, w); this.tone({ f0: 60, dur: .12, wave: 'sine', a: .005, vol: .35 * v, when: w + .15 }); this.tone({ f0: 60, dur: .12, wave: 'sine', a: .005, vol: .3 * v, when: w + .33 }); break;
       case 'encounter': this.tone({ f0: 110, f1: 170, dur: .6, wave: 'sawtooth', a: .05, d: .55, vol: .12 * v, when: w, wet: .3 }); this.bubble(80, .3 * v, w); break;
+      case 'lunge': this.tone({ f0: 95, f1: 36, dur: .38, wave: 'sawtooth', a: .01, d: .34, vol: .2 * v, when: w, wet: .25 }); this.bubble(70, .18 * v, w + .05); break; // gruñido grave: el enemigo que ya te vio embiste
+
       case 'fall': this.tone({ f0: 1400, f1: 180, dur: .5, wave: 'sine', a: .02, d: .48, vol: .16 * v, when: w }); break;
       case 'splash': this.splat(2.2, .6 * v, w); this.noise({ kind: 'brown', type: 'lowpass', f0: 400, f1: 80, dur: .6, a: .005, d: .55, vol: .5 * v, when: w, wet: .6 }); this.duck(-6, 200, 400); break;
       case 'tinkle': [0, 7, 12, 16, 19].forEach((n, i) => this.bell(1568 * this.semi(n), .4, .07 * v, w + i * .06, .4)); break;

@@ -18,11 +18,13 @@ Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás (en el menú de batalla,
 - **Formación** alrededor del punto del encuentro: eje grupo→enemigo; enemigos delante, grupo detrás en escalera. La cámara de reposo (`camRest`) se calcula para dejar a los enemigos arriba-izquierda y al grupo abajo-derecha; `camFocus` la gira y acerca a cada acción y `camReset` la devuelve.
 
 ## Transición (`transitionGen`, siete fases)
-1. **Detección**: el mapa se congela, el enemigo late con un `!`, y sobre el grupo crece la sombra de la gota que viene. El tema del mapa frena.
-2. **Caída** con aceleración; la sombra se cierra.
-3. **Salpicón**: hit-stop, sacudida, anillos de onda y gotas grandes que vuelan hacia la cámara.
-4. **Mancha orgánica** (metabolas + tentáculos) que crece desde el impacto; por delante va una onda que **desatura** el mapa (composición `saturation`). Mientras cubre, la cámara pasa de cenital a la vista de batalla: el mapa se inclina.
+1. **Detección**: el mapa se congela, el tema del mapa se hunde de tono (`Audio.bend`) y el enemigo que te perseguía **se agazapa y tiembla** (si ya te vio en el mapa no repite el `!`: gruñe y embiste, `lunge`). El grupo se sobresalta: se gira, abre los ojos como platos (`wide`) y tiembla, el líder primero y los demás en cadena; sobre ellos crece la sombra.
+2. **Salto**: es el propio enemigo el que salta en arco hacia el grupo, estirándose al despegar y **hinchándose hacia la cámara** en el ápice; el grupo se va encogiendo y la sombra se cierra.
+3. **Salpicón**: hit-stop, flash de tinta, sacudida con más peso vertical y **golpe de zoom** sobre el grupo, anillos de onda y gotas grandes que vuelan hacia la cámara.
+4. **Ventana de tinta**: la mancha orgánica (metabolas + tentáculos) crece desde el impacto y abre una **ventana de borde blando** en el mapa congelado: fuera sigue el mapa, desaturado por la onda que va por delante (composición `saturation`); dentro se ve la escena mientras la cámara pasa de cenital a la vista de batalla. Al final la ventana desborda la pantalla, sin corte.
 5. **Drenaje**: la tinta se escurre hacia los enemigos y se vuelve su charco; los enemigos emergen con chorreones, el grupo rebota a su formación como tres gotas de color.
+
+Mantén **OK pulsado** para verla al doble de velocidad (`»»`); con un grupo de enemigos ya conocido (`Game.met`) la anticipación y el salto van más cortos. En batalla, cuando un enemigo está a punto de actuar (ATB ≥ 82) además del sonido **late, destella y un aro de tinta se cierra bajo él**; La Tinta carga la Marea negra encogiéndose mientras la tinta del charco sube hacia ella y el suelo retumba.
 
 ## Personajes (`sprites.js`)
 Sprites dibujados a mano como matrices de caracteres con rampa por color (contorno, oscuro, sombra, base, luz, brillo) más paleta fija por sprite. Grupo en tres vistas (espaldas tres cuartos para el reposo, perfil para actuar, frente para herido/KO/victoria): Carmín gota gorda con boina, Ámbar afilada como punta de lápiz con la mina arriba, Añil salpicadura con cresta y tres gotitas satélite que orbitan. Gotas Negras de frente con el color robado en el núcleo; La Tinta ocupa media pantalla. Expresiones (normal, parpadeo, herido, KO, feliz, cejas) y squash & stretch por pose.

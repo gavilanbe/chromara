@@ -106,18 +106,26 @@ function startTransition(foe) { initBattle(foe); setState('transition'); }
 // =====================================================================
 // 3. Transición: detección, caída, salpicón, mancha que se traga el mapa (y lo inclina), drenaje al charco, entrada
 // =====================================================================
+// Mantén OK pulsado para verla al doble de velocidad; con enemigos ya conocidos (Game.met) la anticipación y el salto van más cortos.
 function* transitionGen(foe) {
-  const T = B.tr; Audio.stop(); Audio.sfx('detect'); Audio.sfx('hum_down', { vol: .5 });
-  // 1) anticipación: el mapa se congela, el enemigo late, la sombra de la gota crece sobre el grupo
-  T.stage = 'detect'; T.foe = foe; for (let i = 0; i < 18; i++) { T.k = i / 18; yield; }
-  // 2) caída
-  T.stage = 'fall'; Audio.sfx('fall'); for (let i = 0; i < 22; i++) { T.k = i / 22; yield; }
-  // 3) salpicón: hit-stop, sacudida, gotas hacia la cámara, ondas
-  T.stage = 'splash'; T.k = 0; Audio.sfx('splash'); Audio.sfx('encounter'); B.shake = 6; Audio.play(foe.boss ? 'boss' : 'battle');
+  const T = B.tr, sig = foe.enemies.join(','), short = Game.met.has(sig); Game.met.add(sig);
+  T.foe = foe; OW.hideFoe = foe; // el mapa deja de dibujarlo: lo dibuja la transición (se agazapa y salta)
+  // la música del mapa se hunde de tono en vez de cortarse; si el enemigo ya te vio en el mapa (¡) no se repite el aviso: gruñe y embiste
+  Audio.bend(.5, short ? .4 : .7); Audio.sfx('hum_down', { vol: .5 }); Audio.sfx(foe.seen ? 'lunge' : 'detect');
+  // 1) anticipación: el mapa se congela, el enemigo se agazapa y tiembla, el grupo se sobresalta, la sombra crece sobre ellos
+  T.stage = 'detect'; OW.scare = { stage: 'detect', k: 0 }; const nd = short ? 8 : 18;
+  for (let i = 0; i < nd; i++) { T.k = i / nd; OW.scare.k = T.k; yield; }
+  // 2) el propio enemigo salta en arco hacia el grupo y se hincha al acercarse a la cámara; el grupo se encoge
+  T.stage = 'fall'; OW.scare = { stage: 'fall', k: 0 }; Audio.sfx('fall'); const nf = short ? 16 : 22;
+  for (let i = 0; i < nf; i++) { T.k = i / nf; OW.scare.k = T.k; yield; }
+  // 3) salpicón: hit-stop, flash de tinta, sacudida vertical y golpe de zoom, gotas hacia la cámara, ondas
+  T.stage = 'splash'; T.k = 0; T.punch = 1; OW.scare = { stage: 'splash', k: 0 }; OW.flash = { col: '#0b0912', a: .5 };
+  Audio.stop(.05); Audio.sfx('splash'); Audio.sfx('encounter'); B.shake = 7; Audio.play(foe.boss ? 'boss' : 'battle');
   T.drops = []; for (let i = 0; i < 14; i++) T.drops.push({ a: R(0, 6.28), s: R(1.2, 3.2), r: R(3, 9), rot: R(-.05, .05) });
   for (let i = 0; i < 5; i++) yield; // hit-stop
-  for (let i = 0; i < 16; i++) { T.k = i / 16; yield; }
-  // 4) mancha orgánica que crece mientras el mapa se inclina a la vista de batalla (se lleva el color por delante)
+  for (let i = 0; i < 16; i++) { T.k = i / 16; T.punch = 1 - T.k; yield; }
+  T.punch = 0;
+  // 4) la tinta abre una ventana en el mapa congelado: fuera sigue el mapa (desaturado por la onda); dentro, la escena inclinándose a la vista de batalla
   T.stage = 'blot'; T.overworld = false; T.k = 0;
   T.balls = []; for (let i = 0; i < 9; i++) T.balls.push({ a: i / 9 * 6.28 + R(-.3, .3), d: R(.3, 1), r: R(.5, 1), ph: R(0, 6.28) });
   T.tendrils = []; for (let i = 0; i < 7; i++) T.tendrils.push({ a: R(0, 6.28), len: R(1.2, 2.2), w: R(.12, .3), sp: R(.6, 1.4) });
@@ -125,7 +133,7 @@ function* transitionGen(foe) {
   camSet(top);
   for (let i = 0; i < 40; i++) { T.k = i / 40; const k = clamp((i - 8) / 30, 0, 1), e = k * k * (3 - 2 * k); B.propScale = lerp(.5, 1, e); B.unitScale = lerp(.5, 1, e);
     const c = SCENE.cam, r = SCENE.rest; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(top[key], r[key], e); c.yaw = lerp(top.yaw, r.yaw, e); yield; }
-  camSet(SCENE.rest); B.propScale = 1; B.unitScale = 1;
+  camSet(SCENE.rest); B.propScale = 1; B.unitScale = 1; OW.scare = null;
   // 5) la tinta se escurre hacia los enemigos y se vuelve su charco; los enemigos emergen, el grupo rebota a su formación
   T.stage = 'drain'; T.k = 0; Audio.sfx('slow_drip'); Audio.sfx('ink_jet', { when: .2 });
   const from = B.party.map(u => [u.wx, u.wy]);
@@ -136,8 +144,12 @@ function* transitionGen(foe) {
     yield;
   }
   B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); B.enemies.forEach(u => { u.wz = 0; });
-  B.tr = null; B.phase = 'fight'; B.fightStart = B.t; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
+  B.tr = null; OW.hideFoe = null; OW.scare = null; B.phase = 'fight'; B.fightStart = B.t; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
 }
+// Copia del mapa congelado para la fase 'blot': se muestra fuera de la ventana de tinta, con el borde blando y desaturado
+let MAPC = null, MAPG = null; // se crea al primer uso (W y H viven en game.js, que carga después)
+function mapSnap() { if (!MAPC) { MAPC = document.createElement('canvas'); MAPC.width = W; MAPC.height = H; MAPG = MAPC.getContext('2d'); } return MAPG; }
+function drawFastHint() { if (keys.ok && B.tr && !B.tr.boss) txt('»»', W - 22, H - 13, '#8c8ab0'); }
 // Mancha de tinta: cuerpo irregular (radio por ángulo con armónicos), dedos que se alargan con temblor, brillo húmedo en el borde,
 // salpicaduras satélite y goterones que cuelgan por abajo. k = crecimiento 0..1, t = tiempo para el temblor.
 function inkSplat(x, y, R, k, t, seed = 1, drips = true) {
@@ -188,13 +200,15 @@ function drawTransitionFx() {
   }
   if (T.overworld) {
     const sx = lead.wx - OW.cam.x, sy = lead.wy - OW.cam.y, foe = T.foe, fx0 = foe.x - OW.cam.x, fy0 = foe.y - OW.cam.y;
-    if (T.stage === 'detect') { // el enemigo late; sombra circular creciente sobre el grupo
-      const pulse = 1 + Math.sin(T.k * 18) * .12; g.fillStyle = 'rgba(11,9,18,.35)'; g.beginPath(); g.ellipse(fx0, fy0 - 6, 9 * pulse, 9 * pulse, 0, 0, 6.29); g.fill();
-      g.fillStyle = 'rgba(11,9,18,' + (.15 + T.k * .35) + ')'; g.beginPath(); g.ellipse(sx, sy, 4 + T.k * 10, 2 + T.k * 4, 0, 0, 6.29); g.fill();
-      if ((Game.t >> 2) & 1) { g.fillStyle = '#f4f0ea'; g.fillRect(fx0 - 1, fy0 - 26, 2, 6); g.fillRect(fx0 - 1, fy0 - 18, 2, 2); }
-    } else if (T.stage === 'fall') { // la gota cae con aceleración; la sombra se cierra bajo el grupo
-      const k = T.k, y = lerp(-30, sy - 4, k * k); g.fillStyle = 'rgba(11,9,18,' + (.5 + k * .3) + ')'; g.beginPath(); g.ellipse(sx, sy, 14 - k * 6, 6 - k * 3, 0, 0, 6.29); g.fill();
-      drawDrop({ color: C('negro'), shape: 'tall', w: 16, h: 24 }, sx, y, 'hop', 0, { dark: true });
+    const e0 = DATA.enemies[foe.enemies[0]], fspr = buildSprite(foe.enemies[0] + '_mini', C('negro'), e0.color === 'negro' ? null : C(e0.color), { eyes: 'happy' });
+    if (T.stage === 'detect') { // el enemigo del mapa se agazapa (anticipación del salto) y tiembla; la sombra crece bajo el grupo
+      const k = T.k, sq = 1 + k * .45, tr = k > .5 ? (((Game.t >> 1) & 1) ? 1 : -1) : 0;
+      shadow(fx0, fy0, foe.boss ? 18 : 10); drawSprite(fspr, fx0 + tr, fy0, sq, foe.dirLeft, 1 / sq);
+      g.fillStyle = 'rgba(11,9,18,' + (.15 + k * .35) + ')'; g.beginPath(); g.ellipse(sx, sy, 4 + k * 10, 2 + k * 4, 0, 0, 6.29); g.fill();
+    } else if (T.stage === 'fall') { // el mismo enemigo salta en arco: se estira al despegar, se hincha hacia la cámara en el ápice y cae aplastándose sobre el grupo
+      const k = T.k, arc = Math.sin(k * Math.PI), x = lerp(fx0, sx, k), yb = lerp(fy0, sy, k), sc = 1 + arc * 1.9, st = k < .3 ? [.8, 1.35] : k > .82 ? [1.3, .75] : [1, 1];
+      g.fillStyle = 'rgba(11,9,18,' + (.5 + k * .3) + ')'; g.beginPath(); g.ellipse(sx, sy, 14 - k * 6, 6 - k * 3, 0, 0, 6.29); g.fill();
+      drawSprite(fspr, x, yb - 2 - arc * 38, sc * st[0], foe.dirLeft, st[1]); // arco bajo: la altura la vende la escala (viene hacia la cámara), no que se salga por arriba
     } else if (T.stage === 'splash') { // impacto: mancha en el suelo, ondas, gotas grandes hacia la cámara
       const k = T.k; g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(sx, sy, 10 + k * 26, 5 + k * 12, 0, 0, 6.29); g.fill();
       for (let r = 0; r < 3; r++) { const kk = clamp(k * 1.4 - r * .25, 0, 1); if (kk <= 0) continue; g.strokeStyle = 'rgba(244,240,234,' + (.7 * (1 - kk)) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(sx, sy, 8 + kk * 60, 4 + kk * 26, 0, 0, 6.29); g.stroke(); }
@@ -203,10 +217,15 @@ function drawTransitionFx() {
     return;
   }
   const p = project(lead.hx, lead.hy, 0) || [W / 2, H / 2, 1], q = project(B.puddle.wx, B.puddle.wy, 0) || [W / 2, H / 2, 1];
-  if (T.stage === 'blot') { // mancha orgánica: metabolas + tentáculos, delante va la onda que desatura
+  if (T.stage === 'blot') { // ventana de tinta: fuera queda el mapa congelado (desaturado por la onda), dentro la escena inclinándose; en medio la mancha orgánica
     const k = T.k, grow = Math.sin(Math.min(1, k * 1.15) * Math.PI / 2), R0 = 22 + grow * 96;
     const [sx, sy] = [lerp(lead.wx - OW.cam.x, p[0], clamp((k - .2) / .75, 0, 1)), lerp(lead.wy - OW.cam.y, p[1], clamp((k - .2) / .75, 0, 1))];
-    g.globalCompositeOperation = 'saturation'; g.fillStyle = '#7a7a7a'; g.beginPath(); g.ellipse(sx, sy, R0 * 2.1, R0 * 1.5, 0, 0, 6.29); g.fill(); g.globalCompositeOperation = 'source-over';
+    const rw = R0 * 2.1 + clamp((k - .65) / .35, 0, 1) * 110, inner = Math.max(0, rw - 28); // al final la ventana desborda la pantalla: no hay corte con el drenaje
+    MAPG.save(); MAPG.translate(sx, sy); MAPG.scale(1, .72);
+    MAPG.globalCompositeOperation = 'saturation'; MAPG.fillStyle = '#7a7a7a'; MAPG.beginPath(); MAPG.arc(0, 0, rw * 1.35, 0, 6.29); MAPG.fill();
+    const gr = MAPG.createRadialGradient(0, 0, inner, 0, 0, rw); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    MAPG.globalCompositeOperation = 'destination-out'; MAPG.fillStyle = gr; MAPG.fillRect(-W * 3, -H * 4, W * 6, H * 8); MAPG.restore();
+    g.drawImage(MAPC, 0, 0);
     inkSplat(sx, sy, R0 * .75, k, B.t, 7, true);
   } else if (T.stage === 'drain') { // la mancha se escurre hacia el charco de los enemigos y encoge
     const k = T.k, e = k * k, cx = lerp(p[0], q[0], e), cy = lerp(p[1], q[1], e), R0 = lerp(118, B.puddle.rx, e);
@@ -405,7 +424,9 @@ function updateBattle() {
   if (B.slowmo > 0) { B.slowmo--; if (B.t & 1) return; } // cámara lenta: el mundo avanza a la mitad
   for (const f of B.fx) f.t++; B.fx = B.fx.filter(f => f.t <= f.dur);
   for (const m of B.marks) m.t++; B.marks = B.marks.filter(m => m.t <= m.life);
-  if (B.phase === 'trans') { if (B.gen && B.gen.next().done) B.gen = null; return; }
+  if (B.phase === 'trans') { // con OK pulsado la transición (no la de la jefa) corre al doble
+    for (let n = (B.tr && !B.tr.boss && keys.ok) ? 2 : 1; n > 0 && B.gen && B.phase === 'trans'; n--) if (B.gen.next().done) B.gen = null;
+    return; }
   if (B.phase === 'victory' || B.phase === 'defeat') { updateEnd(); return; }
   // una acción cada vez: la siguiente de la cola arranca cuando termina la anterior; el ATB espera
   if (!B.actions.length && B.actQueue.length) B.actions.push(B.actQueue.shift());
@@ -492,12 +513,16 @@ function drawUnit(u) {
   }
   if (u.erasing && (B.t >> 1) & 1) g.globalAlpha = .35;
   const gp = project(u.wx, u.wy, 0); if (!u.dead && gp && u.wz > -u.def.h * .9) shadow(gp[0], gp[1], Math.max(3, Math.round(u.shadowW * gp[2] * B.unitScale * (1 - clamp(u.wz / 120, 0, .6)))));
+  // aviso de que va a actuar (ATB ≥ 82, junto al sonido enemy_soon): un aro de tinta se cierra bajo él y el sprite late y destella
+  const warn = u.kind === 'enemy' && u.warned && u.alive && !u.acting && B.phase === 'fight', wq = (B.t % 22) / 22;
+  if (warn && gp) { const pa = g.globalAlpha, rw = u.def.w * .6 * s + 6, k = 1.7 - wq * .7; g.strokeStyle = '#0b0912'; g.lineWidth = 1.5; g.globalAlpha = .75 * (1 - wq); g.beginPath(); g.ellipse(gp[0], gp[1] + 1, rw * k, rw * .42 * k, 0, 0, 6.29); g.stroke(); g.globalAlpha = pa; }
   // emergiendo del charco: se recorta por debajo del suelo
   let clip = false; if (u.wz < 0 && gp) { g.save(); g.beginPath(); g.rect(0, 0, W, gp[1] + 1); g.clip(); clip = true; }
   const G = u.goop, ga = G ? (G.t > G.life - 20 ? (G.life - G.t) / 20 : 1) : 0;
   const info = unitSpriteInfo(u, frame); let spr = info.spr; if (u.kind === 'party') spr = desatSprite(spr, pigmentFade(u.mp, u.maxmp)); if (G) spr = tintSprite(spr, G.col, .55 * ga); if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
+  if (warn && wq < .18) spr = tintSprite(spr, '#f4f0ea', .4); // destello al compás del aro
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
-  const sqz = u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1; drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx * sqz, flip, info.sy * (u.sqz ? 1.1 : 1));
+  const sqz = (u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1) * (warn ? 1 + Math.sin(B.t * .55) * .045 : 1); drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx * sqz, flip, info.sy * (u.sqz ? 1.1 : 1));
   if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
   if (clip) g.restore();
@@ -517,7 +542,12 @@ function drawGroundLayer() {
 }
 function drawBattle() {
   const T = B.tr;
-  if (T && T.overworld) { drawOverworld(); drawTransitionFx(); return; }
+  if (T && T.overworld) { // fases 1-3 sobre el mapa: sacudida con más peso vertical (el impacto viene de arriba) y golpe de zoom sobre el grupo
+    const sh = B.shake, punch = T.punch || 0, lead = B.party[0], px = lead.wx - OW.cam.x, py = lead.wy - OW.cam.y;
+    g.save(); if (sh) g.translate(RI(-sh, sh) / 2 | 0, RI(-sh, sh)); if (punch > 0) { const z = 1 + punch * .07; g.translate(px, py); g.scale(z, z); g.translate(-px, -py); }
+    drawOverworld(); drawTransitionFx(); g.restore(); drawFastHint(); return;
+  }
+  if (T && T.stage === 'blot') { drawOverworld(); mapSnap().drawImage(buf, 0, 0); } // el mapa congelado se guarda: se verá fuera de la ventana de tinta
   const pal = Game.palette, gris = pal === 'gris';
   const sx = B.shake ? RI(-B.shake, B.shake) : 0, sy = B.shake ? RI(-B.shake, B.shake) / 2 | 0 : 0;
   g.save(); g.translate(sx, sy);
@@ -543,7 +573,7 @@ function drawBattle() {
       else { const by = Math.round(t.y + 4 + bob); g.save(); g.translate(Math.round(t.x - 6), by + 12); g.scale(1, -1); g.drawImage(iconSprite('drop', ucol), 0, 0); g.restore(); } });
   }
   g.restore();
-  if (T) drawTransitionFx();
+  if (T) { drawTransitionFx(); drawFastHint(); }
   if (B.flash) { g.fillStyle = B.flash.col; g.globalAlpha = B.flash.a; g.fillRect(0, 0, W, H); g.globalAlpha = 1; }
   if (B.rainbow > 0) { const cols = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta']; cols.forEach((c, i) => { g.fillStyle = C(c); g.globalAlpha = .5 * B.rainbow / 40; const off = (40 - B.rainbow) * 12 + i * 10; g.fillRect(off - 200, 0, 8, H); g.fillRect(W - off + 200 - 8, 0, 8, H); }); g.globalAlpha = 1; }
   for (const n of B.nums) { g.font = FONT; const sc = n.t < 6 ? 1.9 - n.t * .15 : 1, w = n.v.length * 8; g.save(); g.translate(Math.round(n.x) + w / 2, Math.round(n.y) + 4); g.scale(sc, sc); g.translate(-w / 2, -4); if (n.big) { txt(n.v, 1, 1, n.col, null); } txt(n.v, 0, 0, n.col); g.restore(); }
