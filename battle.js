@@ -167,8 +167,9 @@ function inkSplat(x, y, R, k, t, seed = 1, drips = true) {
 }
 // Transición de la jefa: el Tiznal retumba, La Tinta emerge, diálogo, la tinta inunda desde los bordes y se retira como una marea
 function* bossTransitionGen(foe) {
-  const T = B.tr; T.boss = true; T.foe = foe; Audio.prepare('prelude'); Audio.prepare('boss'); Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
-  T.stage = 'rumble'; for (let i = 0; i < 50; i++) { T.k = i / 50; if (i % 10 === 0) { B.shake = 3; Audio.sfx('impact_sub', { vol: .35 }); } yield; }
+  const T = B.tr; T.boss = true; T.foe = foe; OW.hideFoe = foe; Audio.prepare('prelude'); Audio.prepare('boss'); Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
+  // retumba: la jefa pequeña del mapa se hunde en su charco (que crece) para emerger después a tamaño real, sin verse dos veces
+  T.stage = 'rumble'; for (let i = 0; i < 50; i++) { T.k = i / 50; if (i % 10 === 0) { B.shake = 3; Audio.sfx('impact_sub', { vol: .35 }); } if (i === 30) Audio.sfx('slow_drip', { vol: .6 }); yield; }
   Audio.sfx('ink_jet'); Audio.sfx('splash', { when: .2 });
   T.stage = 'rise'; for (let i = 0; i < 40; i++) { T.k = i / 40; if (i === 30) B.shake = 5; yield; }
   // diálogo
@@ -184,7 +185,7 @@ function* bossTransitionGen(foe) {
   T.overworld = false; T.stage = 'tide'; camSet(SCENE.rest); B.unitScale = 1; B.propScale = 1; B.puddle.k = 1;
   B.enemies.forEach(u => { u.wz = 0; }); B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; u.pose = 'idle'; });
   Audio.sfx('splash', { vol: .6 }); for (let i = 0; i < 50; i++) { T.k = i / 50; if (i === 10) Audio.sfx('slow_drip'); yield; }
-  B.tr = null; B.phase = 'fight'; B.fightStart = B.t; say('LA TINTA', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
+  B.tr = null; OW.hideFoe = null; B.phase = 'fight'; B.fightStart = B.t; say('LA TINTA', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
 }
 // Dibujo de la transición sobre el mapa cenital (fases 1-3) y de la mancha/gotas sobre la escena (4-5)
 function drawTransitionFx() {
@@ -192,7 +193,11 @@ function drawTransitionFx() {
   const lead = B.party[0];
   if (T.boss) { // jefa
     const foe = T.foe, fx0 = foe.x - Math.round(OW.cam.x), fy0 = foe.y - Math.round(OW.cam.y);
-    if (T.stage === 'rumble') { g.fillStyle = 'rgba(11,9,18,' + (T.k * .45).toFixed(2) + ')'; g.fillRect(0, 0, W, H); for (let r = 0; r < 3; r++) { const q = ((T.k * 3 + r * .33) % 1); g.strokeStyle = 'rgba(74,70,100,' + (.6 * (1 - q)).toFixed(2) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(fx0, fy0, 6 + q * 90, 3 + q * 40, 0, 0, 6.29); g.stroke(); } }
+    if (T.stage === 'rumble') { const k = T.k; g.fillStyle = 'rgba(11,9,18,' + (k * .45).toFixed(2) + ')'; g.fillRect(0, 0, W, H); for (let r = 0; r < 3; r++) { const q = ((k * 3 + r * .33) % 1); g.strokeStyle = 'rgba(74,70,100,' + (.6 * (1 - q)).toFixed(2) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(fx0, fy0, 6 + q * 90, 3 + q * 40, 0, 0, 6.29); g.stroke(); }
+      // el charco crece y la jefa pequeña se hunde en él (recortada por la línea del suelo), temblando cada vez más
+      g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 14 + k * 16, 4 + k * 4, 0, 0, 6.29); g.fill();
+      const e0 = DATA.enemies[foe.enemies[0]], spr = buildSprite(foe.enemies[0] + '_mini', C('negro'), e0.color === 'negro' ? null : C(e0.color), { eyes: k > .55 ? 'blink' : 'normal' }), sink = k * k * (spr.height + 10), tr = k > .4 ? (((Game.t >> 1) & 1) ? 1 : -1) : 0;
+      g.save(); g.beginPath(); g.rect(0, 0, W, fy0 + 6); g.clip(); drawSprite(spr, fx0 + tr, fy0 + 2 + sink, 1 + k * .25, false, 1); g.restore(); }
     else if (T.stage === 'rise') { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); const k = T.k, spr = buildSprite('tinta', C('negro'), null, { eyes: k > .6 ? 'normal' : 'blink' }); g.save(); g.beginPath(); g.rect(0, 0, W, fy0 + 6); g.clip(); drawSprite(spr, fx0, fy0 + 6 + (1 - k) * 44, 1, false, 1 + (1 - k) * .3); g.restore(); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 30 + k * 10, 8 + k * 3, 0, 0, 6.29); g.fill(); if (k > .3) for (let i = 0; i < 6; i++) { const a = i * 1.05 + k * 2, d = 20 + Math.sin(k * 9 + i) * 6; g.fillRect(fx0 + Math.cos(a) * d - 1, fy0 + 4 + Math.sin(a) * d * .35 - (k * 10 * ((i * 7) % 3 + 1)) % 14, 2, 3); } }
     else if (T.stage === 'dialogue') { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); const spr = buildSprite('tinta', C('negro'), null, { eyes: 'normal' }); drawSprite(spr, fx0, fy0 + 6 + Math.sin(B.t * .06) * 1.5, 1, false, 1 + Math.sin(B.t * .06) * .02); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 40, 11, 0, 0, 6.29); g.fill(); drawDialogue(T.dlg); }
     else if (T.stage === 'flood') { const k = T.k, e = k * k; g.fillStyle = '#0b0912'; for (let x = 0; x <= W; x += 4) { const hb = e * (H * .62) + Math.sin(x * .05 + B.t * .15) * 6 + Math.sin(x * .13) * 3; g.fillRect(x, H - hb, 4, hb + 2); const ht = e * (H * .5) + Math.sin(x * .07 + B.t * .12) * 5; g.fillRect(x, 0, 4, ht); } for (let y = 0; y <= H; y += 4) { const wl = e * (W * .55) + Math.sin(y * .06 + B.t * .13) * 6; g.fillRect(0, y, wl, 4); g.fillRect(W - wl, y, wl, 4); } if (k > .5) { g.fillStyle = '#2a2438'; for (let i = 0; i < 12; i++) { const rnd = seeded(i * 9); g.fillRect(rnd() * W | 0, (H * .4 + rnd() * 20 - e * 40) | 0, 3, 1); } } }

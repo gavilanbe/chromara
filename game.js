@@ -385,7 +385,7 @@ const OW = { x: 0, y: 0, cam: { x: 0, y: 0 }, hist: [], moving: false, t: 0, msg
 function initOverworld() {
   if (!Game.puzzle) Game.puzzle = PUZ0();
   OW.x = MAP.spawn[0] * TILE + 8; OW.y = MAP.spawn[1] * TILE + 12; OW.hist = []; OW.puddles = []; OW.dust = []; OW.vx = OW.vy = 0; OW.bob = 0; OW.dir = 'down'; OW.landT = 0; OW.landZ = null; OW.landed = [0, 0, 0]; OW.jar = { bubbles: [], tint: [], hidden: [false, false, false], jump: [null, null, null], pos: [], wob: 0, glow: 0, cd: 0 }; OW.heal = null; OW.floats = []; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
-  OW.foes = MAP.spots.map(s => ({ key: s.key, hx: s.x * TILE + 8, hy: s.y * TILE + 12, x: s.x * TILE + 8, y: s.y * TILE + 12, tx: 0, ty: 0, t: RI(0, 60), enemies: DATA.encounters[s.key], boss: s.key === 'B', seed: s.x * 7 + s.y }));
+  OW.hideFoe = null; OW.scare = null; OW.foes = MAP.spots.map(s => ({ key: s.key, hx: s.x * TILE + 8, hy: s.y * TILE + 12, x: s.x * TILE + 8, y: s.y * TILE + 12, tx: 0, ty: 0, t: RI(0, 60), enemies: DATA.encounters[s.key], boss: s.key === 'B', seed: s.x * 7 + s.y }));
   if (Game.intro) OW.msg = { lines: DATA.texts.intro, t: 0 };
   OW.msgWait = true;
 }
@@ -460,7 +460,7 @@ function updateOverworld() {
   for (const f of OW.foes) {
     if (Game.defeated.has(f.key)) continue;
     const d = Math.hypot(OW.x - f.x, OW.y - f.y);
-    if (d < 56 && !f.seen) { f.seen = true; f.alert = 30; Audio.sfx('detect'); } else if (d > 96) f.seen = false;
+    if (d < 56 && !f.seen) { f.seen = true; f.alert = 30; if (f.boss) { Audio.sfx('impact_sub', { vol: .35 }); OW.shake = 2; } else Audio.sfx('detect'); } else if (d > 96) f.seen = false; // la jefa no grita "!": el suelo retumba
     if (f.alert > 0) f.alert--;
     if (f.boss) { f.x = f.hx; f.y = f.hy; }
     else if (d < 56) { if (f.alert > 12) { /* se queda quieto un instante al verte */ } else { const a = Math.atan2(OW.y - f.y, OW.x - f.x); const nx = f.x + Math.cos(a) * .85, ny = f.y + Math.sin(a) * .85; if (walkable(nx, ny)) { f.x = nx; f.y = ny; } } }
@@ -692,7 +692,13 @@ function drawOverworld() {
   for (const f of OW.foes) {
     if (Game.defeated.has(f.key) || OW.hideFoe === f) continue; // hideFoe: la transición lo dibuja ella (se agazapa y salta)
     const e = DATA.enemies[f.enemies[0]], core = e.color === 'negro' ? null : C(e.color);
-    ents.push({ y: f.y, draw: () => { const hop = Math.abs(Math.sin((OW.t + f.seed * 7) * (f.seen ? .25 : .12))) * (f.seen ? 4 : 2), x = f.x - cx, y = f.y - cy; shadow(x, y, f.boss ? 18 : 8); const spr = buildSprite(f.enemies[0] + '_mini', C('negro'), core, { eyes: f.alert > 0 ? 'happy' : 'normal' }); drawSprite(spr, x, Math.round(y - hop), 1, f.dirLeft); if (f.alert > 0) { const by = y - spr.height - 10 + (f.alert > 24 ? (30 - f.alert) : 0); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, by, 2, 6); g.fillRect(x - 1, by + 8, 2, 2); } } });
+    if (f.boss) { // la jefa no bota ni avisa con "!": es una masa pesada que respira sobre su charco y, cuando te acercas, el charco hace ondas
+      ents.push({ y: f.y, draw: () => { const x = f.x - cx, y = f.y - cy, br = 1 + Math.sin(OW.t * .045 + f.seed) * .035; g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(x, y + 4, 14, 4, 0, 0, 6.29); g.fill();
+        if (f.seen) for (let r = 0; r < 2; r++) { const q = ((OW.t / 70 + r * .5) % 1); g.strokeStyle = 'rgba(74,70,100,' + (.55 * (1 - q)).toFixed(2) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y + 4, 14 + q * 34, 4 + q * 12, 0, 0, 6.29); g.stroke(); }
+        const spr = buildSprite(f.enemies[0] + '_mini', C('negro'), core, { eyes: 'normal' }); drawSprite(spr, x, y + 2, br, f.dirLeft, 1 / (br * br)); } });
+      continue;
+    }
+    ents.push({ y: f.y, draw: () => { const hop = Math.abs(Math.sin((OW.t + f.seed * 7) * (f.seen ? .25 : .12))) * (f.seen ? 4 : 2), x = f.x - cx, y = f.y - cy; shadow(x, y, 8); const spr = buildSprite(f.enemies[0] + '_mini', C('negro'), core, { eyes: f.alert > 0 ? 'happy' : 'normal' }); drawSprite(spr, x, Math.round(y - hop), 1, f.dirLeft); if (f.alert > 0) { const by = y - spr.height - 10 + (f.alert > 24 ? (30 - f.alert) : 0); g.fillStyle = '#f4f0ea'; g.fillRect(x - 1, by, 2, 6); g.fillRect(x - 1, by + 8, 2, 2); } } });
   }
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }

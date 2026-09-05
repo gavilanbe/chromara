@@ -82,7 +82,8 @@ class Score:
         conductor.extend([mido.MetaMessage('track_name', name=self.title),
                           mido.MetaMessage('set_tempo', tempo=mido.bpm2tempo(self.bpm)),
                           mido.MetaMessage('time_signature', numerator=self.meter, denominator=4)])
-        for ch, (voice, notes) in enumerate(self.voices.items()):
+        for index, (voice, notes) in enumerate(self.voices.items()):
+            ch = index if index < 9 else index + 1 # CT drum presets are pitched bank-0 instruments, not GM channel 10
             program, level, pan, send = PALETTE[voice]
             track = mido.MidiTrack(); mf.tracks.append(track)
             track.append(mido.MetaMessage('track_name', name=voice))
@@ -289,9 +290,12 @@ def render_score(score, synth, output):
     peak=float(np.max(np.abs(mix)))
     mix*=.75/max(peak,.0001)
     # Linear 8 ms seam, before encoding; the intro and first loop stay intact.
-    a,b=meta['loopStartSample'],meta['loopEndSample']; n=round(.008*SR)
-    ramp=np.linspace(0,1,n,dtype=np.float32)[:,None]
-    mix[b-n:b]=mix[b-n:b]*(1-ramp)+mix[a-n:a]*ramp
+    if meta['loop']:
+        a,b=meta['loopStartSample'],meta['loopEndSample']; n=round(.008*SR)
+        ramp=np.linspace(0,1,n,dtype=np.float32)[:,None]
+        mix[b-n:b]=mix[b-n:b]*(1-ramp)+mix[a-n:a]*ramp
+    else:
+        n=round(.20*SR);mix[-n:]*=np.linspace(1,0,n)[:,None]
     mix[:128]*=np.linspace(0,1,128)[:,None]
     output.write_bytes(wav_bytes(mix))
     edges=[]
