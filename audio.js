@@ -107,7 +107,8 @@ const Audio = {
       } else {
         const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
         try {
-          const response = await fetch('music/' + name + '.opus.ogg', { signal: controller.signal });
+          const revision = this.cue(name)?.revision;
+          const response = await fetch('music/' + name + '.opus.ogg' + (revision ? '?v=' + encodeURIComponent(revision) : ''), { signal: controller.signal });
           if (!response.ok) throw new Error('Audio HTTP ' + response.status);
           bytes = await response.arrayBuffer();
         } finally { clearTimeout(timer); }
@@ -177,6 +178,7 @@ const Audio = {
     M.tracks.forEach(tr => { for (const n of tr.notes) events.push({ step: n[0], tr, midi: n[1], dur: n[2] * sps, vel: n[3] ?? 1 }); });
     (M.drums || []).forEach(d => events.push({ step: d[0], drum: d[1], vel: d[2] ?? 1 }));
     events.sort((a, b) => a.step - b.step); if (!events.length) return;
+    const repeatStep = M.loopStart || 0, repeatIndex = Math.max(0, events.findIndex(e => e.step >= repeatStep));
     if (this.echo) this.echo.delayTime.value = Math.min(.9, sps * 3); // eco a corchea con puntillo
     let loopStart = this.ctx.currentTime + 0.06, idx = 0;
     const tick = () => {
@@ -184,7 +186,7 @@ const Audio = {
       for (let guard = 0; guard < 4000; guard++) {
         const ev = events[idx], t = loopStart + ev.step * sps; if (t > this.ctx.currentTime + 0.25) return;
         if (ev.drum) this.drum(ev.drum, t, ev.vel); else this.note(ev.tr, t, ev.midi, ev.dur, ev.vel);
-        if (++idx >= events.length) { if (M.loop === false) { clearInterval(this.seq); this.seq = null; return; } idx = 0; loopStart += len * sps; }
+        if (++idx >= events.length) { if (M.loop === false) { clearInterval(this.seq); this.seq = null; return; } idx = repeatIndex; loopStart += (len - repeatStep) * sps; }
       }
     };
     tick(); this.seq = setInterval(tick, 50);

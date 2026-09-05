@@ -1,5 +1,5 @@
-// CHROMARA — kit de efectos: agua, pintura, papel y herramientas. Síntesis Web Audio (ruido filtrado, gotas, campanas
-// inarmónicas, reverb generada). Cada sonido acepta { semi (transposición), vol, pan } con acentos muestreados de Chrono Trigger y afinación estable.
+// CHROMARA — materia original muestreada a 32 kHz + firmas musicales del mismo
+// banco CT que la BSO. La síntesis de abajo queda como respaldo sin muestras.
 'use strict';
 const SFX = {
   ctx: null, out: null, rev: null, wet: null, noiseBuf: {}, amb: null, last: {},
@@ -10,7 +10,7 @@ const SFX = {
     const ir = ctx.createBuffer(2, ctx.sampleRate * 1.4 | 0, ctx.sampleRate);
     for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2) * (i < 400 ? i / 400 : 1); }
     this.rev = ctx.createConvolver(); this.rev.buffer = ir; this.wet = ctx.createGain(); this.wet.gain.value = 0.48; this.rev.connect(this.wet); this.wet.connect(this.out);
-    this.samples = {};
+    this.samples = {}; this.effects = {}; this.effectCounters = {};
     if (typeof SFX_SAMPLES !== 'undefined') for (const [name, sample] of Object.entries(SFX_SAMPLES)) {
       // Generated PCM WAVs have one mono 16-bit data chunk. Decode synchronously
       // so the first button press gets the same timbre as subsequent presses.
@@ -18,8 +18,11 @@ const SFX = {
       const view = new DataView(bytes.buffer), frames = view.getUint32(40, true) / 2;
       const buffer = ctx.createBuffer(1, frames, view.getUint32(24, true)), channel = buffer.getChannelData(0);
       for (let i = 0; i < frames; i++) channel[i] = view.getInt16(44 + i * 2, true) / 32768;
-      this.samples[name] = buffer;
+      if (sample.kind === 'effect') {
+        (this.effects[sample.event] ||= []).push({ buffer, gain: sample.gain, variant: sample.variant });
+      } else this.samples[name] = buffer;
     }
+    Object.values(this.effects).forEach(variants => variants.sort((a, b) => a.variant - b.variant));
     for (const k of ['white', 'pink', 'brown']) this.noiseBuf[k] = this.makeNoise(k);
   },
   makeNoise(kind) {
@@ -28,19 +31,38 @@ const SFX = {
     return b;
   },
   // One recognizable instrument per pigment; scheduled chords keep every note.
-  sample(name, semi = 0, vol = .15, when = 0, pan = 0) {
+  sample(name, semi = 0, vol = .15, when = 0, pan = 0, attack = 0) {
     const buffer = this.samples?.[name];
     if (!buffer) { this.bell(587.33 * this.semi(semi), .35, vol * .45, when, .2); return; }
     const c = this.ctx, t = c.currentTime + when, source = c.createBufferSource(), gain = c.createGain();
     source.buffer = buffer; source.playbackRate.value = this.semi(semi);
-    gain.gain.value = vol; source.connect(gain); this.route(gain, 1, .16, pan);
-    source.start(t); source.onended = () => { source.disconnect(); gain.disconnect(); };
+    gain.gain.value = vol;
+    if (attack) { gain.gain.setValueAtTime(0, t); gain.gain.linearRampToValueAtTime(vol, t + attack); }
+    source.connect(gain); const routed = this.route(gain, 1, .16, pan);
+    source.start(t); source.onended = () => { source.disconnect(); gain.disconnect(); routed.dispose(); };
+  },
+  effect(name, o = {}) {
+    const variants = this.effects?.[name]; if (!variants?.length) return false;
+    const count = this.effectCounters[name] || 0; this.effectCounters[name] = count + 1;
+    const sample = variants[count % variants.length], c = this.ctx, source = c.createBufferSource();
+    source.buffer = sample.buffer;
+    // Physical microvariation never transposes the musical identity of a colour.
+    const stretch = name === 'brush_sweep' || name === 'scratch' ? Math.max(.6, Math.min(1.6, o.len || 1)) : 1;
+    source.playbackRate.value = (count % 2 ? .989 : 1.011) / stretch;
+    const gain = c.createGain(); gain.gain.value = sample.gain * (o.vol ?? 1);
+    source.connect(gain);
+    const wet = /^(ink|dissolve|splash_clean|glass|shimmer)/.test(name) ? .09 : .025;
+    const routed = this.route(gain, 1, wet, o.pan || 0);
+    source.start(c.currentTime + (o.when || 0));
+    source.onended = () => { source.disconnect(); gain.disconnect(); routed.dispose(); };
+    return true;
   },
   // --- bloques
   route(node, vol, wet, pan, t0, dur) {
-    const g = this.ctx.createGain(); g.gain.value = vol; let tail = node;
-    if (pan && this.ctx.createStereoPanner) { const p = this.ctx.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan)); tail.connect(p); tail = p; }
-    tail.connect(g); g.connect(this.out); if (wet) { const w = this.ctx.createGain(); w.gain.value = wet; g.connect(w); w.connect(this.rev); }
+    const g = this.ctx.createGain(); g.gain.value = vol; let tail = node; const nodes = [g];
+    if (pan && this.ctx.createStereoPanner) { const p = this.ctx.createStereoPanner(); nodes.push(p); p.pan.value = Math.max(-1, Math.min(1, pan)); tail.connect(p); tail = p; }
+    tail.connect(g); g.connect(this.out); if (wet) { const w = this.ctx.createGain(); nodes.push(w); w.gain.value = wet; g.connect(w); w.connect(this.rev); }
+    g.dispose = () => nodes.forEach(n => n.disconnect());
     return g;
   },
   env(param, t0, a, d, peak, sus = 0, hold = 0, rel = 0) {
@@ -85,6 +107,12 @@ const SFX = {
   play(name, o = {}) {
     if (!this.ctx) return; const s = this.semi(o.semi), v = o.vol ?? 1, w = o.when || 0, pan = o.pan || 0;
     const now = performance.now(), key = name + ':' + (o.semi || 0); if (!w && this.last[key] && now - this.last[key] < 30) return; if (!w) this.last[key] = now; // antirepetición
+    if (this.effect(name, o)) {
+      if (name === 'splat_big') this.duck(-3, 160, 80);
+      if (name === 'impact_sub') this.duck(-5, 120, 200);
+      if (name === 'splash' || name === 'ink_tide') this.duck(-6, 200, 400);
+      return;
+    }
     switch (name) {
       // ---- UI: cuaderno
       case 'cursor': this.sample('pizz', 12 + (o.semi || 0), .15 * v, w, pan); break;
@@ -121,8 +149,24 @@ const SFX = {
       case 'splash_clean': this.noise({ kind: 'white', type: 'bandpass', f0: 2400, f1: 1200, q: .7, dur: .18, a: .002, vol: .3 * v, when: w, wet: .35 }); for (let i = 0; i < 5; i++) this.drip(1200 + Math.random() * 1600, .12 * v, w + .05 + Math.random() * .2, .4, (Math.random() - .5)); break;
       case 'bubbles': for (let i = 0; i < 6; i++) this.bubble(250 + Math.random() * 500, .1 * v, w + i * .07 + Math.random() * .03); break;
       // ---- mezclas
-      case 'charge': { const f = 330 * s; this.tone({ f0: f, f1: f * 2, dur: .5, wave: 'triangle', a: .05, d: .5, vol: .09 * v, when: w, wet: .3, curve: 'exp' }); break; }
-      case 'mix_bell': this.sample('harp', o.semi || 0, .4 * v, w, pan); this.sample('choir', 12 + (o.semi || 0), .16 * v, w + .04); this.noise({ kind: 'white', type: 'highpass', f0: 4200, dur: .26, vol: .06 * v, when: w, wet: .3 }); this.duck(-4, 100, 220); break;
+      case 'charge': {
+        const n = o.semi || 0, voice = n === 0 ? 'pizz' : n === 4 ? 'marimba' : 'harp';
+        this.sample(voice, n, .19 * v, w, pan);
+        this.sample('choir', n + 12, .11 * v, w + .025, pan, .12);
+        this.effect('brush_hiss', { ...o, vol: .12 * v }); break;
+      }
+      case 'mix_bell': {
+        const colours = o.colours || [0,4,7];
+        colours.forEach((n,i) => this.sample(n === 0 ? 'pizz' : n === 4 ? 'marimba' : 'harp', n, .25 * v, w + i * .045, (i - (colours.length - 1) / 2) * .35));
+        // Their separate notes meet in the leap E–A of the shared Prism phrase.
+        this.sample('harp', 2, .22 * v, w + .16, pan);
+        this.sample('harp', 7, .26 * v, w + .29, pan);
+        this.sample('choir', 12, .10 * v, w + .25, 0, .08);
+        this.effect('shimmer', { ...o, vol: .18 * v }); this.duck(-4, 100, 220); break;
+      }
+      case 'pigment_return':
+        [0,4,2,7].forEach((n,i) => this.sample(i === 1 ? 'marimba' : 'harp', n, .16 * v, w + [0,.15,.23,.38][i], pan));
+        break;
       case 'fwoom': this.noise({ kind: 'brown', type: 'lowpass', f0: 200, f1: 1600, q: .8, dur: .5, a: .12, d: .4, vol: .5 * v, when: w, wet: .2 }); this.noise({ kind: 'pink', type: 'bandpass', f0: 800, f1: 2500, dur: .45, a: .1, vol: .2 * v, when: w + .05 }); break;
       case 'crackle': for (let i = 0; i < 14; i++) this.noise({ kind: 'white', type: 'bandpass', f0: 1500 + Math.random() * 3000, q: 5, dur: .015, vol: .1 * v * Math.random(), when: w + Math.random() * .8 }); break;
       case 'grow': for (let i = 0; i < 7; i++) this.noise({ kind: 'white', type: 'bandpass', f0: 700 + i * 260, q: 8, dur: .03, vol: .14 * v, when: w + i * .06 }); this.tone({ f0: 180, f1: 420, dur: .5, wave: 'triangle', a: .05, vol: .06 * v, when: w }); break;
@@ -138,6 +182,8 @@ const SFX = {
       case 'hitweak': this.splat(1.3, .4 * v, w, pan); this.noise({ kind: 'white', type: 'highpass', f0: 3000, dur: .05, vol: .3 * v, when: w }); this.bell(1568 * s, .5, .12 * v, w + .02, .35); break;
       case 'resist': this.noise({ kind: 'brown', type: 'lowpass', f0: 250, dur: .12, a: .003, vol: .35 * v, when: w }); this.tone({ f0: 140, f1: 90, dur: .1, wave: 'triangle', vol: .12 * v, when: w }); break;
       case 'ink_jet': this.noise({ kind: 'brown', type: 'lowpass', f0: 1200, f1: 400, q: 1, dur: .35, a: .03, d: .32, vol: .3 * v, when: w, am: 18 }); this.bubble(100, .2 * v, w + .3); break;
+      case 'ink_hit': this.splat(.7, .3 * v, w, pan); break;
+      case 'ink_tide': this.play('splash', o); break;
       case 'slow_drip': this.drip(220, .22 * v, w, .5); this.drip(180, .2 * v, w + .35, .5); break;
       case 'dissolve': this.tone({ f0: 320, f1: 70, dur: .55, wave: 'sine', a: .01, d: .5, vol: .18 * v, when: w, wet: .3 }); for (let i = 0; i < 7; i++) this.bubble(120 + Math.random() * 300, .12 * v, w + .05 + i * .06); this.drip(500, .2 * v, w + .55, .5); break;
       case 'flat_drop': this.noise({ kind: 'brown', type: 'lowpass', f0: 600, f1: 150, dur: .25, a: .002, vol: .35 * v, when: w, wet: .3 }); this.tone({ f0: 240, f1: 60, dur: .3, wave: 'sine', vol: .2 * v, when: w }); break;
@@ -155,7 +201,10 @@ const SFX = {
       case 'fall': this.tone({ f0: 1400, f1: 180, dur: .5, wave: 'sine', a: .02, d: .48, vol: .16 * v, when: w }); break;
       case 'splash': this.splat(2.2, .6 * v, w); this.noise({ kind: 'brown', type: 'lowpass', f0: 400, f1: 80, dur: .6, a: .005, d: .55, vol: .5 * v, when: w, wet: .6 }); this.duck(-6, 200, 400); break;
       case 'tinkle': [0,4,7,14].forEach((n,i) => this.sample('harp', n + (o.semi || 0), .12 * v, w + i * .065, pan)); break;
-      case 'saturate': { const c = this.ctx, t0 = c.currentTime + w; [0, 4, 7, 11, 14].forEach(n => { const osc = c.createOscillator(), f = c.createBiquadFilter(), g = c.createGain(); osc.type = 'sawtooth'; osc.frequency.value = 146.8324 * this.semi(n); f.type = 'lowpass'; f.frequency.setValueAtTime(200, t0); f.frequency.exponentialRampToValueAtTime(8000, t0 + 1.6); this.env(g.gain, t0, .4, 1.8, .06 * v); osc.connect(f); f.connect(g); this.route(g, 1, .5, 0); osc.start(t0); osc.stop(t0 + 2.6); }); break; }
+      case 'saturate':
+        [0,4,7].forEach((n,i) => this.sample('choir', n, .16 * v, w + i * .1, (i-1)*.3, .15));
+        [0,4,2,7,12].forEach((n,i) => this.sample('harp', n, .2 * v, w + [0,.2,.3,.5,.85][i], pan));
+        this.effect('shimmer', { ...o, vol: .35 * v }); break;
       case 'victory': [0,4,2,7,12].forEach((n,i) => this.sample('marimba', n, .25 * v, w + [0,.14,.28,.42,.7][i], pan)); break;
       case 'discovery':
         this.duck(-7, 80, 1500);

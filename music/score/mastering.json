@@ -1,51 +1,51 @@
 {
-  "map": {
-    "inputLUFS": -16.05,
-    "inputTruePeakDB": -1.58,
-    "gainDB": -4.95,
+  "title": {
+    "inputLUFS": -15.27,
+    "inputTruePeakDB": -2.7,
+    "gainDB": -5.73,
     "estimatedOutputLUFS": -21.0,
-    "estimatedTruePeakDB": -6.53,
-    "bytes": 2646440
+    "estimatedTruePeakDB": -8.43,
+    "bytes": 1954182
+  },
+  "map": {
+    "inputLUFS": -14.79,
+    "inputTruePeakDB": -2.58,
+    "gainDB": -6.21,
+    "estimatedOutputLUFS": -21.0,
+    "estimatedTruePeakDB": -8.79,
+    "bytes": 1597424
   },
   "battle": {
-    "inputLUFS": -17.1,
-    "inputTruePeakDB": -1.12,
-    "gainDB": -1.9,
+    "inputLUFS": -16.31,
+    "inputTruePeakDB": -2.87,
+    "gainDB": -2.69,
     "estimatedOutputLUFS": -19.0,
-    "estimatedTruePeakDB": -3.02,
-    "bytes": 1524993
+    "estimatedTruePeakDB": -5.56,
+    "bytes": 1426113
   },
   "boss": {
-    "inputLUFS": -18.46,
-    "inputTruePeakDB": -1.45,
-    "gainDB": -0.75,
-    "estimatedOutputLUFS": -19.21,
-    "estimatedTruePeakDB": -2.2,
-    "bytes": 1578005
+    "inputLUFS": -18.57,
+    "inputTruePeakDB": -2.91,
+    "gainDB": -0.43,
+    "estimatedOutputLUFS": -19.0,
+    "estimatedTruePeakDB": -3.34,
+    "bytes": 1466410
   },
   "victory": {
-    "inputLUFS": -12.78,
-    "inputTruePeakDB": -1.82,
-    "gainDB": -5.22,
+    "inputLUFS": -14.52,
+    "inputTruePeakDB": -3.28,
+    "gainDB": -3.48,
     "estimatedOutputLUFS": -18.0,
-    "estimatedTruePeakDB": -7.04,
-    "bytes": 110074
+    "estimatedTruePeakDB": -6.76,
+    "bytes": 105185
   },
   "gameover": {
-    "inputLUFS": -16.12,
-    "inputTruePeakDB": -1.09,
-    "gainDB": -6.88,
+    "inputLUFS": -14.0,
+    "inputTruePeakDB": -2.54,
+    "gainDB": -9.0,
     "estimatedOutputLUFS": -23.0,
-    "estimatedTruePeakDB": -7.97,
-    "bytes": 78314
-  },
-  "title": {
-    "inputLUFS": -15.37,
-    "inputTruePeakDB": -1.61,
-    "gainDB": -5.63,
-    "estimatedOutputLUFS": -21.0,
-    "estimatedTruePeakDB": -7.24,
-    "bytes": 2085876
+    "estimatedTruePeakDB": -11.54,
+    "bytes": 120759
   },
   "atelier": {
     "inputLUFS": -14.98,
@@ -53,7 +53,7 @@
     "gainDB": -7.02,
     "estimatedOutputLUFS": -22.0,
     "estimatedTruePeakDB": -9.74,
-    "bytes": 1237075
+    "bytes": 1235844
   },
   "prelude": {
     "inputLUFS": -14.08,
@@ -61,14 +61,14 @@
     "gainDB": -9.92,
     "estimatedOutputLUFS": -24.0,
     "estimatedTruePeakDB": -12.48,
-    "bytes": 1486695
+    "bytes": 1488632
   },
   "restored": {
-    "inputLUFS": -14.44,
+    "inputLUFS": -14.43,
     "inputTruePeakDB": -2.6,
-    "gainDB": -5.56,
+    "gainDB": -5.57,
     "estimatedOutputLUFS": -20.0,
-    "estimatedTruePeakDB": -8.16,
-    "bytes": 1675315
+    "estimatedTruePeakDB": -8.17,
+    "bytes": 1669993
   }
 }

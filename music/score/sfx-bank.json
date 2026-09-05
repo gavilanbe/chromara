@@ -1,0 +1,466 @@
+{
+  "fx_brush_sweep": {
+    "event": "brush_sweep",
+    "duration": 0.29,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1211,
+    "sha256": "508d9e98bc20f8f397b3b6ff679ad221033910103d73b1689d9424024edff0a6"
+  },
+  "fx_brush_sweep_1": {
+    "event": "brush_sweep",
+    "duration": 0.29,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1118,
+    "sha256": "1091fc1345e97416887de49b52a665d6d1d2bbde89c3fa7b36f5e32c4cafeeba"
+  },
+  "fx_brush_big": {
+    "event": "brush_big",
+    "duration": 0.49,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1568,
+    "sha256": "85289bec6357bf29337e9df8d0fd4b24295d1be0329ad0cb4dcdaade1f901248"
+  },
+  "fx_scratch": {
+    "event": "scratch",
+    "duration": 0.19,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1079,
+    "sha256": "4affe663ef7c737fef016c839f698f7674f363fed9d1ed8adfecd36fa8001619"
+  },
+  "fx_scratch_1": {
+    "event": "scratch",
+    "duration": 0.19,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1219,
+    "sha256": "988c5d6a3a933f665a92bc4bf42bc8c6d0e1094a2d07a08639e0a059457c4ae2"
+  },
+  "fx_scratch_long": {
+    "event": "scratch_long",
+    "duration": 0.4,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1019,
+    "sha256": "255c6d533c9d6f76d6d53a0a0a5aa4c7b07f22753bfc34ce2b70e3ee89c37eda"
+  },
+  "fx_splat_small": {
+    "event": "splat_small",
+    "duration": 0.284,
+    "gain": 0.86,
+    "peak": 0.5563,
+    "rms": 0.0918,
+    "sha256": "8098caf9f473fb060e18d40894af7a2dfbcd4bbf739a8c33102950280bc72f6e"
+  },
+  "fx_splat": {
+    "event": "splat",
+    "duration": 0.34,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.0982,
+    "sha256": "46650cc92df9dc02e0050d1bfb01b57bbb78ee7e1016627e828a58a4f3c294a4"
+  },
+  "fx_splat_1": {
+    "event": "splat",
+    "duration": 0.34,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1133,
+    "sha256": "d721114642fc340956424ae9603a4f85bcd4ffd6187fdec3caf8f5b63fb9b564"
+  },
+  "fx_splat_big": {
+    "event": "splat_big",
+    "duration": 0.428,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1054,
+    "sha256": "46b7b169302dcbaaa45e3ef2d0ff78f60c2f7511bbf84fc2410a1db5e25af748"
+  },
+  "fx_splash": {
+    "event": "splash",
+    "duration": 0.5,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1039,
+    "sha256": "41ff0d382a1d7f6b40cf128efdfc1634cf5e369629fa596bf30414f239e80acf"
+  },
+  "fx_hit": {
+    "event": "hit",
+    "duration": 0.3176,
+    "gain": 0.86,
+    "peak": 0.6912,
+    "rms": 0.1183,
+    "sha256": "0ac32a2f806d602a805d2236be08696e06b55544fe57c0e8fc796cd3637e384c"
+  },
+  "fx_hit_1": {
+    "event": "hit",
+    "duration": 0.3176,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1041,
+    "sha256": "1d0767b3000e109b245c0933997918e35b1b23fd14d2999576f1d1f4b49eb11a"
+  },
+  "fx_hitweak": {
+    "event": "hitweak",
+    "duration": 0.3464,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.101,
+    "sha256": "29773e5df448daeeb06497b67cb6741f28af6f918dceaef771bbf3cceab397f6"
+  },
+  "fx_resist": {
+    "event": "resist",
+    "duration": 0.19,
+    "gain": 0.86,
+    "peak": 0.5217,
+    "rms": 0.0992,
+    "sha256": "64b145e0ec5fa91f32fd91738df2495721e3b0465b3342de41e742182cf8adf7"
+  },
+  "fx_ink_jet": {
+    "event": "ink_jet",
+    "duration": 0.4,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1426,
+    "sha256": "72591a0e012c4d57f36e7edcc47d71e64cd634357bb408661e8820781da9b49f"
+  },
+  "fx_ink_jet_1": {
+    "event": "ink_jet",
+    "duration": 0.4,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1593,
+    "sha256": "c220c28892b8a04e04f4cf16ae6d4f96ee5b9bf6f9fccd8683195f5313a6f69a"
+  },
+  "fx_ink_hit": {
+    "event": "ink_hit",
+    "duration": 0.3,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1103,
+    "sha256": "c6b8f02d31dd28060d76351632dcc6007e3b7d71c64ca9a98e17632429bb95d5"
+  },
+  "fx_lunge": {
+    "event": "lunge",
+    "duration": 0.43,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1553,
+    "sha256": "37d1c0035c4c0b4f8239d55033edbe1d4dfd9971b945be42e7dc8569fcaf8908"
+  },
+  "fx_dissolve": {
+    "event": "dissolve",
+    "duration": 0.81,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1364,
+    "sha256": "41c0fc8612d94a568617e83e9968084afd9734c47fec2a88e2ef4c41d243e4a1"
+  },
+  "fx_enemy_soon": {
+    "event": "enemy_soon",
+    "duration": 0.29,
+    "gain": 0.46,
+    "peak": 0.7,
+    "rms": 0.1532,
+    "sha256": "99f13cab3c4639f770bdad815fa4af1920bd0aa309dd60d057c53aa443ea332f"
+  },
+  "fx_ink_tide": {
+    "event": "ink_tide",
+    "duration": 0.92,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1295,
+    "sha256": "6a8f15a28a3cfc7bf42271c7a89804b5ee05474c367bef23c4e48e6ce76f1f88"
+  },
+  "fx_flat_drop": {
+    "event": "flat_drop",
+    "duration": 0.4,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1729,
+    "sha256": "e21c0c6c702585de6703a63df214edc71ae4a92ce950942db7f5da9d1dbe9a1b"
+  },
+  "fx_splash_clean": {
+    "event": "splash_clean",
+    "duration": 0.44,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.0886,
+    "sha256": "652da160009a50d80ceeaa18e7feb107707b12f870b73b43d8cd5c18d151d540"
+  },
+  "fx_splash_clean_1": {
+    "event": "splash_clean",
+    "duration": 0.44,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.0875,
+    "sha256": "bce0f7b579b056fc01068635a9711385a3f40d3bd7ec1954086329ba69a2f257"
+  },
+  "fx_brush_hiss": {
+    "event": "brush_hiss",
+    "duration": 0.22,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1377,
+    "sha256": "2776ab1fb5508052edd3245c708a61026c5572cd7367594dc3ab90043cb7f130"
+  },
+  "fx_bubbles": {
+    "event": "bubbles",
+    "duration": 0.52,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1721,
+    "sha256": "1417a60eca457b27888d769dd9510c531f55f2452b68a08c46180500db53edbf"
+  },
+  "fx_plop": {
+    "event": "plop",
+    "duration": 0.19,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1429,
+    "sha256": "5d5e8e252a01298fb2e53e39f3acd076e471db601b419ce4bfdeca783dfb0e91"
+  },
+  "fx_slow_drip": {
+    "event": "slow_drip",
+    "duration": 0.52,
+    "gain": 0.86,
+    "peak": 0.6625,
+    "rms": 0.1216,
+    "sha256": "a86997b4ac4c305073da448516881e4456a999713f889dec687c10470e534497"
+  },
+  "fx_fwip": {
+    "event": "fwip",
+    "duration": 0.14,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1539,
+    "sha256": "faabadb2f067661ba77763884b9f36971cd8349d989b6be1e5d191310b319d9a"
+  },
+  "fx_whip": {
+    "event": "whip",
+    "duration": 0.19,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1415,
+    "sha256": "2e46acd222c53a85c7f17eb1154225652dbe9e0ab1eed7eacc02bd5dd2db2673"
+  },
+  "fx_dash": {
+    "event": "dash",
+    "duration": 0.24,
+    "gain": 0.66,
+    "peak": 0.7,
+    "rms": 0.1416,
+    "sha256": "e2d8433128330a263a0f1226d0ee4f8b548e1d9f07b9297dabcf48fe30d258b4"
+  },
+  "fx_banner": {
+    "event": "banner",
+    "duration": 0.21,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1345,
+    "sha256": "15f4c9e19a113674ba11c0a53ca36d3c246edfc09e973b95976d39bdadaf2dd6"
+  },
+  "fx_page": {
+    "event": "page",
+    "duration": 0.3,
+    "gain": 0.46,
+    "peak": 0.7,
+    "rms": 0.1132,
+    "sha256": "ff35b46a00379f491e4493a86a3fbbb5cac089d9d2fa1723db1c1e66b62a27f6"
+  },
+  "fx_book_open": {
+    "event": "book_open",
+    "duration": 0.3,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.117,
+    "sha256": "9fc7646ea1f4155225095c7f80d446e09629102f75954eb6ca0c412644664752"
+  },
+  "fx_book_close": {
+    "event": "book_close",
+    "duration": 0.22,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1169,
+    "sha256": "a604615d2b515e1a187c23cad4b3485fe48fee67acb328a53f57df0d13616e2e"
+  },
+  "fx_cancel": {
+    "event": "cancel",
+    "duration": 0.22,
+    "gain": 0.46,
+    "peak": 0.7,
+    "rms": 0.1282,
+    "sha256": "8806ccb879776f73d1a172e97d642332914018d7180e1a38f2c2be055e7e6bcc"
+  },
+  "fx_rub": {
+    "event": "rub",
+    "duration": 0.16,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.128,
+    "sha256": "d4eb647a3a6a207de9e3bd0dd41a568df72430a399fc3c342ac65e79534d24d3"
+  },
+  "fx_crumbs": {
+    "event": "crumbs",
+    "duration": 0.18,
+    "gain": 0.46,
+    "peak": 0.7,
+    "rms": 0.0745,
+    "sha256": "a514e1970eec28203865f64f52c3a7bee69f3b3cfac8120f409e255aa9ab08e8"
+  },
+  "fx_squeeze": {
+    "event": "squeeze",
+    "duration": 0.4,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1259,
+    "sha256": "d263875fc6edcd190a8bc8e93db86695627604e5e9eaf471353624ae67374b67"
+  },
+  "fx_drop_fall": {
+    "event": "drop_fall",
+    "duration": 0.36,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1545,
+    "sha256": "1fa9529184275becd617ea6d78646e0a902fd5694b7a4b2b13a4bdf93389193f"
+  },
+  "fx_fall": {
+    "event": "fall",
+    "duration": 0.36,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1371,
+    "sha256": "e636a900a44e92a80efa7d5e8812208c7040f5246e351e8a1c7e5386e587edfd"
+  },
+  "fx_fwoom": {
+    "event": "fwoom",
+    "duration": 0.62,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1111,
+    "sha256": "257063c88417426fc6d510a709be0e1a29220ef4601c535fe48c6705a8d869be"
+  },
+  "fx_crackle": {
+    "event": "crackle",
+    "duration": 0.66,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.0604,
+    "sha256": "19ec4b85be001be4f07b97f6b6b4474adbf09feb4f9d2b17621e0c501b2e8ca4"
+  },
+  "fx_grow": {
+    "event": "grow",
+    "duration": 0.58,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1192,
+    "sha256": "5ec6fa93cbb19303c5fad1ce84f96eb554ed1f9319304bfbb9eb632a725af32e"
+  },
+  "fx_leaves": {
+    "event": "leaves",
+    "duration": 0.32,
+    "gain": 0.46,
+    "peak": 0.7,
+    "rms": 0.1002,
+    "sha256": "76be46aa84dd5832f38d85277ac10c9146391ea33bd6e838a070ff01930aa4f5"
+  },
+  "fx_hum_down": {
+    "event": "hum_down",
+    "duration": 1.02,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.2,
+    "sha256": "25e72f0f5eeceda57325e391d1e39848bb572215a47c231152ceac59974e1ec7"
+  },
+  "fx_impact_sub": {
+    "event": "impact_sub",
+    "duration": 0.42,
+    "gain": 0.86,
+    "peak": 0.4991,
+    "rms": 0.0882,
+    "sha256": "41d56c2550a3d3a9846f84bd93a0550ad9070311014191595b3421fb9965ba66"
+  },
+  "fx_glass": {
+    "event": "glass",
+    "duration": 0.55,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1067,
+    "sha256": "9f4b3b2ffd2e458c80cdca7df1b903906e45222f6d90bc1c500f1f2447af01b7"
+  },
+  "fx_shimmer": {
+    "event": "shimmer",
+    "duration": 0.96,
+    "gain": 0.46,
+    "peak": 0.7,
+    "rms": 0.1328,
+    "sha256": "df6bcba2b374d6c24ee012aa9cc27a14071d3c0bb693cf860b29c08b95276037"
+  },
+  "fx_detect": {
+    "event": "detect",
+    "duration": 0.36,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1388,
+    "sha256": "ffb2bb96cb22b029f13570b3d9f49cb99d7f9aafa333512f54720cafc1534879"
+  },
+  "fx_encounter": {
+    "event": "encounter",
+    "duration": 0.58,
+    "gain": 0.86,
+    "peak": 0.7,
+    "rms": 0.1971,
+    "sha256": "3d1b9d4a3d19456bcc588196e5439cba63ec14790ffe5d79f0349ffc30c6a1bb"
+  },
+  "fx_step_grass": {
+    "event": "step_grass",
+    "duration": 0.07,
+    "gain": 0.26,
+    "peak": 0.7,
+    "rms": 0.1102,
+    "sha256": "6354be79ed41d692f61c3ff24a06fc6d3cb14a93ec640d30ae3a96910e0ed283"
+  },
+  "fx_step_grass_1": {
+    "event": "step_grass",
+    "duration": 0.07,
+    "gain": 0.26,
+    "peak": 0.7,
+    "rms": 0.0805,
+    "sha256": "cdfd207887197777361e689dce768a87f63670b2b08fed43e23b13408c134129"
+  },
+  "fx_step_path": {
+    "event": "step_path",
+    "duration": 0.055,
+    "gain": 0.26,
+    "peak": 0.5985,
+    "rms": 0.1338,
+    "sha256": "f5715b1aafe68f61e125cd0606944587e8294a5727dd114d95d6db82a702cd29"
+  },
+  "fx_step_path_1": {
+    "event": "step_path",
+    "duration": 0.055,
+    "gain": 0.26,
+    "peak": 0.7,
+    "rms": 0.0847,
+    "sha256": "9f1d60d614741305f387521c409d3f2af2c2f30786bf02ebe6040449b0ba1b6d"
+  },
+  "fx_step_wood": {
+    "event": "step_wood",
+    "duration": 0.085,
+    "gain": 0.26,
+    "peak": 0.5462,
+    "rms": 0.1121,
+    "sha256": "fad8e46a04a4a6bebf7046370752d30938cf132514082a5b60d4f284d5c820b4"
+  },
+  "fx_step_wood_1": {
+    "event": "step_wood",
+    "duration": 0.085,
+    "gain": 0.26,
+    "peak": 0.5462,
+    "rms": 0.1121,
+    "sha256": "fde5d9b76abfa3fc93943daa9a3cefda31ea301a3ad7b99e88bf0ef0350d761e"
+  }
+}

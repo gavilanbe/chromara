@@ -2,7 +2,7 @@
 
 __pycache__/
 *.pyc
-# Regenerated intermediate masters; the six original tracked WAVs remain sources.
+# Regenerated intermediate masters; six named WAV masters are also kept for direct listening.
 music/atelier.wav
 music/prelude.wav
 music/restored.wav

@@ -23,7 +23,7 @@
   const scripts = ['data.js', 'music.js', 'music_cues.js', 'music_fallback.js'];
   if (location.protocol === 'file:') scripts.push('music_samples.js');
   scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'sprites.js', 'scene.js', 'gui.js', 'battle.js', 'attacks.js', 'game.js');
-  const version = location.protocol === 'file:' ? Date.now() : 'audio3';
+  const version = location.protocol === 'file:' ? Date.now() : 'audio4';
   for (const src of scripts) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
 })();
 </script>

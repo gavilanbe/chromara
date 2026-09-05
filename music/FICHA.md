@@ -1,53 +1,84 @@
-# CHROMARA — BSO y diseño sonoro v3
+# CHROMARA — una partitura para el cuaderno (v4)
 
-El mundo es un cuaderno vivo. El grupo no conquista un territorio: devuelve pigmento a una página que alguien dibujó. La Tinta teme perder su lugar en ese dibujo. La música comparte un motivo entre exploración, amenaza y recuperación, y deja huecos para oír el papel y las herramientas.
+El color necesita una línea que lo sostenga. Carmín, Ámbar y Añil devuelven vida a una página; La Tinta teme que olviden quién dibujó sus contornos. Esta suite desarrolla esa relación entre exploración, lucha y reconciliación.
 
-## Qué cambia
+## Escuchar
 
-Se conserva la escritura de los seis temas v2 y se publican de nuevo con niveles coherentes, agudos más suaves y empalmes tratados. Se añaden tres piezas originales, cuatro muestras para efectos musicales y dirección de música por escena. La documentación histórica está en [FICHA_v2.md](FICHA_v2.md); sus niveles y comprobaciones describen la versión anterior.
+- [Recorrido del leitmotif · 59 s](leitmotif-demo.mp3): título **0:00**, mapa **0:09**, batalla **0:19**, La Tinta **0:32**, mundo recuperado **0:40**, victoria **0:51**.
+- [Muestra de SFX · 52 s](sfx-demo.mp3): cuaderno **0:00**, Carmín **0:03**, Ámbar **0:06**, Añil **0:09**, goma **0:12**, pigmento devuelto **0:15**, Llamarada **0:19**, Brote **0:23**, Eclipse **0:27**, Arcoíris **0:31**, enemigos **0:36**, Marea negra **0:43**, Pluma **0:48**.
+- [Batalla completa](battle.mp3) · [Mapa gris](map.mp3) · [La Tinta](boss.mp3) · [Mundo recuperado](restored.mp3).
 
-| Escena / archivo | Pieza | Centro / pulso | Función |
-|---|---|---|---|
-| Título · `title` | El cuaderno se abre | Re mayor · 90 | Presentar la promesa de color con maderas, arpa y celesta |
-| Mapa gris · `map` | Chromara apagada | Re dorio · 100 | Curiosidad, melancolía y pequeñas ventanas al color |
-| Estuche · `atelier` | Lo que duerme en el estuche | Re dorio / Fa lidio · 108, **3/4** | Marimba que pregunta, oboe que contesta, arpa y pasos de pizzicato |
-| Combate · `battle` | Mezcla de colores | La menor · 150 | Impulso y respuestas entre voces; margen para los golpes |
-| Diálogo · `prelude` | Debajo del color | Re menor / frigio · 72 | Oboe en registro humano sobre cuerdas; la segunda bemol es herida, no sólo amenaza |
-| Jefa · `boss` | La Tinta | Re frigio · 144 | El mundo se reconoce dentro del tema enemigo |
-| Victoria · `victory` | Una gota más de luz | Re mayor · 168 | El motivo encendido; entra con la celebración, tras la disolución |
-| Derrota · `gameover` | Los colores se apagan | Re → Mi♭ · 96 | Una frase que no logra volver a casa |
-| Mundo recuperado · `restored` | La línea también es color | Re mayor · 100 | Las voces comparten el canto; el recuerdo menor queda incorporado al final |
+Los dos demos son montajes de escucha, no piezas adicionales. Los MP3 de esta carpeta se abren directamente en el ordenador. La secuencia exacta de los demos está en [score/preview-cues.json](score/preview-cues.json).
 
-## Las tres composiciones nuevas
+## La idea musical
 
-**Lo que duerme en el estuche**: dos compases de entrada y un vals de 24 compases, A–B–A′. Re–Fa–Mi–La aparece en marimba, con corcheas y silencios que recuerdan a una punta de lápiz buscando dónde apoyar. El puente se ilumina en Fa lidio. La vuelta reduce su dinámica antes de recuperar la flauta en las respuestas. No hay batería de combate en el puzle.
+La célula del Prisma es **Re–Fa–Mi–La**: partir, abrirse, retroceder un paso y saltar. En el mapa su ritmo largo–corto deja respirar la frase; en la batalla se comprime y desplaza contra el bajo. No se repite igual en cada escena.
 
-**Debajo del color**: dos compases de entrada, 16 de ciclo. El oboe dice la célula en registro medio, sobre pedal y díadas de cuerda. Re–Fa–Mi♭–La guarda relación con la jefa. En la segunda mitad el arpa recuerda el Mi natural del mapa: queda algo que escuchar en La Tinta. Termina en la dominante sin resolver y permite detenerse a leer el diálogo.
+El color abre **Fa a Fa♯**. El mapa gris y el mundo recuperado comparten pulso, arquitectura y contorno melódico: el final permite reconocer el lugar que se ha salvado. Carmín, Ámbar y Añil aportan **Re, Fa♯ y La**. En los efectos de carga son pizzicato, marimba y arpa; al mezclarse suenan las notas de los participantes y una respuesta Mi–La.
 
-**La línea también es color**: cuatro compases de presentación separada —arpa, marimba, flauta, respuesta de oboe— y 24 de ciclo. La célula es Re–Fa♯–Mi–La. El puente pasa por Sol lidio y por Si♭/Sol menor, un recuerdo de la página oscura. Ahí baja la dinámica y desaparece el pulso de marimba; después vuelven flauta y oboe en contrapunto con refuerzo de trompa. El cambio de color tiene una recompensa musical propia.
+La Tinta pliega la célula en **La–Fa–Mi♭–Re**. Su tema recuerda literalmente una frase del mapa en piano antes de teñir el Mi de Mi♭. El preludio permite escuchar a la persona que hay dentro de la amenaza. El final conserva un pasaje de armonía menor: recuperar el color no borra la línea.
 
-Cada nueva pieza contiene introducción y dos vueltas. El bucle reproduce la segunda, con colas ya asentadas. Duraciones y puntos exactos están en [meta.json](meta.json). Polifonía escrita máxima: estuche 5, preludio 5, mundo restaurado 7. Esto cuenta notas escritas, no colas de muestras; el reproductor es Web Audio, no una emulación estricta del SPC700.
+## Las nueve escenas
 
-## Timbres, mezcla e interacción
+Se han **recompuesto los seis temas principales**, incluida la batalla. Estuche, preludio y mundo recuperado conservan las composiciones incorporadas en v3 y encajan en el nuevo arco. Todos los archivos publicados se han renderizado con el mismo banco CT. Las fichas [v2](FICHA_v2.md) y [v3](FICHA_v3.md) describen ediciones anteriores.
 
-Los efectos físicos conservan sus materiales: fricción seca para lápiz, barrido de cerdas para brocha, golpe húmedo y gotas para pincel, burbujeo grave para tinta. Los eventos musicales usan cuatro muestras cortas del mismo banco: marimba, arpa, pizzicato y coro. Carmín, Ámbar y Añil tienen Re, Fa♯ y La. Los avisos no varían aleatoriamente de afinación; la microvariación se reserva para materia y líquidos. La Pluma tiene un motivo de descubrimiento de seis notas.
+| Escena | Pieza / audio | Escritura y función |
+|---|---|---|
+| Título | [Antes de la primera pincelada](title.mp3) | 84 bpm; entrada incompleta en piano, presentación de las tres voces, recuerdo de la Tinta y promesa en flauta |
+| Mapa gris | [Donde el papel respira](map.mp3) | 100 bpm; Re dorio, ventanas a Fa lidio, retirada a piano y regreso con respuesta de oboe |
+| Estuche | [Lo que duerme en el estuche](atelier.mp3) | 108 bpm, 3/4; marimba curiosa, oboe que contesta, arpa y pizzicato |
+| Batalla | [Tres trazos contra la tinta](battle.mp3) | 160 bpm; motivo inmediato, guitarra, respuesta de metales, puente de flauta y reunión final; bajo sincopado y percusión con remates |
+| Diálogo | [Debajo del color](prelude.mp3) | 72 bpm; oboe cercano, pedal, silencios y segunda bemol; espacio para leer |
+| La Tinta | [El contorno reclama la página](boss.mp3) | 144 bpm; célula plegada, ostinato 3+3+2, cuerda, recuerdo del mapa sin batería y último enfrentamiento con metales |
+| Victoria | [El color encuentra su sitio](victory.mp3) | 160 bpm; cuatro compases que resuelven el gesto de batalla en Re mayor; comienza tras la disolución |
+| Derrota | [Una página sin terminar](gameover.mp3) | 76 bpm; la frase pierde el salto, el Mi desciende a Mi♭ y queda sobre Re |
+| Mundo recuperado | [La línea también es color](restored.mp3) | 100 bpm; la melodía del mapa abre su tercera, las voces cantan juntas y permanece un recuerdo menor |
 
-Los buses de música y SFX tienen margen de nivel y un limitador común. Los impactos bajan temporalmente el bus musical; cada envolvente vuelve a un nivel fijo para que varias techs no vayan apagando la BSO. Un fundido cambia de escena, y el mapa/estuche recuerdan su posición al volver. Al salir de una pestaña se suspende el contexto y el ambiente no acumula sonidos pendientes.
+Las piezas cíclicas contienen una introducción y dos vueltas. El reproductor repite la segunda para conservar las colas asentadas. Victoria y derrota terminan. Los puntos de bucle, instrumentos y formas están en [meta.json](meta.json). La polifonía escrita va de 4 a 9 notas; las colas de muestras son adicionales. Es una estética de muestras SNES reproducida en Web Audio, no una emulación del SPC700.
 
-La masterización usa ganancia constante por pista, filtro a 7,8 kHz y una reducción suave en 2,9 kHz. Conserva la dinámica interna. Referencias de sonoridad: mapa/título −21 LUFS, combate −19, estuche −22, diálogo −24, final −20. Los valores publicados se verifican después de Opus; [score/mastering.json](score/mastering.json) registra el ajuste previo al códec y [score/audio-audit.json](score/audio-audit.json) el análisis posterior. Los 8 ms previos al final del loop se aproximan a la entrada de la vuelta estable para suavizar el empalme.
+## Tacto y respuesta
 
-## Fuente y reconstrucción
+**49 efectos físicos nuevos, 58 muestras contando variantes**, sintetizados y renderizados a PCM de 32 kHz. No son efectos extraídos de otro juego. El código del juego utiliza este banco antes de recurrir al catálogo procedural de emergencia.
 
-Las nuevas piezas y las muestras musicales usan **Chrono Trigger.sf2 (2011)**, de Xouman, distribuida en el [archivo de soundfonts de William Kage](https://www.williamkage.com/snes_soundfonts/). El hash y el origen figuran en [score/soundfont.json](score/soundfont.json). El SF2 no se incluye en este repositorio. Los seis masters anteriores ya usan CT + SNES; sus instrumentos están documentados en la ficha v2.
+- Brocha: presión de cerdas, contacto de madera y arrastre húmedo; el brochazo grande tiene más cuerpo.
+- Lápiz: dos cortes secos, grafito y virutas; la versión larga tiene cambios de dirección.
+- Pintura: impacto opaco, salpicadura y pequeñas gotas. Agua: cavidades más claras y burbujas ligeras.
+- Tinta: cavidad grave, fricción áspera y caída de tono; embestida, golpe y Marea negra tienen sonidos propios.
+- Mezclas: fuego y chasquidos en Llamarada, madera y hojas en Brote, caída de resonancia y rotura en Eclipse. Las notas de los colores se reúnen antes del Arcoíris.
+- Papel y mapa: apertura, cierre, paso de página, goma y pasos por tres superficies.
 
-Dependencias de autoría: Python, FluidSynth, FFmpeg y `pip install -r tools/audio_requirements.txt`. Ejecución desde la raíz del proyecto:
+Al aterrizar el pigmento liberado por un enemigo, la animación dispara la célula en mayor. Carmín conserva su Re al anticipar un ataque: se corrigió un valor cero que antes se interpretaba como la afinación enemiga. La microvariación de material no desafina los avisos musicales.
+
+[score/sfx-bank.json](score/sfx-bank.json) identifica cada efecto, duración, nivel y hash. El demo de SFX se renderiza con el código real del juego y sus niveles de bus, sin música ni normalización posterior.
+
+## Mezcla e integración
+
+La masterización aplica una ganancia constante por tema, corte suave a 7,8 kHz y reducción en 2,9 kHz. Mantiene los contrastes entre secciones. Referencias: mapa/título −21 LUFS, batalla/jefa −19, estuche −22, diálogo −24, mundo recuperado −20. Los nueve Opus decodificados conservan margen de pico; el máximo medido es −3,33 dBTP.
+
+Los impactos atenúan brevemente la música y regresan a un nivel fijo. El mapa recuerda su posición después del combate. Los fundidos, el precargado de escenas y el cambio del estuche evitan reinicios continuos. El manifiesto incluye una revisión por archivo para que la caché no reproduzca la antigua batalla. La edición `file://` incluye exactamente los mismos bytes Opus. Si falla la carga, el sintetizador sigue las partituras nuevas y reproduce la introducción una sola vez.
+
+## Reconstrucción y verificación
+
+Fuente instrumental: **Chrono Trigger.sf2 (2011)** de Xouman, disponible en el [archivo de William Kage](https://www.williamkage.com/snes_soundfonts/). El origen y hash están en [score/soundfont.json](score/soundfont.json). El SF2 no se incluye en Git; las composiciones son originales.
+
+Dependencias: Python con `tools/audio_requirements.txt`, biblioteca FluidSynth y FFmpeg. Desde la raíz:
 
 ```sh
-python tools/compose_score.py --soundfont '/ruta/Chrono Trigger.sf2' --render-dir /tmp/chromara-renders
+python tools/compose_suite.py --soundfont '/ruta/Chrono Trigger.sf2' --render-dir /tmp/chromara-renders
+python tools/design_foley.py
 python tools/pack_music.py --render-dir /tmp/chromara-renders
 python tools/audit_audio.py
 ```
 
-`compose_score.py` contiene las notas, articulaciones, voicings y cambios de dinámica de las piezas nuevas y exporta MIDI. Las seis WAV v2 se conservan como masters. `pack_music.py` produce Ogg/Opus, MP3 y los manifiestos HTTP/offline desde esas mismas fuentes. Los WAV nuevos son intermediarios reproducibles y no se duplican en Git.
+`compose_suite.py` contiene la nueva escritura principal; `compose_score.py` aporta el renderizador y las tres escenas incorporadas en v3. Se exportan nueve MIDI. Los seis WAV principales también están actualizados para escucharlos directamente; los otros tres WAV son intermediarios regenerables. Los informes y gráficos v2 están archivados en `archive/v2/`.
 
-Validación: señal decodificada, picos, sonoridad, empalmes, estado del reproductor, combate completo, final, acordes programados, recuperación del bus, mute, respaldo ante error y apertura `file://`. Las comprobaciones de señal y navegador no equivalen a una revisión auditiva humana.
+Para las comprobaciones del navegador y los demos, con Playwright instalado y un servidor local en el puerto 8765:
+
+```sh
+node tools/test_audio.cjs
+node tools/render_audio_previews.cjs
+```
+
+`CHROME_BIN` permite elegir la ruta de Chrome. Se prueban las coreografías de las herramientas, notas de color y participantes de mezcla, impacto de tinta, las nueve pistas, transiciones hasta el final, recuperación del bus musical, mute, carga offline, caché, errores de red y bucles del respaldo. Se renderizan todos los efectos para detectar silencio, valores no finitos y saturación. [score/audio-audit.json](score/audio-audit.json) y [score/mastering.json](score/mastering.json) contienen las mediciones.
+
+Estas verificaciones comprueban señal, partitura e integración; no sustituyen una escucha crítica humana. Los dos demos permiten valorar el resultado musical y ajustar preferencias concretas.

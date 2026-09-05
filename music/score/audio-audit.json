@@ -1,120 +1,118 @@
 {
-  "map": {
-    "duration": 182.4,
-    "peakDBFS": -6.81,
-    "integratedLUFS": -20.99,
-    "truePeakDBTP": -6.8,
-    "loudnessRangeLU": 15.8,
-    "sha256": "31d4029f3a3b637d36ca82eb09c827c884a9073dabb8babf19581b9c3dba9770",
-    "loopStart": 96.0,
-    "loopEnd": 182.4,
-    "seamJump": 0.003813,
-    "localDerivativeRMS": 0.001669,
+  "title": {
+    "duration": 148.571438,
+    "peakDBFS": -8.42,
+    "integratedLUFS": -21.0,
+    "truePeakDBTP": -8.42,
+    "loudnessRangeLU": 7.4,
+    "sha256": "0c9b1f42d2fa4a0cf676d5ee4b397597b4ebb118f15055532cd98a9ca524f7e1",
+    "loopStart": 80.0,
+    "loopEnd": 148.5714375,
+    "seamJump": 0.002433,
+    "localDerivativeRMS": 0.001019,
     "eightBarRMSDB": [
-      -28.5,
-      -25.7,
-      -22.6,
-      -24.2,
-      -28.4
+      -25.5,
+      -25.8,
+      -21.0
+    ]
+  },
+  "map": {
+    "duration": 124.8,
+    "peakDBFS": -8.83,
+    "integratedLUFS": -20.99,
+    "truePeakDBTP": -8.82,
+    "loudnessRangeLU": 9.0,
+    "sha256": "528adc3d0be186e60c45b4ca5ce39212354ac04ed34aebb9241ed938569cd943",
+    "loopStart": 67.2,
+    "loopEnd": 124.8,
+    "seamJump": 0.000251,
+    "localDerivativeRMS": 0.001026,
+    "eightBarRMSDB": [
+      -21.7,
+      -25.9,
+      -23.3
     ]
   },
   "battle": {
-    "duration": 96.0,
-    "peakDBFS": -2.95,
+    "duration": 99.0,
+    "peakDBFS": -5.67,
     "integratedLUFS": -18.99,
-    "truePeakDBTP": -2.91,
-    "loudnessRangeLU": 4.6,
-    "sha256": "b330a9a5b066fc33e662395f5972462a04c55ae96c08f3446e37458537b2aeec",
-    "loopStart": 51.2,
-    "loopEnd": 96.0,
-    "seamJump": 0.022837,
-    "localDerivativeRMS": 0.011038,
+    "truePeakDBTP": -5.65,
+    "loudnessRangeLU": 2.6,
+    "sha256": "8c232ec06ef7eeb3e2a5d5feaf859e9e057135c0352461a0835277fb3b776eb5",
+    "loopStart": 51.0,
+    "loopEnd": 99.0,
+    "seamJump": 0.003712,
+    "localDerivativeRMS": 0.022708,
     "eightBarRMSDB": [
-      -22.1,
-      -20.9,
-      -21.7,
-      -18.3
+      -21.9,
+      -21.4,
+      -20.4,
+      -21.4
     ]
   },
   "boss": {
-    "duration": 113.333333,
-    "peakDBFS": -2.14,
-    "integratedLUFS": -19.21,
-    "truePeakDBTP": -2.1,
-    "loudnessRangeLU": 14.2,
-    "sha256": "08081c925c160e05640658c011029f635b5e4f8878a09d97c8027ff44a1eceab",
+    "duration": 113.333354,
+    "peakDBFS": -3.33,
+    "integratedLUFS": -18.98,
+    "truePeakDBTP": -3.33,
+    "loudnessRangeLU": 8.1,
+    "sha256": "30a29eb318c613d67b1590b7255591bcd438d80494a8b3a90bf2f78882edee67",
     "loopStart": 60.0,
-    "loopEnd": 113.33333333333333,
-    "seamJump": 0.018604,
-    "localDerivativeRMS": 0.010878,
+    "loopEnd": 113.33334375,
+    "seamJump": 0.003881,
+    "localDerivativeRMS": 0.01799,
     "eightBarRMSDB": [
-      -24.6,
-      -21.9,
-      -30.8,
-      -18.4
+      -20.5,
+      -21.1,
+      -26.7,
+      -19.4
     ]
   },
   "victory": {
-    "duration": 6.714292,
-    "peakDBFS": -7.18,
+    "duration": 7.7,
+    "peakDBFS": -6.64,
     "integratedLUFS": -17.99,
-    "truePeakDBTP": -7.14,
-    "loudnessRangeLU": 1.5,
-    "sha256": "0dec3c7841186d2a7ccfd794818203f479ccb7cd8c9757968bbd36a8f3adc713"
+    "truePeakDBTP": -6.64,
+    "loudnessRangeLU": 3.3,
+    "sha256": "15de814edf8ed8dad5f8efcbfddd1aac96b5a5d816921ade066d1222b4a6145b"
   },
   "gameover": {
-    "duration": 6.0,
-    "peakDBFS": -8.17,
-    "integratedLUFS": -23.0,
-    "truePeakDBTP": -8.17,
-    "loudnessRangeLU": 9.0,
-    "sha256": "66e67ccf85ff70d1ce843335a475d3237c28570f389ff6d42a4d87210f305a2d"
-  },
-  "title": {
-    "duration": 138.666667,
-    "peakDBFS": -7.44,
-    "integratedLUFS": -20.99,
-    "truePeakDBTP": -7.39,
-    "loudnessRangeLU": 11.5,
-    "sha256": "8621a4078fc81f571e410117fbd2b7bbb01714a757764aeaa184e42f70f8d3dd",
-    "loopStart": 74.66666666666667,
-    "loopEnd": 138.66666666666666,
-    "seamJump": 0.003195,
-    "localDerivativeRMS": 0.001692,
-    "eightBarRMSDB": [
-      -27.0,
-      -25.4,
-      -22.6
-    ]
+    "duration": 11.173687,
+    "peakDBFS": -11.57,
+    "integratedLUFS": -22.98,
+    "truePeakDBTP": -11.57,
+    "loudnessRangeLU": 11.4,
+    "sha256": "b65344bded99959d90d4cbcb9b5cabba24d179aa0b89aada12365ed69539d522"
   },
   "atelier": {
     "duration": 83.333354,
-    "peakDBFS": -9.61,
-    "integratedLUFS": -22.0,
-    "truePeakDBTP": -9.6,
+    "peakDBFS": -9.43,
+    "integratedLUFS": -21.99,
+    "truePeakDBTP": -9.43,
     "loudnessRangeLU": 8.9,
-    "sha256": "fdbeea02fc82acd5accf00c98b940075be309661787fd705baa99a93616b896a",
+    "sha256": "e2726779b0da76a3c0fc7278c6ead4d5ffd38e7b9f284aec355cc4e5dfed75c8",
     "loopStart": 43.33334375,
     "loopEnd": 83.33334375,
-    "seamJump": 0.000161,
-    "localDerivativeRMS": 0.007463,
+    "seamJump": 0.000132,
+    "localDerivativeRMS": 0.007891,
     "eightBarRMSDB": [
       -26.6,
       -22.7,
-      -27.8
+      -27.7
     ]
   },
   "prelude": {
     "duration": 113.333354,
-    "peakDBFS": -12.25,
+    "peakDBFS": -12.16,
     "integratedLUFS": -24.0,
-    "truePeakDBTP": -12.25,
+    "truePeakDBTP": -12.16,
     "loudnessRangeLU": 7.6,
-    "sha256": "7202928e0019a3c132af7044e59d1c107f05446bd080ac03694b036e3d37a071",
+    "sha256": "344cbb43f2b8aa1f3e187cc37336c481b96a5b8f0ed729c8c22a4fe320c55bb2",
     "loopStart": 60.0,
     "loopEnd": 113.33334375,
-    "seamJump": 0.000418,
-    "localDerivativeRMS": 0.000642,
+    "seamJump": 0.000198,
+    "localDerivativeRMS": 0.000728,
     "eightBarRMSDB": [
       -24.0,
       -30.1
@@ -122,17 +120,17 @@
   },
   "restored": {
     "duration": 124.8,
-    "peakDBFS": -8.05,
-    "integratedLUFS": -19.99,
-    "truePeakDBTP": -8.05,
+    "peakDBFS": -8.12,
+    "integratedLUFS": -20.0,
+    "truePeakDBTP": -8.11,
     "loudnessRangeLU": 7.4,
-    "sha256": "8a80a27902d39e2140e0e2aa38f046d7bab6d5547c6e0dcef046ecc83e3765db",
+    "sha256": "6ec74bf3f22bf87a2cec0dec45029e655aa06c6717ca4f6cf42cdf2b8e627f9d",
     "loopStart": 67.2,
     "loopEnd": 124.8,
-    "seamJump": 0.000669,
-    "localDerivativeRMS": 0.000915,
+    "seamJump": 0.000521,
+    "localDerivativeRMS": 0.000992,
     "eightBarRMSDB": [
-      -22.6,
+      -22.7,
       -24.7,
       -21.1
     ]

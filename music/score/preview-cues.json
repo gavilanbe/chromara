@@ -1,0 +1,438 @@
+{
+  "leitmotif": [
+    {
+      "at": 0,
+      "name": "title",
+      "meaning": "La promesa: faltaba el salto; aparecen los tres colores",
+      "sourceStart": 0,
+      "duration": 8
+    },
+    {
+      "at": 8.7,
+      "name": "map",
+      "meaning": "El papel gris: Re–Fa–Mi–La",
+      "sourceStart": 9.6,
+      "duration": 9.6
+    },
+    {
+      "at": 19,
+      "name": "battle",
+      "meaning": "El mismo gesto convertido en impulso",
+      "sourceStart": 0,
+      "duration": 12
+    },
+    {
+      "at": 31.7,
+      "name": "boss",
+      "meaning": "La Tinta: La–Fa–Mi♭–Re",
+      "sourceStart": 6.666667,
+      "duration": 8
+    },
+    {
+      "at": 40.4,
+      "name": "restored",
+      "meaning": "El mapa recuperado: Re–Fa♯–Mi–La",
+      "sourceStart": 9.6,
+      "duration": 9.6
+    },
+    {
+      "at": 50.7,
+      "name": "victory",
+      "meaning": "La resolución",
+      "sourceStart": 0,
+      "duration": 7.7
+    }
+  ],
+  "sfx": [
+    {
+      "at": 0,
+      "title": "Cuaderno: pasar página, cursor, confirmar",
+      "events": [
+        {
+          "at": 0,
+          "name": "page",
+          "options": {}
+        },
+        {
+          "at": 0.5,
+          "name": "cursor",
+          "options": {}
+        },
+        {
+          "at": 0.75,
+          "name": "cursor",
+          "options": {
+            "semi": 4
+          }
+        },
+        {
+          "at": 1,
+          "name": "confirm",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 3,
+      "title": "Carmín: cerdas, brocha y pintura espesa",
+      "events": [
+        {
+          "at": 0,
+          "name": "charge",
+          "options": {
+            "semi": 0
+          }
+        },
+        {
+          "at": 0.3,
+          "name": "brush_big",
+          "options": {}
+        },
+        {
+          "at": 0.7,
+          "name": "splat_big",
+          "options": {}
+        },
+        {
+          "at": 0.7,
+          "name": "hit",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 6,
+      "title": "Ámbar: dos cortes de grafito",
+      "events": [
+        {
+          "at": 0,
+          "name": "charge",
+          "options": {
+            "semi": 4
+          }
+        },
+        {
+          "at": 0.25,
+          "name": "scratch",
+          "options": {}
+        },
+        {
+          "at": 0.58,
+          "name": "scratch_long",
+          "options": {}
+        },
+        {
+          "at": 0.85,
+          "name": "hitweak",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 9,
+      "title": "Añil: pincel y agua",
+      "events": [
+        {
+          "at": 0,
+          "name": "charge",
+          "options": {
+            "semi": 7
+          }
+        },
+        {
+          "at": 0.3,
+          "name": "brush_hiss",
+          "options": {}
+        },
+        {
+          "at": 0.55,
+          "name": "splash_clean",
+          "options": {}
+        },
+        {
+          "at": 0.62,
+          "name": "hit",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 12,
+      "title": "Golpe resistido; goma y virutas",
+      "events": [
+        {
+          "at": 0,
+          "name": "resist",
+          "options": {}
+        },
+        {
+          "at": 0.5,
+          "name": "rub",
+          "options": {}
+        },
+        {
+          "at": 0.65,
+          "name": "rub",
+          "options": {}
+        },
+        {
+          "at": 0.8,
+          "name": "crumbs",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 15,
+      "title": "La tinta se disuelve; el pigmento vuelve",
+      "events": [
+        {
+          "at": 0,
+          "name": "die",
+          "options": {}
+        },
+        {
+          "at": 0.95,
+          "name": "splash_clean",
+          "options": {
+            "vol": 0.6
+          }
+        },
+        {
+          "at": 1.03,
+          "name": "pigment_return",
+          "options": {
+            "vol": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "at": 19,
+      "title": "Llamarada: Carmín y Ámbar",
+      "events": [
+        {
+          "at": 0,
+          "name": "mix",
+          "options": {
+            "colours": [
+              0,
+              4
+            ]
+          }
+        },
+        {
+          "at": 0.4,
+          "name": "fwoom",
+          "options": {}
+        },
+        {
+          "at": 0.55,
+          "name": "crackle",
+          "options": {}
+        },
+        {
+          "at": 0.6,
+          "name": "impact_sub",
+          "options": {
+            "vol": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "at": 23,
+      "title": "Brote: Ámbar y Añil",
+      "events": [
+        {
+          "at": 0,
+          "name": "mix",
+          "options": {
+            "colours": [
+              4,
+              7
+            ]
+          }
+        },
+        {
+          "at": 0.4,
+          "name": "grow",
+          "options": {}
+        },
+        {
+          "at": 0.6,
+          "name": "leaves",
+          "options": {}
+        },
+        {
+          "at": 0.9,
+          "name": "heal_bells",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 27,
+      "title": "Eclipse: Carmín y Añil",
+      "events": [
+        {
+          "at": 0,
+          "name": "mix",
+          "options": {
+            "colours": [
+              0,
+              7
+            ]
+          }
+        },
+        {
+          "at": 0.45,
+          "name": "hum_down",
+          "options": {}
+        },
+        {
+          "at": 1.1,
+          "name": "impact_sub",
+          "options": {}
+        },
+        {
+          "at": 1.12,
+          "name": "glass",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 31,
+      "title": "Arcoíris: las tres voces",
+      "events": [
+        {
+          "at": 0,
+          "name": "charge",
+          "options": {
+            "semi": 0
+          }
+        },
+        {
+          "at": 0.1,
+          "name": "charge",
+          "options": {
+            "semi": 4
+          }
+        },
+        {
+          "at": 0.2,
+          "name": "charge",
+          "options": {
+            "semi": 7
+          }
+        },
+        {
+          "at": 0.6,
+          "name": "mix",
+          "options": {}
+        },
+        {
+          "at": 1,
+          "name": "rainbow",
+          "options": {}
+        },
+        {
+          "at": 1.4,
+          "name": "saturate",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 36,
+      "title": "Enemigo: aviso, embestida y golpe de tinta",
+      "events": [
+        {
+          "at": 0,
+          "name": "enemy_soon",
+          "options": {}
+        },
+        {
+          "at": 0.6,
+          "name": "lunge",
+          "options": {}
+        },
+        {
+          "at": 0.95,
+          "name": "ink_hit",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 39,
+      "title": "Tinta proyectada; impacto sobre papel",
+      "events": [
+        {
+          "at": 0,
+          "name": "ink_jet",
+          "options": {}
+        },
+        {
+          "at": 0.5,
+          "name": "ink_hit",
+          "options": {}
+        },
+        {
+          "at": 0.8,
+          "name": "ink_jet",
+          "options": {}
+        },
+        {
+          "at": 1.3,
+          "name": "ink_hit",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 43,
+      "title": "La Tinta: carga y Marea negra",
+      "events": [
+        {
+          "at": 0,
+          "name": "hum_down",
+          "options": {
+            "vol": 0.6
+          }
+        },
+        {
+          "at": 0.7,
+          "name": "impact_sub",
+          "options": {
+            "vol": 0.4
+          }
+        },
+        {
+          "at": 1.1,
+          "name": "ink_tide",
+          "options": {}
+        },
+        {
+          "at": 1.15,
+          "name": "ink_hit",
+          "options": {}
+        }
+      ]
+    },
+    {
+      "at": 48,
+      "title": "La Pluma: descubrimiento",
+      "events": [
+        {
+          "at": 0,
+          "name": "discovery",
+          "options": {}
+        }
+      ]
+    }
+  ],
+  "sfxPeak": 0.27177003026008606,
+  "note": "Extractos y efectos del juego; no son dos composiciones nuevas. SFX sin música, con los niveles del bus del juego."
+}

@@ -2,13 +2,14 @@
 """Master all cues once, encode Opus/MP3 and build matching HTTP/file:// manifests.
 
 python tools/pack_music.py --render-dir /tmp/chromara-renders
-The six existing WAV masters are unchanged. compose_score.py supplies the new WAVs.
+compose_suite.py supplies all nine WAVs; design_foley.py supplies the effect bank.
 Static gain preserves musical dynamics; no per-section loudness flattening.
 """
 import argparse
 from array import array
 import base64
 import json
+import hashlib
 import math
 from pathlib import Path
 import subprocess
@@ -56,7 +57,7 @@ def main():
             render_source=source
             if m['loop']:
                 # Match the final 8 ms to the lead-in of the steady-state loop.
-                # The v2 masters remain untouched; only the published copy changes.
+                # Only the published copy changes; the render remains reproducible.
                 with wave.open(str(source)) as w:
                     params=w.getparams(); pcm=array('h',w.readframes(w.getnframes()))
                 if params.sampwidth != 2: raise ValueError('Loop masters must be PCM16')
@@ -80,6 +81,7 @@ def main():
             m['loopStartSample']=round(m['loopStart']*sample_rate);m['loopEndSample']=round(m['loopEnd']*sample_rate)
             m['loopStart']=m['loopStartSample']/sample_rate;m['loopEnd']=m['loopEndSample']/sample_rate
         entry={key:m[key] for key in ['title','loop','loopStart','loopEnd','duration']}
+        entry['revision']=hashlib.sha256((MUSIC/(name+'.opus.ogg')).read_bytes()).hexdigest()[:12]
         cues[name]=entry
         embedded[name]={**entry,'data':base64.b64encode((MUSIC/(name+'.opus.ogg')).read_bytes()).decode()}
         report[name]={'inputLUFS':integrated,'inputTruePeakDB':peak,'gainDB':round(gain,3),

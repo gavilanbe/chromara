@@ -18,7 +18,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   page.on('pageerror', e => errors.push(e.message)); page.on('request', r=>requests.push(r.url()));
   await page.goto(base); await page.waitForFunction(()=>window.__chromara);
   assert.equal(requests.some(x=>x.includes('music_samples.js')), false, 'HTTP must not load the offline music bundle');
-  assert.equal(requests.some(x=>x.endsWith('.opus.ogg')), false, 'no autoplay before a gesture');
+  assert.equal(requests.some(x=>new URL(x).pathname.endsWith('.opus.ogg')), false, 'no autoplay before a gesture');
   await page.keyboard.press('z'); await delay(180); await page.keyboard.press('z');
   await page.waitForFunction(()=>__chromara.Audio.src?.name==='title');
   console.log('PASS title starts after opening the notebook');
@@ -26,6 +26,28 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   await page.waitForFunction(()=>__chromara.Audio.src?.name==='map'); await delay(650);
   await page.evaluate(()=>__chromara.battle('1'));
   await page.waitForFunction(()=>__chromara.Game.state==='battle' && __chromara.Audio.src?.name==='battle',null,{timeout:20000});
+  assert.equal(await page.evaluate(()=>MUSIC_CUES.battle.title),'Tres trazos contra la tinta');
+  assert.equal(await page.evaluate(()=>MUSIC_FALLBACK.battle.bpm),160);
+  assert(requests.some(x=>/battle\.opus\.ogg\?v=[a-f0-9]{12}$/.test(x)), 'new composition bypasses cached v3 audio');
+  const choreography = await page.evaluate(()=>{
+   const A=__chromara.Audio, original=A.sfx, calls=[];__chromara.pause(true);
+   A.sfx=function(name,options){calls.push({name,options});return original.call(this,name,options);};
+   const target=B.enemies[0], hp=target.hp; target.hp=10000;
+   const run=gen=>{for(let i=0;i<800;i++)if(gen.next().done)return;throw new Error('Attack never completes');};
+   try {
+    for(const u of B.party)run(actAttack(u,target));
+    for(const id of ['llamarada','brote','eclipse','arcoiris']) {
+     const tech=DATA.techs[id], users=tech.users.map(id=>B.party.find(p=>p.id===id));
+     run(actTech(users,tech,[target],tech.color));
+    }
+    damage(B.party[0],1,'negro');
+   } finally {target.hp=hp;A.sfx=original;__chromara.pause(false);}
+   return calls;
+  });
+  for(const name of ['brush_sweep','scratch','scratch_long','brush_hiss','ink_hit'])assert(choreography.some(e=>e.name===name),name+' reaches actual choreography');
+  assert(choreography.some(e=>e.name==='charge'&&e.options.semi===0),'Carmín retains Re, not the enemy pitch');
+  assert.deepEqual(choreography.filter(e=>e.name==='mix').map(e=>e.options.colours),[[0,4],[4,7],[0,7],[0,4,7]],'all four techs use their actual participants');
+  console.log('PASS three tool choreographies, pigment pitches, fusion and ink impact routing');
   const saved = await page.evaluate(()=>__chromara.Audio.positions.map);
   assert(saved>.4, 'the map position is remembered');
   await page.evaluate(()=>__chromara.win());
@@ -92,20 +114,33 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   });
   assert.equal(current,'restored');
   // A failed fetch/decode must start the actual written fallback instead of silence.
-  await page.route('**/music/atelier.opus.ogg',route=>route.abort());
+  await page.route('**/music/atelier.opus.ogg*',route=>route.abort());
   await page.evaluate(()=>{delete __chromara.Audio.buffers.atelier;__chromara.Audio.play('atelier',{restart:true});});
   await page.waitForFunction(()=>__chromara.Audio.cur==='atelier' && !!__chromara.Audio.seq);
   await page.evaluate(()=>__chromara.Audio.stop());
   assert.equal(await page.evaluate(()=>__chromara.Audio.seq),null);
   console.log('PASS cancellation race and failed-fetch fallback');
+  const loopNotes=await page.evaluate(async()=>{
+   const A=__chromara.Audio, original=A.note, notes=[];
+   MUSIC_FALLBACK.__loop_test={bpm:960,stepsPerBeat:4,length:16,loopStart:4,loop:true,
+    tracks:[{notes:[[0,61,1],[4,65,1],[12,69,1]]}]};
+   A.note=(tr,time,midi)=>notes.push(midi);
+   try {A.play('__loop_test',{fallback:true});await new Promise(r=>setTimeout(r,550));}
+   finally {A.stop();A.note=original;delete MUSIC_FALLBACK.__loop_test;}
+   return notes;
+  });
+  assert.equal(loopNotes.filter(n=>n===61).length,1,'fallback intro plays once');
+  assert(loopNotes.filter(n=>n===65).length>=3,'fallback repeats the written loop');
+  console.log('PASS fallback retains the introduction only on first entry');
   // Render the actual sound-design primitives offline, not a mock AudioParam.
   const sfxSource = fs.readFileSync(path.join(root,'sfx.js'),'utf8');
   const effects = await page.evaluate(async source => {
-   const names=['brush_sweep','brush_big','scratch','scratch_long','splash_clean','splat_big','ink_jet','mix_bell','discovery','ready','equip','rainbow','heal','saturate'];
+   const names=[...new Set(Object.values(SFX_SAMPLES).filter(s=>s.kind==='effect').map(s=>s.event)), 'mix_bell','discovery','ready','equip','rainbow','heal','saturate','pigment_return'];
    const rate=32000, interval=3.5, context=new OfflineAudioContext(2, Math.ceil((names.length*interval+3)*rate), rate);
    const master=context.createGain();master.gain.value=.55;master.connect(context.destination);
    const kit=new Function(source+'; return SFX;')();kit.init(context,master);kit.duck=()=>{};
    names.forEach((name,i)=>kit.play(name,{when:i*interval,semi:i===9?7:0}));
+   if(Object.keys(kit.effects).length !== 49 || Object.keys(kit.effectCounters).length !== 49) throw new Error('Every new material must actually reach the effect sampler');
    const out=await context.startRendering(); const data=out.getChannelData(0);
    return names.map((name,i)=>{let peak=0,energy=0;for(const v of data.slice(Math.round(i*interval*rate),Math.round((i+1)*interval*rate))){peak=Math.max(peak,Math.abs(v));energy+=v*v;}return {name,peak,rms:Math.sqrt(energy/(interval*rate))};});
   },sfxSource);
@@ -119,7 +154,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   await offline.keyboard.press('z');await offline.evaluate(()=>{__chromara.start();__chromara.OW.msg=null;});
   await offline.waitForFunction(()=>__chromara.Audio.src?.name==='map');
   assert(offlineRequests.some(x=>x.includes('music_samples.js')));
-  assert(!offlineRequests.some(x=>x.endsWith('.opus.ogg')));
+  assert(!offlineRequests.some(x=>new URL(x).pathname.endsWith('.opus.ogg')));
   console.log('PASS file:// offline embedded playback');
   assert.deepEqual(errors,[]);
  } finally {await browser.close();}

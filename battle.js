@@ -39,7 +39,7 @@ function damage(target, raw, col, src) {
   target.hp = Math.max(0, target.hp - dmg); target.pose = 'hurt'; target.poseT = 14; target.uiHit = 12;
   num(target, dmg, mult >= 2 ? '#f2c93a' : mult < 1 ? '#8c8ab0' : '#f4f0ea', mult >= 2);
   impactFx(target, C(col), mult >= 2 ? 1.6 : mult < 1 ? .6 : 1);
-  Audio.sfx(mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 10 : 6; B.shake = mult >= 2 ? 6 : 4; if (mult >= 2) B.slowmo = Math.max(B.slowmo, 8);
+  Audio.sfx(target.kind === 'party' || col === 'negro' ? 'ink_hit' : mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4 }); B.hitstop = mult >= 2 ? 10 : 6; B.shake = mult >= 2 ? 6 : 4; if (mult >= 2) B.slowmo = Math.max(B.slowmo, 8);
   if (mult >= 2) say((src ? src + ': ' : '') + '¡Débil al ' + DATA.colors[col].name.toLowerCase() + '!', '#f2c93a');
   if (target.hp <= 0) kill(target);
   return dmg;
@@ -424,7 +424,7 @@ function updateBattle() {
     if (u.dead) { const was = u.dead; u.dead += u.boss ? .02 : .03; const q = u.dead - 1;
       if (q < .5 && B.t % 2 === 0) B.particles.push({ wx: u.wx + R(-u.def.w * .4, u.def.w * .4), wy: u.wy + R(-4, 4), wz: R(2, u.def.h * (1 - q * 1.6)), vx: 0, vy: 0, vz: -R(.2, .8), g: .05, col: C('negro'), t: 0, life: 18, size: 2 }); // chorrea
       if (q > .2 && q < 1.2 && B.t % 3 === 0) B.particles.push({ wx: u.wx + R(-u.def.w * .5, u.def.w * .5), wy: u.wy + R(-6, 6), wz: R(0, 6), vx: R(-.2, .2), vy: 0, vz: R(.4, 1), g: -.02, col: '#4a4660', t: 0, life: 26, size: 2 }); // vahos
-      if (u.def.core && was - 1 < 1.4 && q >= 1.4) { B.puddles.push({ wx: u.wx, wy: u.wy, col: u.def.core, w: u.data.w }); burst(u.wx, u.wy, 2, u.def.core, 14, 1.8, 30, .06); Audio.sfx('splash_clean', { vol: .6 }); Audio.sfx('tinkle', { when: .1, semi: 5 }); }
+      if (u.def.core && was - 1 < 1.4 && q >= 1.4) { B.puddles.push({ wx: u.wx, wy: u.wy, col: u.def.core, w: u.data.w }); burst(u.wx, u.wy, 2, u.def.core, 14, 1.8, 30, .06); Audio.sfx('splash_clean', { vol: .6 }); Audio.sfx('pigment_return', { when: .08, vol: .8 }); }
       if (u.def.core && was - 1 < .5 && q >= .5) Audio.sfx('grow', { vol: .5, semi: 7 }); } if (u.goop) { const G = u.goop; G.t++; for (const d of G.drips) d.len = Math.min(d.max, d.len + d.speed); if (G.t > G.life || !u.alive) u.goop = null; } }
   if (B.hitstop > 0) { B.hitstop--; return; }
   if (B.slowmo > 0) { B.slowmo--; if (B.t & 1) return; } // cámara lenta: el mundo avanza a la mitad
