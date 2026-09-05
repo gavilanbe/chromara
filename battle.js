@@ -167,14 +167,15 @@ function inkSplat(x, y, R, k, t, seed = 1, drips = true) {
 }
 // Transición de la jefa: el Tiznal retumba, La Tinta emerge, diálogo, la tinta inunda desde los bordes y se retira como una marea
 function* bossTransitionGen(foe) {
-  const T = B.tr; T.boss = true; T.foe = foe; Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
+  const T = B.tr; T.boss = true; T.foe = foe; Audio.prepare('prelude'); Audio.prepare('boss'); Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
   T.stage = 'rumble'; for (let i = 0; i < 50; i++) { T.k = i / 50; if (i % 10 === 0) { B.shake = 3; Audio.sfx('impact_sub', { vol: .35 }); } yield; }
   Audio.sfx('ink_jet'); Audio.sfx('splash', { when: .2 });
   T.stage = 'rise'; for (let i = 0; i < 40; i++) { T.k = i / 40; if (i === 30) B.shake = 5; yield; }
   // diálogo
+  Audio.play('prelude', { fade: .8 });
   T.stage = 'dialogue'; T.dlg = { i: 0, ch: 0, t: 0 };
   const D = DATA.bossDialogue;
-  while (T.dlg.i < D.length) { const line = D[T.dlg.i]; T.dlg.t++; if (T.dlg.ch < line.text.length) { T.dlg.ch += (T.dlg.t % 2 === 0 ? 1 : 0); if (T.dlg.t % 6 === 0) Audio.sfx('scratch', { vol: .18, semi: line.who === 'tinta' ? -7 : 4 }); }
+  while (T.dlg.i < D.length) { const line = D[T.dlg.i]; T.dlg.t++; if (T.dlg.ch < line.text.length) { T.dlg.ch += (T.dlg.t % 2 === 0 ? 1 : 0); if (T.dlg.t % 6 === 0) Audio.sfx('text', { vol: .65, semi: SEMI[line.who] ?? -12 }); }
     if (hit('ok')) { if (T.dlg.ch < line.text.length) T.dlg.ch = line.text.length; else { T.dlg.i++; T.dlg.ch = 0; T.dlg.t = 0; Audio.sfx('page', { vol: .5 }); } }
     yield; }
   // inundación: la tinta sube por los bordes hasta cubrirlo todo
@@ -449,7 +450,7 @@ function projectUnits() { for (const u of B.units) { const p = project(u.wx, u.w
 const updateTransition = () => updateBattle(), drawTransition = () => drawBattle();
 function checkEnd() {
   B.menu = null; B.queue = [];
-  if (!alive(B.enemies).length) { B.phase = 'victory'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.victory) Audio.play('victory'); else Audio.sfx('victory'); B.gen = victoryGen(); }
+  if (!alive(B.enemies).length) { B.phase = 'victory'; B.t = 0; Audio.prepare('victory'); if (B.foe.boss) Audio.prepare('restored'); Audio.stop(.35); B.gen = victoryGen(); }
   else if (!alive(B.party).length) { B.phase = 'defeat'; B.t = 0; Audio.stop(); if (typeof MUSIC !== 'undefined' && MUSIC.gameover) Audio.play('gameover'); }
 }
 function updateEnd() {
@@ -460,6 +461,7 @@ function updateEnd() {
 // por el suelo mientras la cámara vuelve a cenital y ellos regresan a su sitio del mapa. Sin corte: el mapa ya está debajo.
 function* victoryGen() {
   while (B.enemies.some(u => u.dead && u.dead < 2.4)) yield; // que el último enemigo termine de disolverse
+  Audio.play('victory', { fade: .025 });
   const pc = partyC(); camFocus(pc[0], pc[1], { dist: 66, turn: .4, h: 36, pitch: .5, ease: .08 }); B.showResult = false;
   for (let i = 0; i < 64; i++) {
     B.party.forEach((u, j) => { if (!u.alive) return; const k = (i - j * 8) / 26; if (k >= 0 && k < 1) { u.pose = 'happy'; u.wz = Math.abs(Math.sin(k * Math.PI * 2)) * (k < .5 ? 18 : 9); if (i - j * 8 === 0) { Audio.sfx('tinkle', semiOf(u)); sparkle(u.wx, u.wy, u.def.h + 8, C(u.color)); burst(u.wx, u.wy, u.def.h * .5, C(u.color), 8, 1.2, 22, .02); } } else if (k >= 1) u.wz = 0; });
@@ -490,12 +492,13 @@ function* victoryGen() {
   }
   rf.dur = 0;
   if (B.foe.boss) { Game.bossDown = true; Game.palette = 'vivo'; Audio.sfx('saturate'); Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); OW.msg = { lines: DATA.texts.ending, t: 0 }; }
-  OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; if (Party.some(q => q.cur.hp < effStats(q).hp * .6 || q.cur.mp < effStats(q).mp * .3)) OW.hint = 150; setState('overworld'); Audio.play('map');
+  OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; if (Party.some(q => q.cur.hp < effStats(q).hp * .6 || q.cur.mp < effStats(q).mp * .3)) OW.hint = 150; setState('overworld'); Audio.play(worldCue(), { resume: true });
 }
 function resetGame() {
   Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false; Game.owned = {}; Game.puzzle = PUZ0();
   Party.forEach((p, i) => { p.acc = DATA.party[i].acc; const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; });
-  initOverworld(); setState('overworld'); Audio.play('map');
+  Audio.positions = {};
+  initOverworld(); setState('overworld'); Audio.play(worldCue());
 }
 // =====================================================================
 // 7. Render: cielo, suelo Mode 7, capa de suelo (charcos, marcas), entidades por profundidad, partículas, GUI

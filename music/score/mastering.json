@@ -1,0 +1,74 @@
+{
+  "map": {
+    "inputLUFS": -16.05,
+    "inputTruePeakDB": -1.58,
+    "gainDB": -4.95,
+    "estimatedOutputLUFS": -21.0,
+    "estimatedTruePeakDB": -6.53,
+    "bytes": 2646440
+  },
+  "battle": {
+    "inputLUFS": -17.1,
+    "inputTruePeakDB": -1.12,
+    "gainDB": -1.9,
+    "estimatedOutputLUFS": -19.0,
+    "estimatedTruePeakDB": -3.02,
+    "bytes": 1524993
+  },
+  "boss": {
+    "inputLUFS": -18.46,
+    "inputTruePeakDB": -1.45,
+    "gainDB": -0.75,
+    "estimatedOutputLUFS": -19.21,
+    "estimatedTruePeakDB": -2.2,
+    "bytes": 1578005
+  },
+  "victory": {
+    "inputLUFS": -12.78,
+    "inputTruePeakDB": -1.82,
+    "gainDB": -5.22,
+    "estimatedOutputLUFS": -18.0,
+    "estimatedTruePeakDB": -7.04,
+    "bytes": 110074
+  },
+  "gameover": {
+    "inputLUFS": -16.12,
+    "inputTruePeakDB": -1.09,
+    "gainDB": -6.88,
+    "estimatedOutputLUFS": -23.0,
+    "estimatedTruePeakDB": -7.97,
+    "bytes": 78314
+  },
+  "title": {
+    "inputLUFS": -15.37,
+    "inputTruePeakDB": -1.61,
+    "gainDB": -5.63,
+    "estimatedOutputLUFS": -21.0,
+    "estimatedTruePeakDB": -7.24,
+    "bytes": 2085876
+  },
+  "atelier": {
+    "inputLUFS": -14.98,
+    "inputTruePeakDB": -2.72,
+    "gainDB": -7.02,
+    "estimatedOutputLUFS": -22.0,
+    "estimatedTruePeakDB": -9.74,
+    "bytes": 1237075
+  },
+  "prelude": {
+    "inputLUFS": -14.08,
+    "inputTruePeakDB": -2.56,
+    "gainDB": -9.92,
+    "estimatedOutputLUFS": -24.0,
+    "estimatedTruePeakDB": -12.48,
+    "bytes": 1486695
+  },
+  "restored": {
+    "inputLUFS": -14.44,
+    "inputTruePeakDB": -2.6,
+    "gainDB": -5.56,
+    "estimatedOutputLUFS": -20.0,
+    "estimatedTruePeakDB": -8.16,
+    "bytes": 1675315
+  }
+}

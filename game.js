@@ -39,6 +39,21 @@ addEventListener('keyup', e => { const k = KEYMAP[e.key] || KEYMAP[e.key.toLower
 let ANYKEY = false; addEventListener('keydown', e => { if (e.repeat) return; ANYKEY = true; Audio.init(); }); // cualquier tecla (portada)
 const hit = k => { const v = pressed[k]; pressed[k] = false; return !!v; };
 
+addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'm' && !e.repeat) {
+    Audio.init(); Audio.muted = !Audio.muted;
+    if (Audio.master) Audio.master.gain.setTargetAtTime(Audio.muted ? 0 : .55, Audio.ctx.currentTime, .025);
+    document.getElementById('hint').textContent = 'Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás · Enter: menú · M ' + (Audio.muted ? 'activar sonido' : 'silenciar') + ' · F1 debug';
+  }
+});
+// Pause audio with the tab and release held keys, avoiding a hidden ambient loop.
+document.addEventListener('visibilitychange', () => {
+  for (const k in keys) keys[k] = false;
+  if (!Audio.ctx) return;
+  if (document.hidden) Audio.ctx.suspend().catch(() => {});
+  else Audio.ctx.resume().catch(() => {});
+});
+
 // --- Color utils (hue-shifting: sombras hacia azul, luces hacia amarillo)
 function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function rgbHex(r, gg, b) { return '#' + [r, gg, b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join(''); }
@@ -73,143 +88,9 @@ function desat(hex, amt, dl = 0) { let [h, s, l] = rgbHsl(...hexRgb(hex)); retur
 const C = k => DATA.colors[k].hex;
 
 // =====================================================================
-// 1. Audio: SFX por osciladores + secuenciador chiptune mínimo
+// 1. Patrones de emergencia (el motor de audio vive en audio.js)
 // =====================================================================
-const Audio = {
-  ctx: null, master: null, seq: null, cur: null,
-  init() {
-    if (this.ctx) return;
-    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
-    this.master = this.ctx.createGain(); this.master.gain.value = 0.35; this.master.connect(this.ctx.destination);
-    if (typeof SFX !== 'undefined') { SFX.init(this.ctx, this.master); if (SFX.ambPending !== undefined) SFX.ambient(SFX.ambPending); }
-    this.preload();
-    if (this.pending) this.play(this.pending);
-  },
-  tone(f, t0, dur, type = 'square', vol = 0.25, slide = 0) {
-    if (!this.ctx) return; const o = this.ctx.createOscillator(), gn = this.ctx.createGain();
-    o.type = type; o.frequency.setValueAtTime(f, t0); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f + slide), t0 + dur);
-    gn.gain.setValueAtTime(vol, t0); gn.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-    o.connect(gn); gn.connect(this.master); o.start(t0); o.stop(t0 + dur + 0.02);
-  },
-  noise(t0, dur, vol = 0.2, hp = 800) {
-    if (!this.ctx) return; const n = this.ctx.sampleRate * dur | 0, b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = b.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
-    const s = this.ctx.createBufferSource(); s.buffer = b; const f = this.ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
-    const gn = this.ctx.createGain(); gn.gain.value = vol; s.connect(f); f.connect(gn); gn.connect(this.master); s.start(t0);
-  },
-  sfx(name, o) {
-    if (!this.ctx) return; if (typeof SFX !== 'undefined' && SFX.ctx) { SFX.play(name, o); return; } const t = this.ctx.currentTime;
-    switch (name) {
-      case 'move': this.tone(880, t, .04, 'square', .08); break;
-      case 'ok': this.tone(660, t, .05, 'square', .12); this.tone(990, t + .05, .08, 'square', .12); break;
-      case 'back': this.tone(440, t, .08, 'square', .1, -200); break;
-      case 'nope': this.tone(180, t, .12, 'square', .12); break;
-      case 'hit': this.noise(t, .08, .25, 1500); this.tone(160, t, .1, 'square', .2, -100); break;
-      case 'hitweak': this.noise(t, .1, .3, 900); this.tone(220, t, .18, 'sawtooth', .22, -180); this.tone(880, t + .04, .12, 'square', .12, 400); break;
-      case 'heal': [523, 659, 784, 1047].forEach((f, i) => this.tone(f, t + i * .07, .18, 'triangle', .16)); break;
-      case 'tech': this.tone(300, t, .3, 'sawtooth', .16, 900); this.noise(t + .1, .15, .12, 3000); break;
-      case 'mix': [392, 494, 587, 784, 988].forEach((f, i) => this.tone(f, t + i * .04, .22, 'square', .12)); this.noise(t + .18, .2, .2, 2000); break;
-      case 'rainbow': [262, 330, 392, 523, 659, 784, 1047, 1319].forEach((f, i) => this.tone(f, t + i * .05, .3, 'triangle', .16)); break;
-      case 'ready': this.tone(1320, t, .05, 'square', .07); break;
-      case 'die': this.noise(t, .3, .2, 400); this.tone(200, t, .35, 'sawtooth', .15, -150); break;
-      case 'fall': this.tone(1200, t, .45, 'sine', .15, -1000); break;
-      case 'splash': this.noise(t, .35, .4, 300); this.tone(90, t, .3, 'sine', .3, -60); break;
-      case 'victory': [523, 523, 523, 659, 784, 659, 784].forEach((f, i) => this.tone(f, t + [0, .12, .24, .36, .6, .84, .96][i], i > 3 ? .3 : .12, 'square', .14)); break;
-      case 'ko': this.tone(300, t, .5, 'square', .15, -250); break;
-      case 'encounter': this.tone(110, t, .6, 'sawtooth', .18, 60); break;
-      case 'equip': this.tone(740, t, .06, 'triangle', .12); this.tone(1100, t + .06, .1, 'triangle', .12); break;
-    }
-  },
-  // ---- Sintetizador de música (esquema MUSIC de music.js): pulsos con duty, ADSR, vibrato, eco, batería
-  waves: {},
-  wave(osc, name) {
-    if (name === 'tri') osc.type = 'triangle'; else if (name === 'saw') osc.type = 'sawtooth'; else if (name === 'sine') osc.type = 'sine';
-    else { const d = { pulse50: .5, pulse25: .25, pulse12: .125, square: .5 }[name] ?? .5; let w = this.waves[d]; if (!w) { const N = 32, re = new Float32Array(N), im = new Float32Array(N); for (let n = 1; n < N; n++) re[n] = (2 / (n * Math.PI)) * Math.sin(n * Math.PI * d); w = this.waves[d] = this.ctx.createPeriodicWave(re, im, { disableNormalization: false }); } osc.setPeriodicWave(w); }
-  },
-  bus() { // eco compartido (retardo sincronizado al tempo por canción)
-    if (this.echo) return this.echo; const d = this.ctx.createDelay(1); d.delayTime.value = .28; const fb = this.ctx.createGain(); fb.gain.value = .32; const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200;
-    d.connect(lp); lp.connect(fb); fb.connect(d); const out = this.ctx.createGain(); out.gain.value = .5; lp.connect(out); out.connect(this.master); this.echo = d; return d;
-  },
-  note(tr, t0, midi, dur, vel = 1) {
-    const ctx = this.ctx, f = 440 * Math.pow(2, (midi - 69) / 12), [a, dc, su, rl] = tr.env || [0.005, 0.06, 0.75, 0.06], peak = (tr.vol ?? .2) * vel * 1.5; // la música iba ~6 dB por debajo de los SFX
-    const o = ctx.createOscillator(); this.wave(o, tr.wave || 'pulse50'); o.frequency.value = f;
-    const gn = ctx.createGain(); gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(peak, t0 + a); gn.gain.linearRampToValueAtTime(peak * su, t0 + a + dc);
-    const end = t0 + Math.max(a + dc, dur - rl * .5); gn.gain.setValueAtTime(peak * su, end); gn.gain.linearRampToValueAtTime(0.0001, end + rl);
-    o.connect(gn); gn.connect(this.master); if (tr.echo) { const s = ctx.createGain(); s.gain.value = tr.echo; gn.connect(s); s.connect(this.bus()); }
-    if (tr.vib) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = 5.6; lg.gain.value = tr.vib * 14; l.connect(lg); lg.connect(o.detune); l.start(t0 + .08); l.stop(end + rl + .05); }
-    o.start(t0); o.stop(end + rl + .05);
-  },
-  drum(kind, t0, vol = 1) {
-    const ctx = this.ctx; vol *= 1.3;
-    if (kind === 'k') { const o = ctx.createOscillator(), gn = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(160, t0); o.frequency.exponentialRampToValueAtTime(42, t0 + .1); gn.gain.setValueAtTime(.5 * vol, t0); gn.gain.exponentialRampToValueAtTime(.001, t0 + .16); o.connect(gn); gn.connect(this.master); o.start(t0); o.stop(t0 + .2); this.noise(t0, .02, .12 * vol, 2000); }
-    else if (kind === 's') { this.noise(t0, .12, .22 * vol, 1200); const o = ctx.createOscillator(), gn = ctx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(220, t0); o.frequency.exponentialRampToValueAtTime(120, t0 + .06); gn.gain.setValueAtTime(.25 * vol, t0); gn.gain.exponentialRampToValueAtTime(.001, t0 + .08); o.connect(gn); gn.connect(this.master); o.start(t0); o.stop(t0 + .1); }
-    else if (kind === 'h') this.noise(t0, .03, .07 * vol, 7000);
-    else if (kind === 'o') this.noise(t0, .14, .06 * vol, 6000);
-  },
-  // ---- Reproducción por samples (music_samples.js: Ogg/Opus embebido con loop points sample-exactos, estilo SPC700)
-  buffers: {}, decoding: {},
-  async decode(name) {
-    if (this.buffers[name]) return this.buffers[name]; if (this.decoding[name]) return this.decoding[name];
-    const S = MUSIC_SAMPLES[name], bin = atob(S.data), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-    return this.decoding[name] = this.ctx.decodeAudioData(arr.buffer).then(b => { this.buffers[name] = b; delete this.decoding[name]; return b; });
-  },
-  playSample(name) {
-    const S = MUSIC_SAMPLES[name]; if (!this.musicBus) { this.musicBus = this.ctx.createGain(); this.musicBus.gain.value = 0.9; this.musicBus.connect(this.master); }
-    const token = this.token = (this.token || 0) + 1;
-    this.decode(name).then(buf => {
-      if (this.token !== token || this.cur !== name) return; // se pidió otra cosa mientras decodificaba
-      const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = !!S.loop; if (S.loop) { src.loopStart = S.loopStart; src.loopEnd = Math.min(S.loopEnd, buf.duration); }
-      const gn = this.ctx.createGain(); gn.gain.setValueAtTime(1, this.ctx.currentTime); src.connect(gn); gn.connect(this.musicBus); src.start(); this.src = { src, gn };
-      if (!S.loop) src.onended = () => { if (this.src && this.src.src === src) this.src = null; };
-    }).catch(e => console.warn('música', name, e));
-  },
-  preload() { if (typeof MUSIC_SAMPLES === 'undefined' || !this.ctx) return; for (const k in MUSIC_SAMPLES) this.decode(k); },
-  play(name) {
-    this.pending = name; if (!this.ctx) return; if (this.cur === name && (this.seq || this.src)) return;
-    this.stop(); this.cur = name;
-    if (typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES[name]) { this.playSample(name); return; }
-    const M = (typeof MUSIC !== 'undefined' && MUSIC[name]) ? MUSIC[name] : null;
-    if (!M) { this.playLegacy(name); return; }
-    const sps = 60 / M.bpm / (M.stepsPerBeat || 4), len = M.length, events = [];
-    M.tracks.forEach(tr => { for (const n of tr.notes) events.push({ step: n[0], tr, midi: n[1], dur: n[2] * sps, vel: n[3] ?? 1 }); });
-    (M.drums || []).forEach(d => events.push({ step: d[0], drum: d[1], vel: d[2] ?? 1 }));
-    events.sort((a, b) => a.step - b.step); if (!events.length) return;
-    if (this.echo) this.echo.delayTime.value = Math.min(.9, sps * 3); // eco a corchea con puntillo
-    let loopStart = this.ctx.currentTime + 0.06, idx = 0;
-    const tick = () => {
-      if (!this.ctx) return;
-      for (let guard = 0; guard < 4000; guard++) {
-        const ev = events[idx], t = loopStart + ev.step * sps; if (t > this.ctx.currentTime + 0.25) return;
-        if (ev.drum) this.drum(ev.drum, t, ev.vel); else this.note(ev.tr, t, ev.midi, ev.dur, ev.vel);
-        if (++idx >= events.length) { if (M.loop === false) { clearInterval(this.seq); this.seq = null; return; } idx = 0; loopStart += len * sps; }
-      }
-    };
-    tick(); this.seq = setInterval(tick, 50);
-  },
-  playLegacy(name) {
-    const song = SONGS[name]; if (!song) return;
-    const spb = 60 / song.bpm / 4; let step = 0, next = this.ctx.currentTime + 0.05;
-    const N = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-    const freq = n => { const m = N[n[0]] + (n[1] === '#' ? 1 : 0) + 12 * (parseInt(n[n.length - 1]) + 1); return 440 * Math.pow(2, (m - 69) / 12); };
-    const len = song.tracks[0].pat.length;
-    this.seq = setInterval(() => {
-      if (!this.ctx) return;
-      while (next < this.ctx.currentTime + 0.15) {
-        for (const tr of song.tracks) {
-          const n = tr.pat[step % len]; if (n === '-' || n === '.') continue;
-          let d = 1; while (tr.pat[(step + d) % len] === '.' && d < 16) d++;
-          this.tone(freq(n), next, spb * d * 0.9, tr.wave, tr.vol);
-        }
-        if (song.drums) { const dr = song.drums[step % song.drums.length]; if (dr === 'k') this.drum('k', next); if (dr === 's') this.drum('s', next); if (dr === 'h') this.drum('h', next); }
-        next += spb; step++;
-      }
-    }, 40);
-  },
-  stop(fade = .12) { if (this.seq) clearInterval(this.seq); this.seq = null; this.cur = null; this.pending = null; this.token = (this.token || 0) + 1;
-    if (this.src) { const { src, gn } = this.src, t = this.ctx.currentTime; gn.gain.setValueAtTime(gn.gain.value, t); gn.gain.linearRampToValueAtTime(0, t + fade); try { src.stop(t + fade + .01); } catch (e) {} this.src = null; } },
-  // Hunde (o recupera) el tono de la música actual: rate 1 = normal, .5 = una octava abajo. Solo con música muestreada.
-  bend(rate, secs = .5) { if (!this.ctx || !this.src) return; const pr = this.src.src.playbackRate, t = this.ctx.currentTime; pr.cancelScheduledValues(t); pr.setValueAtTime(pr.value, t); pr.linearRampToValueAtTime(rate, t + secs); },
-};
+
 const P = s => s.trim().split(/\s+/);
 const SONGS = {
   map: { bpm: 96, tracks: [
@@ -523,12 +404,24 @@ function walkable(px, py) { // hitbox pies 8×6
   for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (solid(tileAt((px + dx) / TILE | 0, (py + dy) / TILE | 0))) return false;
   return true;
 }
+// A room change settles for 24 frames before switching; crossing the doorway
+// cannot repeatedly restart the cues. Returning from combat resumes the phrase.
+function worldCue() {
+  if (Game.palette === 'vivo') return 'restored';
+  return OW.x >= 28 * TILE && OW.y >= 16 * TILE && OW.y < 25 * TILE ? 'atelier' : 'map';
+}
+function updateWorldMusic() {
+  const cue = worldCue();
+  if (OW.musicWant !== cue) { OW.musicWant = cue; OW.musicWait = 0; Audio.prepare(cue); }
+  if (++OW.musicWait >= 24 && Audio.cur !== cue) Audio.play(cue, { resume: true, fade: .65 });
+}
 function updateOverworld() {
   OW.t++;
+  if (!OW.landT) updateWorldMusic();
   if (OW.landT > 0) { // entrada: caen del cielo y salpican, uno tras otro
     if (OW.landT > 900) return; OW.landT--; OW.landZ = OW.landZ || [0, 0, 0];
     Party.forEach((p, i) => { const k = clamp((48 - OW.landT - i * 6) / 26, 0, 1); OW.landZ[i] = k >= 1 ? 0 : 120 * (1 - k * k); if (k >= 1 && !OW.landed[i]) { OW.landed[i] = 1; Audio.sfx('plop', { semi: [0, 4, 7][i] }); for (let j = 0; j < 8; j++) OW.dust.push({ x: OW.x - i * 12 + R(-4, 4), y: OW.y + 1, vx: R(-1.2, 1.2), vy: -R(.5, 1.6), col: C(p.color), t: 0, life: RI(12, 20) }); } });
-    if (OW.landT === 0) { OW.landZ = null; Audio.play('map'); Audio.sfx('page', { vol: .4 }); }
+    if (OW.landT === 0) { OW.landZ = null; Audio.play(worldCue(), { resume: true }); Audio.sfx('page', { vol: .4 }); }
     for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life);
     return;
   }
@@ -707,7 +600,7 @@ function* openEstucheGen() {
   const P = MAP.pz, Z = Game.puzzle; Z.zip = 0; OW.vx = OW.vy = 0; OW.moving = false;
   for (let i = 1; i <= 24; i++) { Z.zip = i / 24; if (i % 3 === 0) Audio.sfx('scratch', { vol: .3, semi: i }); yield; }
   Z.open = 0; Audio.sfx('page'); for (let i = 1; i <= 10; i++) { Z.open = i / 10; yield; }
-  Audio.sfx('mix'); Audio.sfx('tinkle', { semi: 0, when: .1 }); Audio.sfx('tinkle', { semi: 4, when: .25 }); Audio.sfx('tinkle', { semi: 7, when: .4 });
+  Audio.sfx('discovery');
   Z.rise = 0; for (let i = 1; i <= 40; i++) { Z.rise = i / 40; if (i % 4 === 0) OW.dust.push({ x: P.estuche[0] * TILE + 8 + R(-10, 10), y: P.estuche[1] * TILE + 6 - Z.rise * 20, vx: R(-.4, .4), vy: -R(.2, .6), col: i % 2 ? '#fff3c0' : '#c9c4d4', t: 0, life: 20 }); yield; }
   yield* wait(20); Z.opened = true; Game.owned.pluma = true; Z.rise = 0;
   OW.msg = { lines: ['¡Has conseguido la Pluma!', 'Estilográfica del delineante:', 'escribe con el color de quien', 'la empuña. Equípala en el menú.'], t: 0 };
@@ -906,7 +799,7 @@ function drawLogo(t, x0, y0) {
 const COVER = { t: 0, open: 0 };
 function updateCover() {
   COVER.t++; COVER.dust = COVER.dust || []; for (const d of COVER.dust) { d.x += d.vx; d.y += d.vy; d.vy += .1; d.t++; } COVER.dust = COVER.dust.filter(d => d.t < d.life);
-  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; COVER.snap = null; Audio.play((typeof MUSIC_SAMPLES !== 'undefined' && MUSIC_SAMPLES.title) ? 'title' : 'map'); } ANYKEY = false; return; }
+  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { setState('title'); TITLE.t = 0; TITLE.L = null; TITLE.balls = null; TITLE.drips = []; TITLE.spl = []; COVER.snap = null; Audio.play('title'); } ANYKEY = false; return; }
   const t = COVER.t, done = t >= 175;
   if (t > 20 && t <= 110 && (t - 20) % 10 === 1) Audio.sfx('scratch', { vol: .35, semi: RI(-2, 4) }); // el lápiz escribe
   if (t === 112) Audio.sfx('scratch_long', { vol: .5 }); if (t === 126) Audio.sfx('fwip', { vol: .6 }); // subrayado y floritura
@@ -1104,13 +997,13 @@ function render() {
 }
 // Hooks de depuración
 window.__chromara = {
-  Game, Party, OW, B, DATA, MAP,
+  Game, Party, OW, B, DATA, MAP, Audio, SFX,
   battle(key) { const f = OW.foes.find(x => x.key === String(key)); if (f) { startTransition(f); } return !!f; },
   heal() { Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); },
   atb() { if (B.party) B.party.forEach(u => u.atb = 100); },
   kill() { if (B.enemies) B.enemies.forEach(u => u.alive && (u.hp = 1)); },
   win() { if (B.enemies) B.enemies.forEach(u => u.alive && kill(u)); checkEnd(); },
-  start() { if (Game.state === 'title' || Game.state === 'cover') { initOverworld(); setState('overworld'); } },
+  start() { if (Game.state === 'title' || Game.state === 'cover') { initOverworld(); setState('overworld'); Audio.play(worldCue()); } },
   title(t) { setState('title'); TITLE.t = t; },
   pause(v = !Game.paused) { Game.paused = v; },
   colorize() { Game.palette = Game.palette === 'gris' ? 'vivo' : 'gris'; },

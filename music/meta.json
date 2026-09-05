@@ -23,7 +23,9 @@
       "shaker"
     ],
     "loopStartSample": 4233600,
-    "loopEndSample": 8043840
+    "loopEndSample": 8043840,
+    "title": "Chromara apagada",
+    "sampleRate": 44100
   },
   "battle": {
     "bpm": 150,
@@ -45,15 +47,17 @@
       "kick/hats/toms/crash"
     ],
     "loopStartSample": 2257920,
-    "loopEndSample": 4233600
+    "loopEndSample": 4233600,
+    "title": "Mezcla de colores",
+    "sampleRate": 44100
   },
   "boss": {
     "bpm": 144,
     "intro_s": 6.6667,
     "loop_s": 53.3333,
     "loopStart": 60.0,
-    "loopEnd": 113.3333,
-    "duration": 113.3333,
+    "loopEnd": 113.33333333333333,
+    "duration": 113.33333333333333,
     "loop": true,
     "key": "D phrygian",
     "form": "intro(4) + [A(8) B(8) C(8) D(8)] x2",
@@ -71,7 +75,9 @@
       "tubular bell"
     ],
     "loopStartSample": 2646000,
-    "loopEndSample": 4998000
+    "loopEndSample": 4998000,
+    "title": "La Tinta",
+    "sampleRate": 44100
   },
   "victory": {
     "bpm": 168,
@@ -79,7 +85,7 @@
     "loop_s": 5.7143,
     "loopStart": 0.0,
     "loopEnd": 0.0,
-    "duration": 6.7143,
+    "duration": 6.714285714285714,
     "loop": false,
     "key": "D major add9",
     "form": "fanfarria de 4 compases (sin loop)",
@@ -92,7 +98,9 @@
       "timpani",
       "crash/toms",
       "tubular bell"
-    ]
+    ],
+    "title": "Una gota más de luz",
+    "sampleRate": 44100
   },
   "gameover": {
     "bpm": 96,
@@ -112,15 +120,17 @@
       "timpani",
       "music box",
       "tam-tam"
-    ]
+    ],
+    "title": "Los colores se apagan",
+    "sampleRate": 44100
   },
   "title": {
     "bpm": 90,
     "intro_s": 10.6667,
     "loop_s": 64.0,
-    "loopStart": 74.6667,
-    "loopEnd": 138.6667,
-    "duration": 138.6667,
+    "loopStart": 74.66666666666667,
+    "loopEnd": 138.66666666666666,
+    "duration": 138.66666666666666,
     "loop": true,
     "key": "D major",
     "form": "intro(4) + [A(8) B(8) C(8)] x2",
@@ -136,6 +146,88 @@
       "timpani"
     ],
     "loopStartSample": 3292800,
-    "loopEndSample": 6115200
+    "loopEndSample": 6115200,
+    "title": "El cuaderno se abre",
+    "sampleRate": 44100
+  },
+  "atelier": {
+    "title": "Lo que duerme en el estuche",
+    "bpm": 108,
+    "meter": "3/4",
+    "key": "D dorian / F lydian",
+    "intro_s": 3.3333333333333335,
+    "loop_s": 40.0,
+    "loop": true,
+    "loopStart": 43.33334375,
+    "loopEnd": 83.33334375,
+    "duration": 83.33334375,
+    "loopStartSample": 1386667,
+    "loopEndSample": 2666667,
+    "sampleRate": 32000,
+    "form": "intro(2) + [A(8) B(8) A′(8)] x2",
+    "instruments": [
+      "harp",
+      "marimba",
+      "bass",
+      "pizz",
+      "oboe",
+      "strings",
+      "flute"
+    ],
+    "maxWrittenPolyphony": 5,
+    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive"
+  },
+  "prelude": {
+    "title": "Debajo del color",
+    "bpm": 72,
+    "meter": "4/4",
+    "key": "D minor / phrygian inflection",
+    "intro_s": 6.666666666666667,
+    "loop_s": 53.333333333333336,
+    "loop": true,
+    "loopStart": 60.0,
+    "loopEnd": 113.33334375,
+    "duration": 113.33334375,
+    "loopStartSample": 1920000,
+    "loopEndSample": 3626667,
+    "sampleRate": 32000,
+    "form": "intro(2) + [A(8) B(8)] x2",
+    "instruments": [
+      "harp",
+      "bass",
+      "oboe",
+      "strings",
+      "pizz"
+    ],
+    "maxWrittenPolyphony": 5,
+    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive"
+  },
+  "restored": {
+    "title": "La línea también es color",
+    "bpm": 100,
+    "meter": "4/4",
+    "key": "D major / G lydian / borrowed G minor",
+    "intro_s": 9.6,
+    "loop_s": 57.599999999999994,
+    "loop": true,
+    "loopStart": 67.2,
+    "loopEnd": 124.8,
+    "duration": 124.8,
+    "loopStartSample": 2150400,
+    "loopEndSample": 3993600,
+    "sampleRate": 32000,
+    "form": "intro(4) + [A(8) B(8) A′(8)] x2",
+    "instruments": [
+      "harp",
+      "marimba",
+      "flute",
+      "oboe",
+      "bass",
+      "strings",
+      "pizz",
+      "horn"
+    ],
+    "maxWrittenPolyphony": 7,
+    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive"
   }
 }

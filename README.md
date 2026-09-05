@@ -61,14 +61,19 @@ Todo lo que se ve es material de dibujo. Suelo = papel con hierba a lápiz (rayi
 - Versiones mini dibujadas a mano de los mismos personajes: espaldas al subir, frente al bajar, perfil a los lados (los seguidores miran hacia donde avanzan por la estela). Movimiento con aceleración y frenada, bote de gota al andar con gotitas del color del líder al aterrizar y pasos según el terreno, parpadeo en reposo, cámara suave con anticipación. Los enemigos usan sus sprites, botan, avisan con `!` al verte y persiguen; los vencidos dejan un charco con el color robado.
 - Autotiling por vecindad (`groundTile`, cacheado por forma) para orillas, bordes de camino, reglas sobre el agua y tinta; 16 variantes de suelo.
 
-## Sonido
-- SFX sintetizados en Web Audio (`sfx.js`): agua, pintura, papel y herramientas; cada gota tiene su nota (Carmín Re, Ámbar Fa#, Añil La).
-- **Tema de título** «El cuaderno se abre» (Re mayor, 90 bpm, intro de celesta y gotas, loop con flauta y el leitmotiv del Prisma en tres colores), pista `title`; ficha en `music/FICHA.md`.
-- **Música con samples SNES** (v2): compuesta en ~/composer (YAML `chromara2_*`), renderizada con fluidsynth sobre `Chrono Trigger.sf2` + `snes.sf2`, empaquetada por `tools/pack_music.py` a Ogg/Opus base64 en `music_samples.js` y reproducida con `AudioBufferSource` y loop points. `music.js` (chiptune v1) queda como fallback. Ficha en `music/FICHA.md`.
+## Sonido — BSO v3
+- **Nueve piezas con muestras SNES/Chrono Trigger.** Los seis temas originales conservan su escritura y tienen una nueva mezcla de publicación. Tres composiciones nuevas completan la historia: «Lo que duerme en el estuche» (vals de misterio), «Debajo del color» (conversación con La Tinta) y «La línea también es color» (mundo restaurado). Partituras, créditos y reconstrucción en [`music/FICHA.md`](music/FICHA.md).
+- El leitmotiv Re–Fa–Mi–La cambia a **Re–Fa♯–Mi–La** al recuperar el color. Marimba/pizzicato para el gesto del lápiz, arpa para agua y pigmento, maderas para las voces de los personajes. La Tinta conserva la segunda bemol como sombra.
+- El mapa **continúa su frase después de combatir**; el estuche tiene entrada con fundido y margen en la puerta para evitar cambios nerviosos. La fanfarria espera a que acabe de disolverse el último enemigo. El mundo recuperado tiene su propia música.
+- **SFX táctiles + muestras afinadas** (`sfx.js`, `sfx_samples.js`): brochas, grafito, agua, papel y tinta; avisos de turno en Re/Fa♯/La, mezclas y descubrimiento de la Pluma. Los acordes programados conservan todas sus notas. Los impactos apartan brevemente la BSO y esta recupera siempre su nivel.
+- `audio.js` separa música/efectos, limita picos, maneja fundidos, cancelación de cargas y respaldo. **M** silencia/reactiva. Cambiar de pestaña suspende el audio y el ambiente.
+- Por HTTP se carga sólo la pista necesaria y se guardan hasta cuatro buffers PCM. Al abrir `index.html` con `file://`, `music_samples.js` contiene los mismos Ogg/Opus sin depender de peticiones de red. Si falla la carga/decodificación, entra la partitura sintetizada.
+- Comprobación de integración: `tools/test_audio.cjs` (Playwright). Medición de archivos publicados: `tools/audit_audio.py`.
 
 ## Estructura
 - `data.js` — todo lo tuneable: colores, complementarios, equipo, objetos, grupo, techs, enemigos, encuentros, mapa (strings), textos.
-- `game.js` — núcleo/input/color · audio · arte procedural del mapa (gotas pequeñas, tiles) · overworld · título y bucle.
+- `audio.js` — reproducción, mezcla y respaldo de BSO.
+- `game.js` — núcleo/input/color · arte procedural del mapa (gotas pequeñas, tiles) · overworld · título y bucle.
 - `sprites.js` — sprites a mano y expresiones. `scene.js` — suelo Mode 7, cámara y proyección. `gui.js` — cuaderno. `battle.js` — estado, transición, efectos en el mundo, menú, ATB, fin. `attacks.js` — coreografías.
 - Hooks: `window.__chromara` → `start()`, `battle('2')`, `atb()`, `kill()`, `win()`, `heal()`, `colorize()`, `pause()`.
 

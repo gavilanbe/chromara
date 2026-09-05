@@ -1,0 +1,141 @@
+{
+  "map": {
+    "bpm": 100,
+    "intro_s": 9.6,
+    "loop_s": 86.4,
+    "loopStart": 96.0,
+    "loopEnd": 182.4,
+    "duration": 182.4,
+    "loop": true,
+    "key": "D dorian",
+    "form": "intro(4) + [A(8) A2(8) B(8) C(8) link(4)] x2",
+    "instruments": [
+      "flute",
+      "oboe",
+      "strings",
+      "string pad",
+      "harp",
+      "marimba",
+      "finger bass",
+      "choir",
+      "music box",
+      "hand drum",
+      "shaker"
+    ],
+    "loopStartSample": 4233600,
+    "loopEndSample": 8043840
+  },
+  "battle": {
+    "bpm": 150,
+    "intro_s": 6.4,
+    "loop_s": 44.8,
+    "loopStart": 51.2,
+    "loopEnd": 96.0,
+    "duration": 96.0,
+    "loop": true,
+    "key": "A minor (eolico)",
+    "form": "intro(4) + [A(8) A2(8) B(8) C(4)] x2",
+    "instruments": [
+      "trumpet",
+      "horn",
+      "strings",
+      "synth lead",
+      "synth bass",
+      "snare",
+      "kick/hats/toms/crash"
+    ],
+    "loopStartSample": 2257920,
+    "loopEndSample": 4233600
+  },
+  "boss": {
+    "bpm": 144,
+    "intro_s": 6.6667,
+    "loop_s": 53.3333,
+    "loopStart": 60.0,
+    "loopEnd": 113.3333,
+    "duration": 113.3333,
+    "loop": true,
+    "key": "D phrygian",
+    "form": "intro(4) + [A(8) B(8) C(8) D(8)] x2",
+    "instruments": [
+      "trumpet",
+      "horn",
+      "strings",
+      "harpsichord",
+      "finger bass",
+      "choir",
+      "timpani",
+      "orchestral snare",
+      "kick/toms/tam-tam",
+      "music box",
+      "tubular bell"
+    ],
+    "loopStartSample": 2646000,
+    "loopEndSample": 4998000
+  },
+  "victory": {
+    "bpm": 168,
+    "intro_s": 0.0,
+    "loop_s": 5.7143,
+    "loopStart": 0.0,
+    "loopEnd": 0.0,
+    "duration": 6.7143,
+    "loop": false,
+    "key": "D major add9",
+    "form": "fanfarria de 4 compases (sin loop)",
+    "instruments": [
+      "trumpet",
+      "horn",
+      "strings",
+      "choir",
+      "harp",
+      "timpani",
+      "crash/toms",
+      "tubular bell"
+    ]
+  },
+  "gameover": {
+    "bpm": 96,
+    "intro_s": 0.0,
+    "loop_s": 5.0,
+    "loopStart": 0.0,
+    "loopEnd": 0.0,
+    "duration": 6.0,
+    "loop": false,
+    "key": "D -> Eb (bII sin resolver)",
+    "form": "2 compases (sin loop)",
+    "instruments": [
+      "oboe",
+      "strings",
+      "choir",
+      "finger bass",
+      "timpani",
+      "music box",
+      "tam-tam"
+    ]
+  },
+  "title": {
+    "bpm": 90,
+    "intro_s": 10.6667,
+    "loop_s": 64.0,
+    "loopStart": 74.6667,
+    "loopEnd": 138.6667,
+    "duration": 138.6667,
+    "loop": true,
+    "key": "D major",
+    "form": "intro(4) + [A(8) B(8) C(8)] x2",
+    "instruments": [
+      "flute",
+      "oboe",
+      "celesta",
+      "pizzicato",
+      "harp",
+      "string pad",
+      "strings",
+      "finger bass",
+      "timpani"
+    ],
+    "loopStartSample": 3292800,
+    "loopEndSample": 6115200
+  }
+}

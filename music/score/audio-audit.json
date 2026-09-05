@@ -1,0 +1,140 @@
+{
+  "map": {
+    "duration": 182.4,
+    "peakDBFS": -6.81,
+    "integratedLUFS": -20.99,
+    "truePeakDBTP": -6.8,
+    "loudnessRangeLU": 15.8,
+    "sha256": "31d4029f3a3b637d36ca82eb09c827c884a9073dabb8babf19581b9c3dba9770",
+    "loopStart": 96.0,
+    "loopEnd": 182.4,
+    "seamJump": 0.003813,
+    "localDerivativeRMS": 0.001669,
+    "eightBarRMSDB": [
+      -28.5,
+      -25.7,
+      -22.6,
+      -24.2,
+      -28.4
+    ]
+  },
+  "battle": {
+    "duration": 96.0,
+    "peakDBFS": -2.95,
+    "integratedLUFS": -18.99,
+    "truePeakDBTP": -2.91,
+    "loudnessRangeLU": 4.6,
+    "sha256": "b330a9a5b066fc33e662395f5972462a04c55ae96c08f3446e37458537b2aeec",
+    "loopStart": 51.2,
+    "loopEnd": 96.0,
+    "seamJump": 0.022837,
+    "localDerivativeRMS": 0.011038,
+    "eightBarRMSDB": [
+      -22.1,
+      -20.9,
+      -21.7,
+      -18.3
+    ]
+  },
+  "boss": {
+    "duration": 113.333333,
+    "peakDBFS": -2.14,
+    "integratedLUFS": -19.21,
+    "truePeakDBTP": -2.1,
+    "loudnessRangeLU": 14.2,
+    "sha256": "08081c925c160e05640658c011029f635b5e4f8878a09d97c8027ff44a1eceab",
+    "loopStart": 60.0,
+    "loopEnd": 113.33333333333333,
+    "seamJump": 0.018604,
+    "localDerivativeRMS": 0.010878,
+    "eightBarRMSDB": [
+      -24.6,
+      -21.9,
+      -30.8,
+      -18.4
+    ]
+  },
+  "victory": {
+    "duration": 6.714292,
+    "peakDBFS": -7.18,
+    "integratedLUFS": -17.99,
+    "truePeakDBTP": -7.14,
+    "loudnessRangeLU": 1.5,
+    "sha256": "0dec3c7841186d2a7ccfd794818203f479ccb7cd8c9757968bbd36a8f3adc713"
+  },
+  "gameover": {
+    "duration": 6.0,
+    "peakDBFS": -8.17,
+    "integratedLUFS": -23.0,
+    "truePeakDBTP": -8.17,
+    "loudnessRangeLU": 9.0,
+    "sha256": "66e67ccf85ff70d1ce843335a475d3237c28570f389ff6d42a4d87210f305a2d"
+  },
+  "title": {
+    "duration": 138.666667,
+    "peakDBFS": -7.44,
+    "integratedLUFS": -20.99,
+    "truePeakDBTP": -7.39,
+    "loudnessRangeLU": 11.5,
+    "sha256": "8621a4078fc81f571e410117fbd2b7bbb01714a757764aeaa184e42f70f8d3dd",
+    "loopStart": 74.66666666666667,
+    "loopEnd": 138.66666666666666,
+    "seamJump": 0.003195,
+    "localDerivativeRMS": 0.001692,
+    "eightBarRMSDB": [
+      -27.0,
+      -25.4,
+      -22.6
+    ]
+  },
+  "atelier": {
+    "duration": 83.333354,
+    "peakDBFS": -9.61,
+    "integratedLUFS": -22.0,
+    "truePeakDBTP": -9.6,
+    "loudnessRangeLU": 8.9,
+    "sha256": "fdbeea02fc82acd5accf00c98b940075be309661787fd705baa99a93616b896a",
+    "loopStart": 43.33334375,
+    "loopEnd": 83.33334375,
+    "seamJump": 0.000161,
+    "localDerivativeRMS": 0.007463,
+    "eightBarRMSDB": [
+      -26.6,
+      -22.7,
+      -27.8
+    ]
+  },
+  "prelude": {
+    "duration": 113.333354,
+    "peakDBFS": -12.25,
+    "integratedLUFS": -24.0,
+    "truePeakDBTP": -12.25,
+    "loudnessRangeLU": 7.6,
+    "sha256": "7202928e0019a3c132af7044e59d1c107f05446bd080ac03694b036e3d37a071",
+    "loopStart": 60.0,
+    "loopEnd": 113.33334375,
+    "seamJump": 0.000418,
+    "localDerivativeRMS": 0.000642,
+    "eightBarRMSDB": [
+      -24.0,
+      -30.1
+    ]
+  },
+  "restored": {
+    "duration": 124.8,
+    "peakDBFS": -8.05,
+    "integratedLUFS": -19.99,
+    "truePeakDBTP": -8.05,
+    "loudnessRangeLU": 7.4,
+    "sha256": "8a80a27902d39e2140e0e2aa38f046d7bab6d5547c6e0dcef046ecc83e3765db",
+    "loopStart": 67.2,
+    "loopEnd": 124.8,
+    "seamJump": 0.000669,
+    "localDerivativeRMS": 0.000915,
+    "eightBarRMSDB": [
+      -22.6,
+      -24.7,
+      -21.1
+    ]
+  }
+}
