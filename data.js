@@ -18,9 +18,9 @@ const DATA = {
 
   // ---- Equipo: armas y accesorios de "material de dibujo"
   weapons: {
-    brocha: { name: 'Brocha',  atk: 6, spd: -1, desc: 'Brocha gorda. Trazos contundentes.' },
-    lapiz:  { name: 'Lápiz',   atk: 4, spd: 2,  desc: 'Lápiz afilado. Rápido y preciso.' },
-    pincel: { name: 'Pincel',  atk: 3, mp: 6,   desc: 'Pincel fino. Canaliza más pigmento.' },
+    brocha: { name: 'Brocha',  atk: 6, spd: -1, desc: 'Salpica al vecino con un 30% del golpe.' },
+    lapiz:  { name: 'Lápiz',   atk: 4, spd: 2,  desc: 'El ataque ignora un 35% de defensa.' },
+    pincel: { name: 'Pincel',  atk: 3, mp: 6,   desc: 'Su pintura dura 3 acciones enemigas.' },
     pluma:  { name: 'Pluma',   atk: 5, mp: 4,   found: true, desc: 'Estilográfica del delineante. Escribe con tu color.' },
   },
   accessories: {
@@ -34,8 +34,14 @@ const DATA = {
     gota_agua: { name: 'Gota de agua',   short: 'Agua',     kind: 'heal',  amount: 55, target: 'ally',  desc: 'Recupera 55 HP.' },
     tubo:      { name: 'Tubo de pintura', short: 'Tubo',    kind: 'mp',   amount: 12, target: 'ally',  desc: 'Recupera 12 MP.' },
     goma_b:    { name: 'Goma de borrar', short: 'Borrar'  , kind: 'erase', amount: 45, target: 'enemy', desc: 'Borra tinta: 45 de daño a Gotas Negras puras.' },
+    savia:     { name: 'Savia de color', short: 'Savia', kind: 'revive', amount: .4, target: 'fallen', desc: 'Revive a una gota con el 40% de vida.' },
   },
-  inventory: { gota_agua: 4, tubo: 2, goma_b: 2 },
+  inventory: { gota_agua: 4, tubo: 2, goma_b: 2, savia: 2 },
+  studies: {
+    veladura: { name: 'Veladura', cost: 18, desc: 'Preparar de Añil moja a todos los enemigos.' },
+    relevo: { name: 'Relevo', cost: 22, desc: 'Proteger devuelve 3 MP a la gota protegida.' },
+    pulso: { name: 'Pulso fino', cost: 24, desc: 'Una interrupción de Ámbar devuelve 35 ATB.' },
+  },
 
   // ---- Grupo: tres gotas primarias. forma = rol.
   party: [
@@ -72,7 +78,7 @@ const DATA = {
     borron:     { name: 'Borrón',     color: 'violeta', shape: 'tall',   hp: 75,  atk: 12, def: 4, spd: 9,  exp: 10, w: 16, h: 28, ai: 'tiznar' },
     charco:     { name: 'Charco',     color: 'naranja', shape: 'blob',   hp: 120, atk: 10, def: 8, spd: 4,  exp: 14, w: 32, h: 18, ai: 'basic' },
     grumo:      { name: 'Grumo',      color: 'azul',    shape: 'round',  hp: 95,  atk: 12, def: 6, spd: 6,  exp: 12, w: 22, h: 22, ai: 'hunter' },
-    tinta:      { name: 'La Tinta',   color: 'negro',   shape: 'blob',   hp: 320, atk: 14, def: 7, spd: 7,  exp: 60, w: 48, h: 40, ai: 'boss', boss: true },
+    tinta:      { name: 'La Tinta',   color: 'negro',   shape: 'blob',   hp: 520, atk: 15, def: 7, spd: 7,  exp: 60, w: 48, h: 40, ai: 'boss', boss: true },
   },
 
   // ---- Encuentros visibles en el mapa (clave = carácter en el mapa)
@@ -87,7 +93,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  H página rota  R río de tinta  G goma empujable  W estante  E estuche (invisible hasta Revelar)  w semilla  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  H pliegue sellado con cera  R río de tinta  E estuche del circuito  w semilla  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -104,13 +110,13 @@ const DATA = {
     'T....~~~...=....~~~~~.....T....TT......T',
     'T..........=...~~~~..........TT........T',
     'T...1......=...~~~~....r...TTTTTTTTTTTTT',
-    'T..........=====~~~~=====..T........TTTT',
-    'T........T.....~~~~.....=..T........T..T',
-    'T...S...TT......~~~~....=..T.RR....TTETT',
-    'T......TT........~~~~...=..T.RR....T..TT',
-    'T.....TT..........~~~~..=..T.RR....TWWTT',
-    'T.....T.V..........~~~~.=.HH.RR.....G..T',
-    'T..P..T.............~~~~=SHH.RR........T',
+    'T..........=====~~~~=====..T.RR........T',
+    'T........T.....~~~~.....=..T.RR........T',
+    'T...S...TT......~~~~....=..T.RR........T',
+    'T......TT........~~~~...=..T.RR........T',
+    'T.....TT..........~~~~..=..T.RR........T',
+    'T.....T.V..........~~~~.=.HH.RR........T',
+    'T..P..T.............~~~~=SHH.RR......E.T',
     'T.....T.S............~~~=..TwRR........T',
     'T.....T...............~~=..T.RR........T',
     'T.....TT...............~=~~~TTTTTTTTTTTT',
@@ -121,9 +127,24 @@ const DATA = {
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
   ],
 
-  signs: { '25,21': ['Post-it del delineante:', 'Pinta lo roto. Riega junto', 'al río. Aparta la goma y', 'dibuja. Lo que no ves, revela.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
-  // ---- Puzle del estuche: puntos a unir (coordenadas de tile con decimales), los ocultos solo se ven con Revelar
-  puzzle: { dots: [{ n: 1, x: 28.4, y: 21.4 }, { n: 2, x: 29.5, y: 21.2, hidden: true }, { n: 3, x: 30.5, y: 20.4 }, { n: 4, x: 31.4, y: 21.6, hidden: true }, { n: 5, x: 32.4, y: 20.8 }], tries: 3 },
+  signs: { '25,21': ['Atelier de las tres tintas', 'C abre las magias de campo.', 'Dos pigmentos, una mezcla.', 'El calor ablanda la cera.', 'El agua limpia los intentos.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
+  // Cada captador comparte su pigmento con dos canales: una única solución.
+  puzzle: {
+    targets: [
+      { id: 'wax', kind: 'wax', name: 'Sello de cera', x: 424, y: 332, color: 'naranja', clue: 'La cera necesita calor.', done: 'La cera se funde. El paso queda abierto.' },
+      { id: 'seed', kind: 'seed', name: 'Semilla dormida', x: 456, y: 364, color: 'verde', clue: 'La semilla necesita vida.', done: 'Las raíces tejen un puente sobre la tinta.' },
+      { id: 'lens', kind: 'lens', name: 'Lente del plano', x: 600, y: 308, color: 'violeta', clue: 'La lente busca tinta oculta.', done: 'El plano revela el color de cada canal.' },
+      { id: 'a', kind: 'node', name: 'Captador A', x: 520, y: 286 },
+      { id: 'b', kind: 'node', name: 'Captador B', x: 584, y: 286 },
+      { id: 'c', kind: 'node', name: 'Captador C', x: 552, y: 336 },
+      { id: 'press', kind: 'press', name: 'Estuche sellado', x: 600, y: 344 },
+    ],
+    edges: [
+      { from: 'a', to: 'b', color: 'violeta' },
+      { from: 'a', to: 'c', color: 'naranja' },
+      { from: 'b', to: 'c', color: 'verde' },
+    ],
+  },
   // ---- Diálogo previo a la jefa (who: tinta | carmin | ambar | anil)
   bossDialogue: [
     { who: 'tinta', text: 'Otra vez color en mi página.' },
@@ -135,7 +156,7 @@ const DATA = {
   ],
   texts: {
     intro: ['Chromara pierde sus colores.', 'Las Gotas Negras beben el pigmento', 'de todo lo que tocan.', '', 'Tres gotas primarias salen a', 'devolver el color al mundo.'],
-    ending: ['La Tinta se disuelve.', '', 'Chromara recupera su color.', '', 'Gracias por jugar la PoC.'],
+    ending: ['La Tinta se disuelve.', '', 'Chromara recupera su color.', '', 'Pero la tinta atraviesa el papel.', 'El pliegue del jardín conduce', 'al territorio de Los Negros.'],
     gameover: ['Los colores se apagan...', '', 'Pulsa una tecla para volver a intentarlo.'],
   },
 };

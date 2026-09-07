@@ -669,7 +669,12 @@ const EYES = { idle: 'normal', hop: 'normal', attack: 'angry', charge: 'normal',
 const SQ = { idle: [[1, 1], [1.03, .97], [1, 1], [.97, 1.03]], hop: [[.92, 1.1]], attack: [[1.06, .96]], charge: [[.9, 1.12]], hurt: [[1.16, .84]], ko: [[1.4, .4]], happy: [[.96, 1.06]] };
 function unitSpriteInfo(u, frame) {
   const party = u.kind === 'party', pose = u.pose || 'idle';
-  const name = party ? `${u.id}_${VIEW[pose] || 'back'}` : u.id;
+  let view=VIEW[pose]||'back';
+  if(party&&['idle','hop'].includes(pose)&&B.axis){
+    const dot=Math.cos(SCENE.cam.yaw)*B.axis.dx+Math.sin(SCENE.cam.yaw)*B.axis.dy;
+    view=dot<-.3?'front':Math.abs(dot)<.3?'side':'back';
+  }
+  const name=party?`${u.id}_${view}`:u.data.phaseSprites?.[(u.bossPhase||1)-1]||u.id;
   const blink = pose === 'idle' && ((B.t + u.idx * 37) % 160) < 6;
   const spr = buildSprite(name, party ? C(u.color) : C('negro'), party ? null : u.def.core, { eyes: blink ? 'blink' : (party ? EYES[pose] : (pose === 'hurt' ? 'hurt' : pose === 'ko' ? 'ko' : 'normal')) });
   const sq = (SQ[pose] || SQ.idle), [sx, sy] = sq[frame % sq.length];

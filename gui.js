@@ -3,6 +3,70 @@
 'use strict';
 const INK = '#2a2438', TXT = '#2a2438', TXT2 = '#6a6480', TXT3 = '#9a90a8', GOLD = '#b8860b', PAPER = '#f1e9d6', PAPER2 = '#e3d8bd', PENCIL = '#5a5670';
 const GUI = { lastLevel: null, flip: 99 };
+// A separate, fixed-step UI clock keeps menus alive while the world is paused.
+// Feedback is deterministic and never consumes the game's random sequence.
+const ARTUI = { t: 0, tracks: new Map(), motes: [] };
+function tickArtUI() {
+  ARTUI.t++;
+  ARTUI.motes = Prefs.shake ? ARTUI.motes.filter(p => ARTUI.t - p.at < 20) : [];
+}
+function artObserve(id, value) {
+  let e = ARTUI.tracks.get(id);
+  if (!e || e.value !== value) { e = {value, at:ARTUI.t}; ARTUI.tracks.set(id, e); }
+  return e.at;
+}
+function artPop(at, duration = 16) {
+  const k = clamp((ARTUI.t - at) / duration, 0, 1);
+  return Prefs.shake ? Math.sin(k * Math.PI) * (1-k) * Prefs.shake : 0;
+}
+function artBurst(x, y, col = '#c79b45') {
+  if (!Prefs.shake) return;
+  for (let i=0; i<6; i++) ARTUI.motes.push({x,y,col,at:ARTUI.t,a:i*2.4});
+  ARTUI.motes = ARTUI.motes.slice(-36);
+}
+function drawArtFeedback() {
+  for (const p of ARTUI.motes) {
+    const t = ARTUI.t-p.at;
+    g.globalAlpha = 1-t/20; g.fillStyle=p.col;
+    g.fillRect(Math.round(p.x+Math.cos(p.a)*t*.55),Math.round(p.y-Math.abs(Math.sin(p.a))*t*.65+t*t*.015),t<9?2:1,1);
+  }
+  g.globalAlpha=1;
+}
+function artFocus(o, i) {
+  if (o.idx===i || o.capture) return;
+  o.idx=i; o.message=''; o.notice=null; Audio.sfx('cursor',{vol:.3});
+}
+// Loose cut paper, a folded corner and a real metal clip; grain stays off type.
+function artSheet(x,y,w,h,col='#aa8554') {
+  maskingLabel(x,y,w,h);
+  g.fillStyle='#d6c8a9';
+  for(let i=8;i<w-8;i+=19)g.fillRect(x+i,y+h-3,2,1);
+  g.beginPath();g.moveTo(x+w-9,y+h-1);g.lineTo(x+w-1,y+h-9);g.lineTo(x+w-1,y+h-1);g.fill();
+  g.fillStyle=col;g.fillRect(x+8,y-2,17,3);
+  g.fillStyle='#6d6871';g.fillRect(x+13,y-4,7,3);
+  g.fillStyle='#eee9dc';g.fillRect(x+14,y-4,4,1);
+}
+function artTag(label,x,y,col='#c49d58',max=308) {
+  const w=Math.min(max,textWidth(label)+16); maskingLabel(x,y,w,15);
+  brushBand(x+2,y+3,3,9,col);smallText(label,x+9,y+4);return w;
+}
+function artButton(id,label,x,y,w,h,col,run,opt={}) {
+  const at=artObserve('button:'+id,!!opt.selected), lift=opt.selected?Math.round(artPop(at)*3):0;
+  const by=y-lift, disabled=!!opt.disabled;
+  brushBand(x,by+2,w,h,'#302635');
+  brushBand(x,by,w,h,disabled?'#c8bdab':col);
+  g.fillStyle=disabled?'#ddd3bf':ramp(col).hi;g.fillRect(x+7,by+2,w-15,1);
+  textCenter(label,x+w/2,by+Math.floor((h-7)/2),disabled?UI_MUTED:accentInk(col));
+  if(opt.selected)g.drawImage(iconSprite('pincel',col),x-5,by+h-8,12,12);
+  uiHit(x,y,w,h,run,opt.hover);
+}
+function artSeal(label,x,y,col,r=16,at=-99) {
+  const pop=artPop(at),rr=r+Math.round(pop*3);
+  g.strokeStyle=col;g.lineWidth=1;g.beginPath();g.arc(x,y,rr,0,6.29);g.stroke();
+  g.beginPath();g.arc(x,y,rr-3,.3,5.8);g.stroke();
+  maskingLabel(x-textWidth(label)/2-3,y-5,textWidth(label)+6,11);
+  textCenter(label,x,y-3,col);
+}
 function ui(s, x, y, col = TXT) { txt(s, x, y, col, col === TXT ? '#d9cdb0' : null); }
 // Página de bloc: papel con grano, borde rasgado arriba, línea a lápiz, anillas a la izquierda (opt.rings), sombra
 function page(x, y, w, h, opt = {}) {
@@ -53,8 +117,8 @@ function atbBrush(x, y, f, col, t) {
 function paintBar(x, y, w, h, f, col) { g.fillStyle = INK; g.fillRect(x, y, w, h); g.fillStyle = '#3a3860'; g.fillRect(x + 1, y + 1, w - 2, h - 2); const n = Math.round((w - 2) * clamp(f, 0, 1)); if (n) { g.fillStyle = ramp(col).base; g.fillRect(x + 1, y + 1, n, h - 2); g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, n, 1); } }
 function swatch(x, y, col, dim) { g.fillStyle = INK; g.fillRect(x, y, 7, 7); g.fillStyle = dim ? '#b8b0a0' : ramp(col).base; g.fillRect(x + 1, y + 1, 5, 5); if (!dim) { g.fillStyle = ramp(col).hi; g.fillRect(x + 1, y + 1, 2, 1); } }
 function banner(s, col, y = 4) {
-  g.font = FONT; const w = g.measureText(s).width + 20, x0 = (W - w) / 2 | 0; pstroke(x0, y + 6, x0 + w, y + 6, 13, ramp(col).sh, 1, 0, true); pstroke(x0 + 3, y + 5, x0 + w - 3, y + 5, 11, col, 1, 0, true);
-  const light = rgbHsl(...hexRgb(col))[2] > .6; txt(s, x0 + 10, y + 2, light ? INK : '#f4f0ea', light ? null : '#14121c');
+  const w = rotuloWidth(s) + 20, x0 = (W - w) / 2 | 0; pstroke(x0, y + 6, x0 + w, y + 6, 13, ramp(col).sh, 1, 0, true); pstroke(x0 + 3, y + 5, x0 + w - 3, y + 5, 11, col, 1, 0, true);
+  const light = rgbHsl(...hexRgb(col))[2] > .6; bigText(s, x0 + 10, y + 2, light ? INK : '#f4f0ea', { outline: light ? null : '#14121c' });
 }
 function hilite(x0, y, x1, w, col, a = .3) { // banda de pincelada translúcida (pstroke acumula alpha al solapar cuadrados)
   g.globalAlpha = a; g.fillStyle = col; const len = x1 - x0;
@@ -69,191 +133,116 @@ function tubeGauge(x, y, f, col, dry) { // tubo de pintura en miniatura: el cuer
   const n = Math.round(12 * clamp(f, 0, 1)); if (n) { g.fillStyle = dry ? '#9a90a8' : rp.base; g.fillRect(x + 15 - n, y + 1, n, 4); g.fillStyle = dry ? '#b8b0c0' : rp.hi; g.fillRect(x + 15 - n, y + 1, n, 1); }
   g.fillStyle = '#2a2438'; g.fillRect(x + 16, y + 1, 3, 4); g.fillStyle = dry ? '#9a90a8' : rp.sh; g.fillRect(x + 16, y + 2, 2, 2); if (f < .999 && !dry) { g.fillStyle = '#9a90a8'; g.fillRect(x + 4, y + 2, 1, 1); g.fillRect(x + 6, y + 3, 1, 1); } // pliegues del tubo vacío
 }
-function drawBattleUI() {
-  const y0 = 128, m = B.menu, act = m ? m.unit : null, tint = act ? C(act.color) : null;
-  GUI.swapT = (GUI.swapT ?? 99) + 1; const flipK = clamp(GUI.swapT / 8, 0, 1);
-  // ---- página derecha: fichas
-  page(104, y0, W - 104, H - y0);
-  B.party.forEach((u, i) => {
-    const y = y0 + 8 + i * 15, active = act === u, col = C(u.color), rp = ramp(col), fade = pigmentFade(u.mp, u.maxmp), full = u.atb >= 100 && u.alive && !u.acting && B.phase === 'fight', qi = B.queue.indexOf(u);
-    u.uiHit = Math.max(0, (u.uiHit || 0) - 1); u.uiHeal = Math.max(0, (u.uiHeal || 0) - 1); u.uiHp = u.uiHp == null ? u.hp : (Math.abs(u.uiHp - u.hp) < 1 ? u.hp : u.uiHp + (u.hp - u.uiHp) * .25); // el número de HP persigue al real
-    if (!u.uiFull && full) { u.uiFull = 1; u.uiPop = 10; Audio.sfx('tinkle', { semi: SEMI[u.id] || 0, vol: .2 }); } if (!full) u.uiFull = 0; u.uiPop = Math.max(0, (u.uiPop || 0) - 1);
-    const shake = u.uiHit > 6 ? ((u.uiHit & 1) ? 1 : -1) : 0, lift = active ? -1 : 0;
-    // resalte del activo, que se desliza entre filas
-    if (active) { GUI.hlY = GUI.hlY == null ? y : lerp(GUI.hlY, y, .35); hilite(112, Math.round(GUI.hlY) + 5, 314, 12, col, .35); dropCursor(106, Math.round(GUI.hlY) + 1, col); }
-    g.save(); g.translate(shake, lift);
-    const pop = u.uiPop > 0 ? 1 + Math.sin(u.uiPop / 10 * Math.PI) * .35 : 1; g.save(); g.translate(118, y + 5); g.scale(pop, pop); g.translate(-118, -y - 5); sticker(118, y + 5, u, 6); g.restore();
-    if (qi >= 0 && !active) { g.fillStyle = INK; g.beginPath(); g.arc(124, y - 1, 4, 0, 6.29); g.fill(); ui(String(qi + 1), 121, y - 4, GOLD); }
-    if (full && !active && (B.t >> 3) % 2) { g.fillStyle = '#ffffff'; g.fillRect(111, y - 1, 1, 3); g.fillRect(110, y, 3, 1); }
-    const nm = !u.alive ? TXT3 : fade > 0 ? desat(rp.sh, fade, .1) : rp.sh; ui(u.name, 128, y - 1, nm);
-    // ATB: pincelada que la brocha va pintando
-    const ax = 128, aw = 56, f = u.alive ? clamp(u.atb / 100, 0, 1) : 0, fw = Math.round(aw * f);
-    g.fillStyle = '#e9e1cc'; g.fillRect(ax, y + 8, aw, 4); g.fillStyle = PENCIL; g.fillRect(ax, y + 12, aw, 1); g.fillRect(ax - 1, y + 8, 1, 5); g.fillRect(ax + aw, y + 8, 1, 5);
-    if (fw > 0) { g.fillStyle = rp.base; for (let k = 0; k < fw; k++) { const h = 4 - ((k * 7) % 3 === 0 ? 1 : 0); g.fillRect(ax + k, y + 8 + (4 - h), 1, h); } g.fillStyle = rp.hi; g.fillRect(ax, y + 8, Math.max(1, fw - 2), 1); g.fillStyle = rp.sh; g.fillRect(ax, y + 11, fw, 1);
-      if (!full) { g.fillStyle = '#5a4630'; g.fillRect(ax + fw - 1, y + 4, 2, 4); g.fillStyle = '#c9c4d4'; g.fillRect(ax + fw - 1, y + 7, 2, 1); g.fillStyle = rp.base; g.fillRect(ax + fw - 2, y + 8, 3, 2); }
-      else { const k = (B.t >> 2) % 8; g.fillStyle = k < 4 ? '#ffffff' : rp.hi; g.fillRect(ax + aw - 3 + (k & 1), y + 7, 2, 1); g.fillRect(ax + (B.t * 3) % aw, y + 8, 3, 1); g.fillStyle = rp.base; g.fillRect(ax + aw - 2, y + 12 + (k >> 1), 2, 2); } }
-    // HP a lápiz: el número persigue al real, la barra salta y se pone roja al recibir daño, verde al curar
-    const hpCol = u.hp <= 0 ? TXT3 : u.uiHit > 0 ? (u.uiHit & 2 ? '#ffffff' : C('rojo')) : u.uiHeal > 0 ? '#2f9a48' : u.hp < u.maxhp * .25 ? ((B.t >> 3) & 1 ? C('rojo') : TXT) : TXT;
-    ui('HP', 190, y - 1, TXT2); ui(String(Math.round(u.uiHp)).padStart(3), 208, y - 1, hpCol); pencilBar(190, y + 8, 42, 4, u.uiHp / u.maxhp, u.uiHit > 0 ? C('rojo') : u.uiHeal > 0 ? C('verde') : col);
-    if (u.hp < u.maxhp * .25 && u.alive && (B.t >> 2) % 6 === 0) { g.fillStyle = rp.base; g.fillRect(190 + Math.round(40 * u.hp / u.maxhp), y + 12, 1, 2); } // la barra gotea cuando queda poca
-    // MP como tubo de pintura
-    ui('MP', 242, y - 1, fade >= 1 ? C('rojo') : TXT2); ui(String(u.mp).padStart(2), 260, y - 1, fade >= 1 ? C('rojo') : TXT); tubeGauge(240, y + 7, u.mp / u.maxmp, col, fade >= 1);
-    if (fade >= 1 && (B.t >> 4) % 2) ui('seca', 262, y + 6, TXT3);
-    // estados como pegatinas pequeñas
-    let sx = 286; if (u.status.tiznado) { smudgeIcon(sx, y + 1); sx += 9; } if (u.status.lento) { ui('z', sx, y - 1, C('violeta')); sx += 9; } if (u.status.contorno) { g.strokeStyle = '#4a4460'; g.setLineDash([1, 1]); g.strokeRect(sx + .5, y + .5, 7, 7); g.setLineDash([]); }
-    g.restore();
-  });
-  // ---- página izquierda: comandos del que actúa (o la ficha del objetivo)
-  if (!m) { page(0, y0, 102, H - y0, { rings: true }); ui('...', 12, y0 + 8, TXT3); GUI.lastLevel = null; GUI.cmdY = null; return; }
-  const u = m.unit, ucol = C(u.color), listing = m.level === 'tech' || m.level === 'item';
-  if (m.level === 'target') { GUI.lastLevel = null; targetCard(m.targets[m.tidx], u, y0, m.pending); return; }
-  g.save(); g.translate(0, 0); g.scale(Math.max(.05, Math.sin(flipK * Math.PI / 2)), 1); // la página pasa hoja al cambiar de gota
-  page(0, y0, 102, H - y0, { rings: true, tint: ucol });
-  tape(8, y0 - 3, 86, 11); swatch(12, y0 - 1, ucol); ui(u.name, 22, y0 - 1, ramp(ucol).sh); if (B.queue.length > 1) ui('◄►', 74, y0 - 1, TXT3); // quién actúa, y que hay otros listos
-  const cmdSel = m.level === 'cmd' ? m.idx : (m.level === 'tech' || m.pending && m.pending.type === 'tech') ? 1 : 2;
-  const rowY = i => y0 + 10 + i * 14; GUI.cmdY = GUI.cmdY == null ? rowY(cmdSel) : lerp(GUI.cmdY, rowY(cmdSel), .4); // el resalte se desliza
-  hilite(12, Math.round(GUI.cmdY) + 5, 98, 12, ucol, listing ? .18 : .35); if (!listing) dropCursor(10, Math.round(GUI.cmdY) + 1, ucol);
-  [[u.data.weapon, 'Atacar'], ['tech', 'Tech'], ['item', 'Objeto']].forEach(([ic, label], i) => {
-    const y = rowY(i), sel = cmdSel === i, wig = sel && !listing ? Math.sin(B.t * .25) * 1.5 : 0, bounce = sel && !listing ? -Math.abs(Math.sin(B.t * .12)) * 1 : 0;
-    g.save(); g.translate(28, y + 5 + bounce); g.rotate(wig * .06); g.drawImage(iconSprite(ic, ucol), -6, -6); g.restore(); ui(label, 40, y + 1, sel ? TXT : TXT2);
-  });
-  g.restore();
-  const lv = listing ? (m.pending && m.pending.type === 'item' || m.level === 'item' ? 'item' : 'tech') : null;
-  if (lv !== GUI.lastLevel) { GUI.lastLevel = lv; GUI.flip = 0; } GUI.flip++;
-  if (!listing) return;
-  // ---- hoja que se pasa: lista de techs/objetos
-  const isTech = lv === 'tech', L = m.list;
-  const sel = m.level === 'target' ? L.findIndex(e => e.id === (m.pending.tech ? m.pending.tech.id : m.pending.item)) : m.idx;
-  const rows = Math.max(1, Math.min(4, L.length)), top = clamp(sel - 3, 0, Math.max(0, L.length - 4));
-  const ww = 160, wh = rows * 12 + 12, wy = y0 - wh - 4, k = clamp(GUI.flip / 7, 0, 1), sc = Math.sin(k * Math.PI / 2);
-  g.save(); g.translate(4, 0); g.scale(Math.max(.05, sc), 1);
-  page(0, wy, ww, wh, { rings: true, tint: ucol });
-  if (!L.length) ui('Nada', 20, wy + 7, TXT3);
-  const selY = wy + 7 + (sel - top) * 12; GUI.listY = GUI.listY == null || GUI.flip < 2 ? selY : lerp(GUI.listY, selY, .4);
-  if (L.length) { hilite(14, Math.round(GUI.listY) + 3, ww - 6, 11, ucol, .35); dropCursor(10, Math.round(GUI.listY) - 1, ucol); }
-  L.slice(top, top + 4).forEach((e, kk) => {
-    const i = top + kk, y = wy + 7 + kk * 12;
-    if (isTech) {
-      swatch(20, y, C(e.col), !e.avail); ui(e.t.name, 31, y, e.avail ? TXT : TXT3);
-      e.users.filter(x => x !== u).forEach((x, q) => { g.globalAlpha = e.avail ? 1 : .4; g.drawImage(iconSprite('drop', C(x.color)), 118 + q * 9, y - 3); g.globalAlpha = 1; });
-      const cs = String(e.cost); tubeGauge(ww - 44, y, 1, e.avail ? C(e.col) : '#9a90a8', !e.avail); ui(cs, ww - 8 - cs.length * 8, y, e.avail ? TXT2 : TXT3);
-    } else {
-      g.drawImage(iconSprite('item', e.it.kind === 'mp' ? C('azul') : e.it.kind === 'heal' ? C('verde') : '#e86a8a'), 20, y - 2); ui(e.it.short || e.it.name, 36, y, TXT);
-      const ns = 'x' + e.n; ui(ns, ww - 8 - ns.length * 8, y, TXT2);
-    }
-  });
-  if (L.length > 4) { ui(top > 0 ? '▲' : ' ', ww - 14, wy + 3, TXT2); ui(top + 4 < L.length ? '▼' : ' ', ww - 14, wy + wh - 9, TXT2); }
-  g.restore();
-  if (isTech && L[sel]) {
-    const e = L[sel]; tape(0, 3, W, 24);
-    let x = 8; e.users.forEach((us, j) => { swatch(x, 7, C(us.color)); x += 8; if (j < e.users.length - 1) { ui('+', x, 7, TXT2); x += 9; } });
-    if (e.combo) { ui('=', x + 1, 7, TXT2); x += 10; swatch(x, 7, C(e.col)); x += 10; }
-    ui(e.t.name + ' · ' + e.cost + ' MP', x + 2, 7, e.avail ? ramp(C(e.col)).sh : TXT3);
-    if (e.combo) { const cs = 'con ' + e.users.filter(q => q !== u).map(q => q.name).join(' y '); ui(cs, W - 8 - cs.length * 8, 7, e.avail ? TXT2 : TXT3); }
-    ui(e.t.desc.slice(0, 38), 8, 17, e.avail ? TXT : TXT3);
-    if (!e.avail) { const ns = !e.ready ? '(compañero no listo)' : '(sin MP)'; ui(ns, W - 8 - ns.length * 8, 17, C('rojo')); }
-  }
-  if (!isTech && L[sel]) { tape(0, 3, W, 14); ui(L[sel].it.desc, 8, 6, TXT); }
-}
-// Ficha del objetivo en la página izquierda: la acción elegida, sprite, nombre, HP a lápiz y a qué color es débil (aviso si es el tuyo)
-function targetCard(t, u, y0, pending) {
-  const ucol = C(u.color), enemy = t.kind === 'enemy', weak = enemy ? DATA.complement[t.color] : null, mine = weak === u.color;
-  page(0, y0, 102, H - y0, { rings: true, tint: ucol });
-  const act = pending.type === 'attack' ? 'Atacar' : pending.type === 'tech' ? pending.tech.t.name : DATA.items[pending.item].short || DATA.items[pending.item].name;
-  swatch(10, y0 + 5, pending.type === 'tech' ? C(pending.tech.col) : ucol); ui(act.length > 9 ? act.slice(0, 9) : act, 20, y0 + 5, ramp(ucol).sh); ui('►', 88, y0 + 5, TXT3);
-  const spr = enemy ? buildSprite(t.id + '_mini', C('negro'), t.def.core, { eyes: t.hp < t.maxhp * .25 ? 'hurt' : 'normal' }) : buildSprite(t.id + '_front_mini', C(t.color), null, { eyes: t.hp <= 0 ? 'ko' : 'normal' });
-  shadow(19, y0 + 36, 12); drawSprite(spr, 19, y0 + 35 - (Math.abs(Math.sin(B.t * .12)) * 1.5 | 0), enemy && t.boss ? .8 : 1, false, 1);
-  ui(t.name.length > 8 ? t.name.slice(0, 8) : t.name, 32, y0 + 16, enemy ? TXT : ramp(C(t.color)).sh);
-  pencilBar(32, y0 + 26, 62, 5, t.hp / t.maxhp, enemy ? (t.color === 'negro' ? '#6a6480' : C(t.color)) : C(t.color)); ui('HP ' + t.hp + '/' + t.maxhp, 32, y0 + 33, TXT2);
-  if (enemy) { if (weak) { if (mine) hilite(8, y0 + 46, 96, 10, ucol, .3); ui('débil a', 10, y0 + 43, TXT3); swatch(66, y0 + 42, C(weak)); ui(mine ? '¡tuyo!' : DATA.colors[weak].name.slice(0, 3), 76, y0 + 43, mine ? GOLD : TXT); } else ui('tinta pura', 10, y0 + 43, TXT3); }
-  else ui('MP ' + t.mp + '/' + t.maxmp, 32, y0 + 43, TXT2);
-}
-// Etiqueta del objetivo (ya no se usa en batalla): cinta de carrocero con nombre y HP
-// Etiqueta del objetivo: cinta pegada justo encima del cursor; si no cabe arriba, bajo los pies del objetivo. Nunca tapa el cursor.
-function targetLabel(t, cursorY, top, below) { const label = t.name + (t.kind === 'enemy' ? '  ' + t.hp + '/' + t.maxhp : '  HP ' + t.hp); g.font = FONT; const w = g.measureText(label).width + 22, x0 = clamp(t.x - w / 2, 2, W - w - 2) | 0;
-  let y = below != null ? Math.min(112, below) : Math.round(cursorY - 16); if (y < 2) y = Math.min(112, Math.round(t.y + 6)); tape(x0, y, w, 14); swatch(x0 + 5, y + 3, t.color === 'negro' ? '#2a2438' : C(t.color)); ui(label, x0 + 15, y + 3, TXT); }
-
 // =====================================================================
-// Menú de estado/equipo: el cuaderno del pintor. Se abre con rebote, fichas a la izquierda, retrato y equipo a la derecha.
+// Estuche de equipo: marcapáginas, ficha del personaje y dos bolsillos de tela.
 // ↑↓ personaje · Z entra en el equipo · ↑↓ arma/accesorio · ◄► cambia (la herramienta entra de golpe y salpica) · X vuelve/cierra
 // =====================================================================
 const ACC_LIST = Object.keys(DATA.accessories), WPN_LIST = Object.keys(DATA.weapons);
 const easeBack = k => 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
-function openMenu() { OW.menu = { idx: 0, level: 'chars', row: 0, t: 0, hl: 30, pop: 0, swing: 0, spl: [], delta: null, flip: 99 }; Audio.sfx('book_open'); }
+function openMenu() { ARTUI.tracks.delete('equipment'); OW.menu = { idx: 0, level: 'chars', row: 0, t: 0, hl: 30, pop: 0, swing: 0, spl: [], delta: null, flip: 99 }; Audio.sfx('book_open'); }
 function menuStats(p) { return effStats(p); }
 function updateMenu() {
   const m = OW.menu; if (m.closing) { if (m.t - m.closeT > 10) OW.menu = null; return; }
-  if (m.t < 8) return; // abriéndose
+  if (m.t < 8) return; // evita que la pulsación de apertura cambie equipo
   const p = Party[m.idx], note = () => Audio.sfx('cursor', { semi: SEMI[p.id] || 0 });
   if (m.level === 'chars') {
-    if (hit('down')) { m.idx = (m.idx + 1) % 3; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); } if (hit('up')) { m.idx = (m.idx + 2) % 3; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); }
+    if (hit('down')) { m.idx = (m.idx + 1) % 3; m.delta=null; m.swapped=null; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); } if (hit('up')) { m.idx = (m.idx + 2) % 3; m.delta=null; m.swapped=null; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); }
     if (hit('ok')) { m.level = 'equip'; m.row = 0; Audio.sfx('page'); }
     if (hit('back')) { m.closing = true; m.closeT = m.t; Audio.sfx('book_close'); }
     return;
   }
   if (hit('down') || hit('up')) { m.row = 1 - m.row; note(); }
   if (hit('back')) { m.level = 'chars'; Audio.sfx('cancel'); return; }
-  if (hit('left') || hit('right')) {
-    const dir = keys.right ? 1 : -1, before = effStats(p);
-    if (m.row === 0) { const L = WPN_LIST.filter(k => !DATA.weapons[k].found || Game.owned[k]); const i = L.indexOf(p.weapon), nw = L[(i + dir + L.length) % L.length], other = Party.find(q => q !== p && q.weapon === nw); if (other) other.weapon = p.weapon; p.weapon = nw; m.swapped = other ? other.name : null; } // si otro la lleva, se la cambias; las armas encontradas entran en la rueda
-    else { const i = ACC_LIST.indexOf(p.acc); p.acc = ACC_LIST[(i + dir + ACC_LIST.length) % ACC_LIST.length]; }
-    const after = effStats(p); p.cur.hp = clamp(p.cur.hp + after.hp - before.hp, 1, after.hp); p.cur.mp = clamp(p.cur.mp + after.mp - before.mp, 0, after.mp);
-    m.delta = { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp, t: 0 };
-    m.swing = 1; m.swingDir = dir; Audio.sfx('fwip'); Audio.sfx('equip', { when: .06 }); Audio.sfx('plop', { when: .14, semi: SEMI[p.id] || 0 });
-    const col = C(p.color); for (let j = 0; j < 8; j++) m.spl.push({ x: 226 + R(-10, 10), y: (m.row ? 130 : 98) + R(-4, 4), vx: R(-1.4, 1.4), vy: -R(.4, 1.8), col, t: 0 });
-  }
+  const dir = hit('right') ? 1 : hit('left') ? -1 : 0;
+  if (dir) changeEquipment(m, dir);
+}
+function changeEquipment(m, dir) {
+  const p=Party[m.idx], before=effStats(p);
+  if (m.row === 0) { const L = WPN_LIST.filter(k => !DATA.weapons[k].found || Game.owned[k]); const i = L.indexOf(p.weapon), nw = L[(i + dir + L.length) % L.length], other = Party.find(q => q !== p && q.weapon === nw); if (other) other.weapon = p.weapon; p.weapon = nw; m.swapped = other ? other.name : null; } // si otro la lleva, se la cambias; las armas encontradas entran en la rueda
+  else { const i = ACC_LIST.indexOf(p.acc); p.acc = ACC_LIST[(i + dir + ACC_LIST.length) % ACC_LIST.length]; }
+  const after = effStats(p); p.cur.hp = clamp(p.cur.hp + after.hp - before.hp, 1, after.hp); p.cur.mp = clamp(p.cur.mp + after.mp - before.mp, 0, after.mp);
+  m.delta = { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp, t: 0 };
+  m.swing = 1; m.swingDir = dir; Audio.sfx('fwip'); Audio.sfx('equip', { when: .06 }); Audio.sfx('plop', { when: .14, semi: SEMI[p.id] || 0 });
+  m.changedAt=ARTUI.t;
+  artBurst(128, m.row ? 129 : 103, C(p.color));
+}
+
+// Opening: the bookmarks slide in from the spine, the sheet drops and the pockets rise.
+// Closing runs the same choreography backwards during the ten frames before the case disappears.
+function menuIn(m, duration = 16, delay = 0) {
+  if (!Prefs.shake) return 1;
+  const open = Math.max(0, easeBack(clamp((m.t - delay) / (duration * UI_TEMPO), 0, 1)));
+  return m.closing ? easeBack(clamp(1 - (m.t - m.closeT) / 10, 0, 1)) * open : open;
 }
 function drawMenu() {
-  const m = OW.menu; m.t++; m.flip++;
-  const k = m.closing ? clamp(1 - (m.t - m.closeT) / 10, 0, 1) : clamp(m.t / 16, 0, 1), e = m.closing ? k * k : easeBack(k), oy = Math.round((1 - e) * 200);
-  g.fillStyle = 'rgba(11,9,18,' + (.5 * e).toFixed(2) + ')'; g.fillRect(0, 0, W, H);
-  g.save(); g.translate(0, oy);
-  const p = Party[m.idx], col = C(p.color), rp = ramp(col), s = effStats(p);
-  // ---- página izquierda: fichas
-  page(6, 8, 128, 164, { rings: true });
-  ui('CUADERNO', 22, 14, GOLD); swatch(94, 14, C('amarillo')); ui(String(Game.pigmento), 104, 14, TXT);
-  const hy = 34 + m.idx * 44; m.hl = lerp(m.hl, hy, .3);
-  hilite(18, Math.round(m.hl) + 18, 128, 34, col, m.level === 'chars' ? .28 : .14);
-  Party.forEach((q, i) => {
-    const y = 34 + i * 44, qs = effStats(q), qc = C(q.color), sel = i === m.idx, popS = sel && m.pop > 0 ? 1 + m.pop * .25 : 1;
-    if (sel) m.pop = Math.max(0, m.pop - .12);
-    g.save(); g.translate(30, y + 14); g.scale(popS, popS); g.translate(-30, -y - 14); sticker(30, y + 14, { id: q.id, color: q.color, alive: q.cur.hp > 0, hp: q.cur.hp, maxhp: qs.hp }, 9); g.restore();
-    ui(q.name, 46, y + 2, ramp(qc).sh); ui(q.role, 46, y + 12, TXT2);
-    ui('HP', 46, y + 24, TXT3); pencilBar(64, y + 25, 34, 4, q.cur.hp / qs.hp, qc); ui('MP', 102, y + 24, TXT3); pencilBar(118, y + 25, 12, 4, q.cur.mp / qs.mp, desat(qc, .4, .1));
-    if (sel && m.level === 'chars') dropCursor(10, y + 10, qc);
+  const m=OW.menu; m.t++; m.flip++;
+  UI_HITS.length=0; UI_TEXT.length=0;
+  const p=Party[m.idx], col=C(p.color), s=effStats(p);
+  const at=artObserve('equipment',p.id+':'+m.level+':'+m.row);
+  g.fillStyle='rgba(20,15,28,'+(.48*(Prefs.shake?clamp(m.closing?1-(m.t-m.closeT)/10:m.t/10,0,1):1)).toFixed(2)+')';g.fillRect(0,0,W,H);
+  // Three loose portrait bookmarks stay put while the tool roll changes owner.
+  g.save();g.translate(Math.round((1-menuIn(m,16))*-110),0);
+  brushBand(5,7,90,19,'#34283d');smallText('ESTUCHE',15,13,KIT_LIGHT);
+  g.restore();
+  Party.forEach((q,i)=>{
+    const y=37+i*43,qs=effStats(q),qc=C(q.color),sel=i===m.idx;
+    g.save();g.translate(Math.round((1-menuIn(m,16,3+i*4))*-110),0);
+    maskingLabel(7,y,85,35,sel?'#fff3d2':'#dfd5c1');
+    if(sel)brushBand(29,y+30,57,3,qc);
+    const lift=sel?Math.round(artPop(at)*4):0;
+    sticker(18,y+13-lift,{...q,alive:q.cur.hp>0,hp:q.cur.hp,maxhp:qs.hp,mp:q.cur.mp,maxmp:qs.mp},10);
+    smallText(q.name,33,y+4,sel?UI_INK:UI_MUTED);
+    smallText('HP',33,y+16,UI_MUTED);kitBar(48,y+18,34,q.cur.hp/qs.hp,qc);
+    tubeGauge(34,y+25,q.cur.mp/qs.mp,qc,!q.cur.mp);
+    textRight(q.cur.mp,82,y+25,UI_MUTED);
+    g.restore();
+    const focus=()=>{if(m.idx!==i){artFocus(m,i);m.delta=null;m.swapped=null;}};
+    uiHit(5,y-2,89,40,()=>{focus();m.level='equip';m.row=0;Audio.sfx('page');},focus);
   });
-  // ---- página derecha: retrato, stats y equipo (pasa hoja al cambiar de personaje)
-  const fk = clamp(m.flip / 7, 0, 1), fsc = Math.sin(fk * Math.PI / 2);
-  g.save(); g.translate(140, 0); g.scale(Math.max(.05, fsc), 1);
-  page(0, 8, 174, 164);
-  // retrato con esquinas de cinta
-  const spr = buildSprite(`${p.id}_title`, col, null, { eyes: ((m.t + 20) % 150) < 6 ? 'blink' : p.cur.hp <= 0 ? 'ko' : 'normal' });
-  const px = 38, py = 44, pw = 64, ph = 56; g.fillStyle = '#e9e1cc'; g.fillRect(px - pw / 2, py - ph / 2 + 4, pw, ph); g.fillStyle = PENCIL; g.strokeStyle = PENCIL; g.strokeRect(px - pw / 2 + .5, py - ph / 2 + 4.5, pw - 1, ph - 1);
-  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([a, b]) => tape(px + a * (pw / 2 - 8) - 7, py + b * (ph / 2 - 3) + 1, 14, 5));
-  const bounce = m.pop > 0 ? 1 + Math.sin(m.pop * Math.PI) * .15 : 1, breathe = 1 + Math.sin(m.t * .08) * .02;
-  shadow(px, py + ph / 2 - 2, 20); drawSprite(spr, px, py + ph / 2 - 2, bounce, false, breathe * (2 - bounce)); if (p.id === 'anil') drawSatellites(px, py + ph / 2 - 6, m.t, col, .8);
-  ui(p.name, 80, 16, rp.sh); ui(p.role, 80, 26, TXT2);
-  const D = m.delta && m.delta.t < 50 ? m.delta : null; if (m.delta) m.delta.t++;
-  const stat = (label, val, x, y, d) => { ui(label, x, y, TXT3); ui(String(val), x + label.length * 8 + 4, y, TXT); if (d) { const dx = x + label.length * 8 + 4 + String(val).length * 8 + 4; ui((d > 0 ? '+' : '') + d, dx, y - Math.round((1 - clamp(D.t / 12, 0, 1)) * 4), d > 0 ? '#2f9a48' : C('rojo')); } };
-  stat('HP', p.cur.hp + '/' + s.hp, 80, 38, D && D.hp); stat('MP', p.cur.mp + '/' + s.mp, 80, 48, D && D.mp);
-  stat('ATK', s.atk, 80, 60, D && D.atk); stat('DEF', s.def, 80, 70, D && D.def); stat('SPD', s.spd, 80, 80, D && D.spd);
-  // equipo
-  const rows = [['ARMA', DATA.weapons[p.weapon].name, DATA.weapons[p.weapon].desc], ['ACCESORIO', DATA.accessories[p.acc].name, DATA.accessories[p.acc].desc]];
-  if (m.swing > 0) m.swing = Math.max(0, m.swing - .09);
-  rows.forEach(([label, name, desc], r) => {
-    const y = 92 + r * 28, sel = m.level === 'equip' && m.row === r; ui(label, 12, y, TXT3);
-    if (sel) { hilite(10, y + 17, 166, 16, col, .3); ui('◄', 10, y + 12, rp.sh); ui('►', 158, y + 12, rp.sh); }
-    const sw = sel && m.swing > 0 ? m.swingDir * Math.sin(m.swing * Math.PI) * 14 * m.swing : 0, ang = sel && m.swing > 0 ? Math.sin(m.swing * Math.PI * 2) * .3 * m.swing : 0;
-    if (r === 0) { const img = propSprite(p.weapon, col), P = PROP[p.weapon]; drawProp(img, 46 + sw, y + 20, ang - .2, 1, P.tip[0], P.tip[1], .62); }
-    else { const icons = { paleta: 'tech', goma: 'item', sacapuntas: 'lapiz', lienzo: 'item', difumino: 'pincel' }; g.save(); g.translate(30 + sw, y + 18); g.rotate(ang); g.drawImage(iconSprite(icons[p.acc] || 'item', col), -6, -6); g.restore(); }
-    ui(name, 66, y + 12, sel ? TXT : TXT2);
+  g.save();g.translate(Math.round((1-menuIn(m,16,14))*-110),0);
+  artButton('equip-close',battleKey('back')+' cerrar',7,166,85,12,'#d6c29c',()=>{pressed.back=true;});
+  g.restore();
+  // The portrait is a clipped sketch; numeric stats are pencil annotations.
+  g.save();g.translate(0,Math.round((1-menuIn(m,18,4))*-100));
+  artSheet(104,12,208,74,col);
+  g.fillStyle='#e2d5b9';g.beginPath();g.ellipse(131,49,23,24,-.1,0,6.29);g.fill();
+  const spr=buildSprite(p.id+'_title',col,null,{eyes:p.cur.hp<=0?'ko':'normal'});
+  drawSprite(spr,131,70-Math.round(artPop(at)*3),1.3,false,1.3);
+  smallText(p.name,165,20);smallText(p.role,165,31,UI_MUTED);
+  smallText('HP',165,44,UI_MUTED);smallText(p.cur.hp+'/'+s.hp,184,44);kitBar(251,47,49,p.cur.hp/s.hp,col);
+  smallText('MP',165,55,UI_MUTED);smallText(p.cur.mp+'/'+s.mp,184,55);tubeGauge(269,56,p.cur.mp/s.mp,col,!p.cur.mp);
+  const delta=m.delta&&ARTUI.t-(m.changedAt??-99)<95?m.delta:null;
+  [['ATK',s.atk],['DEF',s.def],['SPD',s.spd]].forEach(([label,n],i)=>{
+    const x=116+i*64;smallText(label,x,74,UI_MUTED);smallText(n,x+22,74);
+    const d=delta?.[label.toLowerCase()];if(d)smallText((d>0?'+':'')+d,x+37,74,d>0?'#34733e':'#a83e3e');
   });
-  const wrap = (txt, n) => { const out = []; let line = ''; for (const w of txt.split(' ')) { if ((line + ' ' + w).trim().length > n) { out.push(line.trim()); line = w; } else line += ' ' + w; } if (line.trim()) out.push(line.trim()); return out.slice(0, 2); };
-  const desc = m.level === 'equip' ? (m.row === 0 && m.swapped && m.delta && m.delta.t < 90 ? 'Se la cambias a ' + m.swapped + '. ' + rows[0][2] : rows[m.row][2]) : p.role === 'Guardia' ? 'Sostiene el dibujo hasta el final.' : p.role === 'Veloz' ? 'Corre para que nadie la borre.' : 'Pinta por pintar.';
-  wrap(desc, 20).forEach((l, i) => ui(l, 10, 141 + i * 10, TXT));
-  ui(m.level === 'equip' ? '◄► cambiar · X volver' : 'Z equipo · X cerrar', 10, 161, TXT3);
-  for (const q of m.spl) { q.t++; q.x += q.vx; q.y += q.vy; q.vy += .12; g.fillStyle = q.t < 8 ? ramp(q.col).hi : ramp(q.col).base; g.fillRect(Math.round(q.x - 140), Math.round(q.y), 2, 2); } m.spl = m.spl.filter(q => q.t < 24);
-  g.restore(); g.restore();
+  g.restore();
+  // Canvas tool pockets: stitched fabric, projecting tools and masking labels.
+  g.save();g.translate(0,Math.round((1-menuIn(m,18,10))*100));
+  brushBand(103,93,210,49,'#806947');brushBand(107,96,202,43,'#ac9062');
+  g.fillStyle='#dec799';for(let x=109;x<306;x+=5){g.fillRect(x,96,2,1);g.fillRect(x,138,2,1);}
+  const rows=[['ARMA',DATA.weapons[p.weapon]],['ACCESORIO',DATA.accessories[p.acc]]];
+  rows.forEach(([label,item],r)=>{
+    const y=97+r*23,sel=m.level==='equip'&&m.row===r;
+    maskingLabel(143,y,119,19,sel?'#fff2ce':'#e0d1ad');
+    smallText(label,150,y+2,UI_MUTED);smallText(item.name,150,y+11);
+    const move=sel?Math.round(artPop(m.changedAt??-99)*9):0;
+    if(r===0){const prop=PROP[p.weapon];drawProp(propSprite(p.weapon,col),124+move,y+17,-.3,1,prop.tip[0],prop.tip[1],.7);}
+    else g.drawImage(iconSprite(({paleta:'tech',sacapuntas:'lapiz',difumino:'pincel'})[p.acc]||'item',col),114+move,y-1,20,20);
+    if(sel){g.drawImage(iconSprite('pincel',col),134,y+8);brushBand(146,y+20,112,2,col);}
+    const focus=()=>{m.level='equip';if(m.row!==r){m.row=r;Audio.sfx('cursor',{vol:.3});}};
+    uiHit(107,y,154,21,focus);
+    artButton('equip-left'+r,'<',265,y,20,19,sel?col:'#c4b28d',()=>{focus();changeEquipment(m,-1);});
+    artButton('equip-right'+r,'>',289,y,20,19,sel?col:'#c4b28d',()=>{focus();changeEquipment(m,1);});
+  });
+  g.restore();
+  const role={carmin:'Proteger cubre un golpe a mitad de daño.',ambar:'Interrumpir (2 MP) corta una carga.',anil:'Preparar (2 MP) deja una capa azul.'};
+  g.save();g.translate(0,Math.round((1-menuIn(m,16,16))*60));
+  maskingLabel(104,145,209,33);
+  const noteAt=artObserve('equipment-note',(m.level==='equip'?rows[m.row][1].desc:role[p.id])+(m.swapped||''));
+  paragraph(m.level==='equip'?rows[m.row][1].desc:role[p.id],111,149,194,UI_INK,2,{progress:Prefs.shake?(ARTUI.t-noteAt)*2.2:Infinity,wet:col});
+  smallText(m.swapped&&delta?'Cambio con '+m.swapped:m.level==='equip'?'< > cambiar material':battleKey('ok')+' elegir material',111,170,UI_MUTED);
+  g.restore();
 }
 
 // =====================================================================
@@ -290,11 +279,23 @@ function pageCurl(snap, k, back = PAPER, back2 = PAPER2) {
 // =====================================================================
 const SPEAKERS = { tinta: { name: 'La Tinta', col: '#8c8ab0', spr: () => buildSprite('tinta', C('negro'), null, { eyes: 'normal' }), sc: 1 }, carmin: { name: 'Carmín', col: 'rojo', spr: () => buildSprite('carmin_title', C('rojo'), null, {}), sc: 1 }, ambar: { name: 'Ámbar', col: 'amarillo', spr: () => buildSprite('ambar_title', C('amarillo'), null, {}), sc: .9 }, anil: { name: 'Añil', col: 'azul', spr: () => buildSprite('anil_title', C('azul'), null, {}), sc: .9 } };
 function drawDialogue(dlg) {
-  const D = DATA.bossDialogue, line = D[Math.min(dlg.i, D.length - 1)], sp = SPEAKERS[line.who], col = sp.col.startsWith('#') ? sp.col : C(sp.col), left = line.who !== 'tinta';
-  const y0 = 118, h = 58; page(6, y0, W - 12, h, { rings: true, tint: col });
-  const px0 = left ? 22 : W - 40, s = sp.spr(); g.save(); g.beginPath(); g.rect(px0 - 18, y0 + 6, 36, 40); g.clip(); g.fillStyle = '#e9e1cc'; g.fillRect(px0 - 18, y0 + 6, 36, 40); shadow(px0, y0 + 44, 20); drawSprite(s, px0, y0 + 44 - (dlg.t % 60 < 4 ? 1 : 0), sp.sc, !left, sp.sc); g.restore(); g.strokeStyle = PENCIL; g.strokeRect(px0 - 17.5, y0 + 6.5, 35, 39); tape(px0 - 12, y0 + 2, 24, 6);
-  const tx = left ? 46 : 14; ui(sp.name, tx, y0 + 6, ramp(col).sh);
-  const words = line.text.slice(0, dlg.ch).split(' '), lines = []; let cur = ''; for (const w of words) { if ((cur + ' ' + w).trim().length > 28) { lines.push(cur.trim()); cur = w; } else cur += ' ' + w; } if (cur.trim()) lines.push(cur.trim());
-  lines.slice(0, 3).forEach((l, i) => ui(l, tx, y0 + 18 + i * 11, TXT));
-  if (dlg.ch >= line.text.length && (B.t / 20 | 0) % 2) ui('▼', W - 24, y0 + h - 12, TXT2);
+  UI_HITS.length=0; UI_TEXT.length=0;
+  const line=DATA.bossDialogue[Math.min(dlg.i,DATA.bossDialogue.length-1)],sp=SPEAKERS[line.who];
+  const col=sp.col.startsWith('#')?sp.col:C(sp.col),left=['carmin','ambar','anil'].includes(line.who);
+  const lines=wrapSmall(line.text,237),h=lines.length*10+23,y=H-h-5;
+  const at=artObserve('dialogue',dlg.i),portraitX=left?26:294,tx=left?52:14,ready=dlg.ch>=line.text.length;
+  // The sheet slides up from the page edge; the speaker leans in and nods while the pen writes.
+  const rise=Math.round((1-artIn(at,18))*(h+26)),talk=!ready&&Prefs.shake?Math.sin(ARTUI.t*.55):0;
+  g.save();g.translate(0,rise);
+  artSheet(left?44:7,y,269,h,col);
+  paintDab(portraitX,y+14,19,col);
+  drawSprite(sp.spr(),portraitX,y+29-Math.round(artPop(at)*3)-Math.round(Math.max(0,talk)*1.5),sp.sc*(1+talk*.02),false,sp.sc*(1-talk*.03));
+  artTag(sp.name,left?49:13,y-15,col,170);
+  // The whole line is wrapped first, so words never jump while the ink is revealed.
+  writtenLines(lines,tx,y+7,UI_INK,dlg.ch,{wet:col,nib:!!Prefs.shake});
+  const key=battleKey('ok')+(ready?' seguir':' completar'),kx=left?304:265;
+  textRight(key,kx,y+h-11,UI_MUTED);
+  if(ready)dropCursor(kx-textWidth(key)-11,y+h-12,col);
+  g.restore();
+  uiHit(0,y-16,W,h+21,()=>pressed.ok=true);
 }

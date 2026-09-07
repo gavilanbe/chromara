@@ -3,18 +3,62 @@
 <head>
 <meta charset="utf-8">
 <title>CHROMARA</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0912">
+<meta name="description" content="Chromara: un JRPG de bolsillo donde tres gotas de color devuelven el pigmento a un cuaderno de pintor.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chromara">
 <style>
+  /* The notebook's own letters, exported from font.js by tools/build_font.py: 16px is native size, 32px exactly double. */
+  @font-face{font-family:'Chromara Cuaderno';src:url('chromara-cuaderno.ttf') format('truetype');font-display:block}
+  @font-face{font-family:'Chromara Rotulo';src:url('chromara-rotulo.ttf') format('truetype');font-display:block}
   html,body{margin:0;height:100%;background:#0b0912;overflow:hidden}
   body{display:flex;align-items:center;justify-content:center}
   canvas{image-rendering:pixelated;image-rendering:crisp-edges;background:#0b0912}
-  #hint{position:fixed;bottom:6px;left:0;right:0;text-align:center;color:#6a6480;font:11px monospace;pointer-events:none}
+  #hint{position:fixed;bottom:4px;left:0;right:0;text-align:center;color:#8a8298;font:16px/1 'Chromara Cuaderno',monospace;-webkit-font-smoothing:none;pointer-events:none}
 </style>
+<link rel="stylesheet" href="mobile.css?v=cuaderno-1">
 </head>
 <body>
-<canvas id="c" width="320" height="180"></canvas>
+<main id="game-shell" aria-label="Chromara">
+  <nav id="touch-toolbar" class="touch-only" aria-label="Menús del juego">
+    <button type="button" data-touch-menu="equipment">Equipo</button>
+    <button type="button" data-touch-action="ring">Magias</button>
+    <button type="button" data-touch-action="journal">Estudios</button>
+    <button type="button" data-touch-action="help">Ayuda</button>
+    <button type="button" data-touch-action="options">Opciones</button>
+    <button type="button" id="touch-sound" aria-label="Silenciar sonido" aria-pressed="false">Sonido</button>
+    <button type="button" id="touch-fullscreen" aria-label="Pantalla completa">⛶</button>
+  </nav>
+  <div id="touch-movement" class="touch-only">
+    <div id="touch-pad" aria-label="Cruceta: toca o desliza para moverte">
+      <button type="button" data-touch-direction="up" aria-label="Arriba">▲</button>
+      <button type="button" data-touch-direction="left" aria-label="Izquierda">◀</button>
+      <span aria-hidden="true" class="pad-center"></span>
+      <button type="button" data-touch-direction="right" aria-label="Derecha">▶</button>
+      <button type="button" data-touch-direction="down" aria-label="Abajo">▼</button>
+    </div>
+    <span class="touch-caption" id="touch-caption">Toca o desliza</span>
+  </div>
+  <div id="game-screen"><canvas id="c" width="320" height="180"></canvas></div>
+  <div id="touch-actions" class="touch-only" aria-label="Acciones del juego">
+    <button type="button" data-touch-action="ok" id="touch-confirm"><b>A</b><span>Confirmar</span></button>
+    <button type="button" data-touch-action="back"><b>B</b><span>Volver</span></button>
+    <button type="button" data-touch-action="swap">Y · Gota</button>
+    <button type="button" data-touch-action="release">X · Liberar</button>
+  </div>
+</main>
+<div id="rotate-device" class="touch-only" role="status">
+  <span class="rotate-icon" aria-hidden="true">▯ ↻ ▭</span>
+  <strong>Gira el móvil</strong>
+  <p>Chromara se juega en horizontal.</p>
+  <small>Tu partida queda pausada mientras giras la pantalla.</small>
+</div>
 <div id="hint" hidden>Flechas/WASD mover · Z/Enter confirmar · X/Esc atrás · Enter en el mapa: menú · M sonido · F1 debug</div>
 <script>
 // The hosted game loads small manifests, then the cue it needs. The offline
@@ -22,9 +66,12 @@
 (function () {
   const scripts = ['data.js', 'music.js', 'music_cues.js', 'music_fallback.js'];
   if (location.protocol === 'file:') scripts.push('music_samples.js');
-  scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'sprites.js', 'scene.js', 'gui.js', 'battle.js', 'attacks.js', 'game.js');
-  const version = location.protocol === 'file:' ? Date.now() : 'title2';
+  scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'font.js', 'sprites.js', 'world_art.js', 'rinse.js', 'field.js', 'scene.js', 'gui.js', 'battle.js', 'attacks.js', 'combat.js', 'battle_ui.js', 'settings.js', 'mobile.js', 'chapter_art.js', 'chapters.js', 'game.js');
+  if (new URLSearchParams(location.search).has('escena')) scripts.push('tools/escenas.js'); // development captures only
+  const version = location.protocol === 'file:' ? Date.now() : 'cuaderno-1';
   for (const src of scripts) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
+  // Installable and playable offline once hosted; file:// and development captures skip the worker.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 })();
 </script>
 </body>

@@ -1,0 +1,78 @@
+/* The original canvas stays 320×180. Touch controls live outside the artwork. */
+html,body { overscroll-behavior:none; }
+#game-shell,#game-screen { display:flex;align-items:center;justify-content:center; }
+#game-shell { width:100%;height:100%; }
+#game-screen { min-width:0;min-height:0; }
+#c { display:block;touch-action:none; }
+.touch-only { display:none; }
+body.touch-mode { -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none; }
+.touch-mode #game-shell {
+  box-sizing:border-box;width:100%;height:100vh;height:100dvh;
+  padding:max(4px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
+  display:grid;grid-template-columns:112px minmax(0,1fr) 80px;grid-template-rows:44px minmax(0,1fr);gap:4px 6px;
+}
+.touch-mode #game-screen { width:100%;height:100%;grid-column:2;grid-row:2; }
+.touch-mode #hint { display:none; }
+.touch-mode button { -webkit-tap-highlight-color:transparent;touch-action:none;cursor:pointer; }
+.touch-mode .touch-only { display:flex; }
+.touch-mode #touch-toolbar { grid-column:1/-1;grid-row:1;justify-content:center;gap:6px;min-width:0; }
+.touch-mode .touch-only button {
+  --paint:#d6b474;box-sizing:border-box;min-height:44px;border:1px solid #b7a07c;border-radius:2px 5px 3px 2px;
+  background:linear-gradient(174deg,#f4e7c8 0%,#e4d1a9 92%,#bca17a 93%);color:#392c3f;font:16px/1.15 'Chromara Cuaderno',system-ui,sans-serif;-webkit-font-smoothing:none;
+  padding:6px 10px;box-shadow:1px 3px 0 #07060c,inset 0 2px 0 #fff2d6;
+  transition:transform 100ms ease,box-shadow 100ms ease,filter 100ms ease;
+}
+.touch-mode .touch-only button:disabled { color:#9e9384;border-color:#514839;background:#302a26;box-shadow:none; }
+.touch-mode .touch-only button.is-held,.touch-mode .touch-only button:active:not(:disabled) { filter:brightness(1.12);transform:translateY(2px) rotate(-1deg);box-shadow:0 1px 0 #07060c; }
+.touch-mode .touch-only button:focus-visible { outline:2px solid #edcd79;outline-offset:2px; }
+.touch-mode #touch-toolbar button { border-top:4px solid var(--paint);padding-top:3px; }
+.touch-mode #touch-toolbar [data-touch-menu=equipment] { --paint:#b88855; }
+.touch-mode #touch-toolbar [data-touch-action=ring] { --paint:#d86257; }
+.touch-mode #touch-toolbar [data-touch-action=journal] { --paint:#579671; }
+.touch-mode #touch-toolbar [data-touch-action=help] { --paint:#688bc2; }
+.touch-mode #touch-toolbar [data-touch-action=options] { --paint:#a28bba; }
+.touch-mode #touch-toolbar #touch-sound { --paint:#9db7ae; }
+.touch-mode #touch-fullscreen { width:44px;padding:0;font-size:25px; }
+.touch-mode #touch-movement { grid-column:1;grid-row:2;flex-direction:column;align-items:center;justify-content:center;gap:12px; }
+#touch-pad { position:relative;width:112px;height:112px;touch-action:none;border-radius:47% 53% 49% 51%;background:repeating-linear-gradient(14deg,#755737 0 12px,#7f603f 13px 15px);box-shadow:inset 0 2px 0 #b28d5d,0 4px 0 #201725; }
+.touch-mode #touch-pad button { position:absolute;width:44px;height:44px;padding:0;font-size:19px;z-index:1; }
+#touch-pad [data-touch-direction=up] { left:34px;top:0; }
+#touch-pad [data-touch-direction=left] { left:0;top:34px; }
+#touch-pad [data-touch-direction=right] { right:0;top:34px; }
+#touch-pad [data-touch-direction=down] { left:34px;bottom:0; }
+.pad-center { position:absolute;left:43px;top:43px;width:26px;height:26px;border-radius:48% 42% 50% 46%;background:#30273b;box-shadow:inset 2px 2px 0 #57415c;pointer-events:none;z-index:2; }
+.touch-caption { color:#9b8f9f;font:16px/1 'Chromara Cuaderno',system-ui,sans-serif; }
+.touch-mode #touch-actions { grid-column:3;grid-row:2;flex-direction:column;justify-content:center;gap:8px; }
+.touch-mode #touch-actions button { width:80px;padding:6px 3px; }
+.touch-mode #touch-actions [data-touch-action=back] { border-bottom:3px solid #9f87b2; }
+.touch-mode #touch-actions [data-touch-action=swap] { border-bottom:3px solid #6a91c5; }
+.touch-mode #touch-actions [data-touch-action=release] { border-bottom:3px solid #b77871; }
+.touch-mode #touch-actions button b { display:block;font:32px/1 'Chromara Rotulo','Chromara Cuaderno',system-ui,sans-serif; }
+.touch-mode #touch-actions button span { display:block;margin-top:3px;font-size:16px; }
+.touch-mode #touch-actions #touch-confirm { min-height:62px;background:linear-gradient(165deg,#e2bf70,#bc9046);border-color:#efd499;color:#342738;border-radius:40% 43% 32% 37%;box-shadow:inset 2px 3px 0 #f4d891,1px 4px 0 #382c27; }
+.touch-mode #touch-actions #touch-confirm.is-held { background:#edc980;box-shadow:inset 1px 1px 0 #f4d891; }
+/* Portrait phones play too: the page on top, the palette of controls underneath. Rotation lock is no obstacle. */
+#rotate-device { display:none; }
+.touch-mode.is-portrait #game-shell { grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:6px;padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); }
+.touch-mode.is-portrait #touch-toolbar { grid-column:1/-1;grid-row:1;flex-wrap:wrap;gap:4px; }
+.touch-mode.is-portrait #touch-toolbar button { min-height:40px;padding:2px 7px 4px; }
+.touch-mode.is-portrait #game-screen { grid-column:1/-1;grid-row:2;width:100%;height:auto;aspect-ratio:16/9; }
+.touch-mode.is-portrait #touch-movement { grid-column:1;grid-row:3;align-self:center; }
+.touch-mode.is-portrait #touch-actions { grid-column:2;grid-row:3;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:center;min-width:0; }
+.touch-mode.is-portrait #touch-actions button { width:auto;min-width:0;min-height:48px;padding:4px 2px; }
+.touch-mode.is-portrait #touch-actions #touch-confirm { grid-column:1/-1;min-height:64px; }
+.touch-mode.is-portrait #touch-actions button b { font-size:16px; }
+.touch-mode.is-portrait #touch-actions #touch-confirm b { font-size:32px; }
+.touch-mode.ui-still .touch-only button { transition:none; }
+.touch-mode.ui-still .touch-only button.is-held,.touch-mode.ui-still .touch-only button:active:not(:disabled) { transform:none; }
+@media (prefers-reduced-motion:reduce) {
+  .touch-mode .touch-only button { transition:none; }
+  .touch-mode .touch-only button.is-held,.touch-mode .touch-only button:active:not(:disabled) { transform:none; }
+}
+@media (max-height:330px) and (orientation:landscape) {
+  .touch-mode #game-shell { grid-template-rows:44px minmax(0,1fr);row-gap:0; }
+  .touch-mode #touch-actions { gap:3px; }
+  .touch-mode #touch-actions #touch-confirm { min-height:48px; }
+  .touch-mode #touch-actions button b { font-size:16px; }
+  .touch-mode .touch-caption { display:none; }
+}

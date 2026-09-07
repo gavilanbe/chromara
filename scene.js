@@ -2,7 +2,7 @@
 // Suelo "Mode 7" con la textura del propio mapa cenital, cámara con guiñada/cabeceo/altura y proyección de sprites en coordenadas de mundo.
 'use strict';
 const SCENE = {
-  cam: { x: 0, y: 0, yaw: 0, pitch: 0.62, h: 70, f: 150, hy: 62 }, // hy = centro óptico vertical (fila)
+  cam: { x: 0, y: 0, yaw: 0, pitch: 0.62, h: 70, f: 150, hy: 62, cx: 160, uiScale: 1 },
   goal: null, ease: .14, shake: 0, // goal = destino de la cámara (tween), shake en px
   img: null, texCache: {}, fog: null,
 };
@@ -11,6 +11,7 @@ function sceneTexture(pal) {
   if (SCENE.texCache[pal]) return SCENE.texCache[pal];
   const tw = MAP.w * TILE, th = MAP.h * TILE, c = document.createElement('canvas'); c.width = tw; c.height = th; const x = c.getContext('2d');
   for (let ty = 0; ty < MAP.h; ty++) for (let tx = 0; tx < MAP.w; tx++) x.drawImage(groundTile(tx, ty, pal, 0), tx * TILE, ty * TILE);
+  drawWorldGround(x, 0, 0, pal, tw, th);
   const d = x.getImageData(0, 0, tw, th);
   return SCENE.texCache[pal] = { data: d.data, w: tw, h: th };
 }
@@ -18,7 +19,7 @@ function sceneTexture(pal) {
 function bigTree(pal, vr) {
   return cached(`bigtree|${pal}|${vr}`, () => {
     const p = PAL[pal], c = document.createElement('canvas'); c.width = 34; c.height = 48; const x = c.getContext('2d');
-    const tint = pal === 'vivo' ? ramp(C(TREE_COLS[vr % 6])) : null, pencil = vr % 3 === 2;
+    const tint = ramp(worldPigment(TREE_COLS[vr % 6], pal)), pencil = vr % 3 === 2;
     if (pencil) {
       const body = tint ? tint.base : p.rock2, bodyHi = tint ? tint.hi : p.rock3, bodyDk = tint ? tint.sh : p.rockOut;
       px(x, '#14121c', 15, 0, 4, 4); px(x, p.wood2, 13, 4, 8, 2); px(x, p.wood, 11, 6, 12, 4); px(x, p.wood3, 12, 6, 4, 2); px(x, p.wood2, 11, 9, 2, 1); px(x, p.wood2, 21, 9, 2, 1);
@@ -56,7 +57,7 @@ function project(wx, wy, wz = 0, cam = SCENE.cam) {
   const z = fwd * b.cP + (cam.h - wz) * b.sP, yc = (cam.h - wz) * b.cP - fwd * b.sP;
   if (z < 4) return null;
   const k = cam.f / z;
-  return [W / 2 + lat * k, cam.hy + yc * k, clamp(Math.pow(110 / z, .55), .7, 1.8), z];
+  return [(cam.cx ?? W / 2) + lat * k, cam.hy + yc * k, clamp(Math.pow(110 / z, .55), .7, 1.8) * (cam.uiScale ?? 1), z];
 }
 // Suelo: por cada fila, un rayo; por cada columna, un punto de la textura (nearest). Niebla hacia el horizonte.
 function drawFloor(pal, skyCol, fogCol) {
@@ -70,7 +71,7 @@ function drawFloor(pal, skyCol, fogCol) {
     if (down <= 0.004) { for (let sx = 0; sx < W; sx++) { const i = row + sx * 4; d[i + 3] = 0; } continue; } // cielo: transparente (se pinta debajo)
     const t = cam.h / down, fwd = (b.cP - dy * b.sP) * t, ox = cam.x + fwd * b.Fx, oy = cam.y + fwd * b.Fy, stepX = t / cam.f * b.Rx, stepY = t / cam.f * b.Ry;
     const fog = clamp((t - fogZ0) / (fogZ1 - fogZ0), 0, .85), inv = 1 - fog;
-    let wx = ox - (W / 2) * stepX, wy = oy - (W / 2) * stepY;
+    let wx = ox - (cam.cx ?? W / 2) * stepX, wy = oy - (cam.cx ?? W / 2) * stepY;
     for (let sx = 0; sx < W; sx++, wx += stepX, wy += stepY) {
       const i = row + sx * 4; let r, gg, bb;
       let tx = wx | 0, ty = wy | 0; // fuera del mapa: se repite el borde (anillo de árboles), nunca vacío
@@ -100,16 +101,141 @@ function camRest(pc, ec) {
   const cx = (pc[0] + ec[0]) / 2, cy = (pc[1] + ec[1]) / 2;
   const back = 128; return { x: cx - Math.cos(yaw) * back - Math.sin(yaw) * 12, y: cy - Math.sin(yaw) * back + Math.cos(yaw) * 12, yaw, pitch: 0.6, h: 86, f: 180, hy: 66 };
 }
-function camGo(goal, ease = .14) { SCENE.goal = Object.assign({}, SCENE.cam, goal); SCENE.ease = ease; }
-function camSet(pose) { Object.assign(SCENE.cam, pose); SCENE.goal = null; }
+// A shot has a world-space pivot. Interpolating pivot, radius and yaw makes a
+// real orbit; interpolating camera X/Y alone would cut across the arena.
+function camGo(goal, ease = .14) {
+  SCENE.menuMove=null;
+  SCENE.goal={...SCENE.cam,cx:W/2,uiScale:1,...goal};SCENE.ease=ease;
+  if(goal.pivot){
+    if(!SCENE.orbit){const c=SCENE.cam,d=Math.hypot(goal.pivot.x-c.x,goal.pivot.y-c.y);SCENE.orbit={x:c.x+Math.cos(c.yaw)*d,y:c.y+Math.sin(c.yaw)*d,dist:d};}
+    SCENE.orbitGoal=goal.pivot;
+  }else{SCENE.orbit=null;SCENE.orbitGoal=null;}
+}
+function camSet(pose) { Object.assign(SCENE.cam,{cx:W/2,uiScale:1},pose);SCENE.goal=null;SCENE.menuMove=null;SCENE.orbit=SCENE.orbitGoal=null; }
+// Menu shots arrive gently, then hold. Duration is independent of battle speed;
+// navigating again starts from the current pose, without a jump or an input lock.
+function camMenuTravel(pose, duration=46) {
+  camGo(pose);
+  SCENE.menuMove={from:{...SCENE.cam},pivot:SCENE.orbit?{...SCENE.orbit}:null,t:0,duration};
+}
 function camTick() {
-  const c = SCENE.cam, gl = SCENE.goal; if (!gl) return;
-  for (const k of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[k] = lerp(c[k], gl[k], SCENE.ease);
-  let d = gl.yaw - c.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); c.yaw += d * SCENE.ease;
+  if(B.currentAction)updateActionCamera();
+  const c=SCENE.cam,gl=SCENE.goal;if(!gl)return;
+  const move=SCENE.menuMove;
+  if(move){
+    move.t=Math.min(move.duration,move.t+1/Prefs.speed);
+    const t=move.t/move.duration,k=t*t*t*(t*(t*6-15)+10),from=move.from;
+    for(const key of ['pitch','h','f','hy','cx','uiScale'])c[key]=lerp(from[key],gl[key],k);
+    const angle=Math.atan2(Math.sin(gl.yaw-from.yaw),Math.cos(gl.yaw-from.yaw));c.yaw=from.yaw+angle*k;
+    if(move.pivot&&SCENE.orbitGoal){
+      const p=SCENE.orbit;for(const key of ['x','y','dist'])p[key]=lerp(move.pivot[key],SCENE.orbitGoal[key],k);
+      c.x=p.x-Math.cos(c.yaw)*p.dist;c.y=p.y-Math.sin(c.yaw)*p.dist;
+    }else{c.x=lerp(from.x,gl.x,k);c.y=lerp(from.y,gl.y,k);}
+    if(t===1)SCENE.menuMove=null;
+    return;
+  }
+  for(const k of ['pitch','h','f','hy','cx','uiScale'])c[k]=lerp(c[k],gl[k],SCENE.ease);
+  const d=Math.atan2(Math.sin(gl.yaw-c.yaw),Math.cos(gl.yaw-c.yaw));c.yaw+=d*SCENE.ease;
+  if(SCENE.orbitGoal){
+    const p=SCENE.orbit,q=SCENE.orbitGoal;
+    for(const k of ['x','y','dist'])p[k]=lerp(p[k],q[k],SCENE.ease);
+    c.x=p.x-Math.cos(c.yaw)*p.dist;c.y=p.y-Math.sin(c.yaw)*p.dist;
+  }else{c.x=lerp(c.x,gl.x,SCENE.ease);c.y=lerp(c.y,gl.y,SCENE.ease);}
 }
-// Encuadre sobre un punto de mundo: acerca la cámara y gira un poco hacia él
-function camFocus(wx, wy, o = {}) {
-  const r = SCENE.rest, dist = (o.dist ?? 80) * 1.15, yaw = r.yaw + (o.turn ?? 0);
-  camGo({ x: wx - Math.cos(yaw) * dist, y: wy - Math.sin(yaw) * dist, yaw, pitch: o.pitch ?? .58, h: (o.h ?? 46) * 1.25, f: o.f ?? 170, hy: 70 }, o.ease ?? .12);
+function cameraBounds(u,cam,home=false) {
+  const p=project(home?u.hx:u.wx,home?u.hy:u.wy,home?0:u.wz,cam);if(!p)return null;
+  const sc=p[2]*(u.kind==='enemy'?(u.boss?1.35:1.6):1);
+  return [p[0]-u.def.w*sc*.58-5,p[1]-u.def.h*sc*1.12-5,p[0]+u.def.w*sc*.58+5,p[1]+7];
 }
-function camReset(ease = .08) { camGo(SCENE.rest, ease); }
+function fitCameraSubjects(subjects,o={}) {
+  const units=[...new Set(subjects)].filter(Boolean);if(!units.length)return {...SCENE.rest};
+  const center=units.reduce((p,u)=>[p[0]+(o.home?u.hx:u.wx)/units.length,p[1]+(o.home?u.hy:u.wy)/units.length],[0,0]);
+  const yaw=o.yaw??SCENE.rest.yaw,dist=o.dist??78;
+  const c={x:center[0]-Math.cos(yaw)*dist,y:center[1]-Math.sin(yaw)*dist,yaw,pitch:o.pitch??.55,h:o.h??49,f:o.f??178,hy:80,cx:160,uiScale:o.zoom??1.18};
+  const rects=units.map(u=>cameraBounds(u,c,o.home)).filter(Boolean);
+  for(const point of o.points||[]){const p=project(point[0],point[1],point[2],c);if(p){const r=(point[3]||0)*p[2];rects.push([p[0]-r,p[1]-r,p[0]+r,p[1]+r]);}}
+  const bounds=[Math.min(...rects.map(r=>r[0])),Math.min(...rects.map(r=>r[1]))-(o.headroom??12),Math.max(...rects.map(r=>r[2])),Math.max(...rects.map(r=>r[3]))];
+  const box=o.box||[15,34,305,139],scale=Math.min(1,(box[2]-box[0])/(bounds[2]-bounds[0]),(box[3]-box[1])/(bounds[3]-bounds[1]));
+  c.f*=scale;c.uiScale*=scale;
+  c.cx=(box[0]+box[2])/2-((bounds[0]+bounds[2])/2-160)*scale;
+  c.hy=(box[1]+box[3])/2-((bounds[1]+bounds[3])/2-80)*scale;
+  c.pivot={x:center[0],y:center[1],dist};return c;
+}
+function cameraPartyYaw() { return Math.atan2(B.axis.dy,B.axis.dx)+2.45; }
+function actionHeadroom(a) { return a.command.type==='item'?(a.command.item==='tubo'?60:a.command.item==='gota_agua'?50:20):12; }
+function cameraShowsUnit(u) {
+  // Every member of the target team belongs to the shot. Resolve overlaps by
+  // depth; only unrelated foreground units are kept out of the HUD.
+  const b=cameraBounds(u,SCENE.cam);
+  if(!b)return false;
+  const m=B.menu,subjects=B.currentAction?SCENE.shot?.subjects:menuCameraSubjects(m)||(m?.level==='target'?validTargets(m.pending,m.unit):null);
+  if(!subjects||subjects.includes(u))return true;
+  return b[0]>=2&&b[1]>=30&&b[2]<=318&&b[3]<=144;
+}
+function beginActionCamera(action) {
+  const command=action.command,ally=action.targets[0]?.kind==='party';
+  action.support=command.type!=='enemy'&&ally;
+  SCENE.shot=null;
+  if(Prefs.camera==='fija'){camGo(menuCameraPose(null),.16);return;}
+  setActionShot(action.support?'target':'source',action.support?action.targets:action.users,{headroom:actionHeadroom(action)});
+}
+function setActionShot(phase,subjects,o={}) {
+  const a=B.currentAction;if(!a||Prefs.camera==='fija')return;
+  const old=SCENE.shot,party=subjects.every(u=>u.kind==='party');
+  // Incoming attacks and healing look at the team's faces, from the enemy side.
+  const base=party&&(a.support||a.command.type==='enemy'||phase==='target')?cameraPartyYaw():SCENE.rest.yaw;
+  const turn=(o.turn??0)*(Prefs.camera==='suave'?.65:1);
+  SCENE.shot={action:a,phase,subjects:[...subjects],at:B.t,baseYaw:base+turn,options:o,impactAt:-999,
+    direction:(B.stats.actions%2?1:-1)*(party?-1:1),held:false};
+  if(old?.action===a&&old.phase===phase)SCENE.shot.direction=old.direction;
+}
+function updateActionCamera() {
+  const a=B.currentAction,shot=SCENE.shot;if(!shot||shot.action!==a||Prefs.camera==='fija')return;
+  let subjects=shot.subjects;
+  if(shot.phase==='target'&&!a.support){
+    // Only a nearby attacking body shares the receiving shot. The distant side
+    // does not force a wide shot while a projectile or a tool crosses the frame.
+    const nearby=a.users.filter(u=>subjects.some(t=>Math.hypot(u.wx-t.wx,u.wy-t.wy)<52));
+    subjects=[...new Set([...subjects,...nearby])];
+  }
+  const t=clamp((B.t-shot.at)/64,0,1),ease=t*t*(3-2*t);
+  const orbit=(Prefs.camera==='cinema'?.48:.24)*(a.support?.65:1);
+  const yaw=shot.baseYaw+shot.direction*orbit*ease;
+  const impact=clamp((B.t-shot.impactAt)/22,0,1),push=Prefs.shake?Math.sin(impact*Math.PI)*.045:0;
+  const o=shot.options,large=a.tier>=2;
+  const pose=fitCameraSubjects(subjects,{...o,yaw,dist:clamp(o.dist??(a.support?78:82),65,large?125:98),h:o.h??49,
+    zoom:(large?1.12:1.25)+push,headroom:o.headroom??actionHeadroom(a)});
+  camGo(pose,o.ease??.17);
+}
+function cameraImpact(target) {
+  const a=B.currentAction,shot=SCENE.shot;if(!a||!shot||shot.action!==a)return;
+  // Incidental healing/splash reactions never steal the main action's shot.
+  if(!a.targets.includes(target)&&!(a.command.type==='enemy'&&target.kind==='party'&&!a.users[0].intent?.all))return;
+  if(shot.phase==='source')setActionShot('target',a.targets,{headroom:12});
+  if(a.command.type==='enemy'&&a.targets.length===1&&target!==a.targets[0]){
+    a.targets=[target];setActionShot('target',[target],{headroom:12});
+  }
+  if(SCENE.shot.impactAt<0)SCENE.shot.impactAt=B.t;
+}
+// Existing choreographies request shots at meaningful beats. The director binds
+// those requests to bodies, so it follows their movement rather than empty ground.
+function camFocus(wx,wy,o={}) {
+  if(Prefs.camera==='fija'){if(!B.currentAction)camReset(.1);return;}
+  const a=B.currentAction;
+  if(a){
+    const near=arr=>arr.length?Math.hypot(wx-centroid(arr)[0],wy-centroid(arr)[1]):Infinity;
+    const source=near(a.users)<near(a.targets);
+    let phase=a.support?'target':source?'source':'target',subjects=phase==='source'?a.users:a.targets;
+    if(o.subjects){subjects=o.subjects;phase=subjects.some(u=>a.targets.includes(u))?'target':'source';}
+    setActionShot(phase,subjects,{...o,headroom:o.headroom??actionHeadroom(a)});return;
+  }
+  const yaw=SCENE.rest.yaw+(o.turn??0)*(Prefs.camera==='suave'?.6:1),dist=o.dist??80;
+  camGo({x:wx-Math.cos(yaw)*dist,y:wy-Math.sin(yaw)*dist,yaw,pitch:o.pitch??.58,h:o.h??46,f:o.f??170,hy:o.hy??70,pivot:{x:wx,y:wy,dist}},o.ease??.12);
+}
+function camReset(ease=.1) {
+  if(B.currentAction&&SCENE.shot){SCENE.shot.held=true;return;}
+  SCENE.shot=null;
+  // Let the next decision choose the return shot in the same update. Resetting
+  // here used to insert a wide view between an action and the next palette.
+  if(B.phase==='fight'){B.viewKey=null;return;}else camGo(SCENE.rest,ease);
+}
