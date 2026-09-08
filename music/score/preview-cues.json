@@ -17,26 +17,26 @@
     {
       "at": 19,
       "name": "battle",
-      "meaning": "El mismo gesto convertido en impulso",
+      "meaning": "Tres gotas: el riff, las tres notas martilleadas y su caída",
       "sourceStart": 0,
-      "duration": 12
+      "duration": 15
     },
     {
-      "at": 31.7,
+      "at": 34.7,
       "name": "boss",
       "meaning": "La Tinta: La–Fa–Mi♭–Re",
       "sourceStart": 6.315789473684211,
       "duration": 8
     },
     {
-      "at": 40.4,
+      "at": 43.4,
       "name": "restored",
       "meaning": "El mapa recuperado: Re–Fa♯–Mi–La",
       "sourceStart": 9.6,
       "duration": 9.6
     },
     {
-      "at": 50.7,
+      "at": 53.7,
       "name": "victory",
       "meaning": "La resolución",
       "sourceStart": 0,

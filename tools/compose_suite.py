@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CHROMARA: a thematic suite, nine scenes (v4; combat rewrite v5).
+"""CHROMARA: a thematic suite, nine scenes (v4; boss v5; colour battle v6).
 
 The Prism cell is D-F-E-A; colour opens F to F#. Ink folds A-F-Eb-D.
 The shared long-short / middle / leap contour matters as much as the pitches.
@@ -165,7 +165,7 @@ def main():
         meta[score.name]=m;fallback[score.name]=export_fallback(score,m)
         print(score.name,m['duration'],'seconds; written voices',m['maxWrittenPolyphony'],flush=True)
     (MUSIC/'meta.json').write_text(json.dumps(meta,ensure_ascii=False,indent=2)+'\n')
-    (ROOT/'music_fallback.js').write_text('// Generated from the thematic suite, including combat revision v5.\nconst MUSIC_FALLBACK = '+json.dumps(fallback,separators=(',',':'))+';\n')
+    (ROOT/'music_fallback.js').write_text('// Generated from the thematic suite, including colour battle v6.\nconst MUSIC_FALLBACK = '+json.dumps(fallback,separators=(',',':'))+';\n')
     if not args.cues:make_sfx(synth)
     synth.close()
     (MUSIC/'score/soundfont.json').write_text(json.dumps({'file':args.soundfont.name,'sha256':hashlib.sha256(args.soundfont.read_bytes()).hexdigest(),

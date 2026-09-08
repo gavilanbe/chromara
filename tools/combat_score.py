@@ -1,9 +1,10 @@
-"""CHROMARA combat revision: recurring hooks, voiced harmony, playable drum tails.
+"""CHROMARA boss score (v5); the normal battle is authored in battle_tres_gotas.py (v7).
 
 All pitches and rhythms are written here. No random note/chord generation.
 The colour cell D–F–E–A and Ink's A–F–Eb–D remain in the melodic foreground.
 """
 from compose_score import Score, pitch
+from battle_tres_gotas import battle
 
 # CT 2011. Levels account for the very different recorded preset levels.
 # A fifth field selects an SF2 bank; bank 1's crashfd1 has a real decay.
@@ -103,87 +104,6 @@ def bassline(s,bar,harmony,next_harmony,variant=0,lyric=False,level=1):
     if lyric:patterns=[[(0,root,1.3),(1.5,root+7,.4),(2.5,root+12,.55),(3.5,approach,.35)]]*4
     for j,(off,p,dur) in enumerate(patterns[variant%4]):
         s.note('bass',bar*4+off,dur,p,round((97 if j==0 else 86+j%2*5)*level))
-
-
-BATTLE_HOOK=[
- 'D5:.75 F5:.25 E5:.5 A5:1.5 -:.5 A4:.5',
- 'D5:.75 F5:.25 E5:.5 C5:.5 D5:1.5 -:.5',
- 'G5:.75 A5:.25 G5:.5 E5:1 D5:.5 C5:.5 -:.5',
- 'C#5:.5 E5:.5 A5:1 -:.5 G5:.25 E5:.25 C#5:.5 A4:.5',
- 'D5:.75 F5:.25 E5:.5 A5:1.5 -:.5 A4:.5',
- 'F5:.75 G5:.25 A5:1 C6:1 A5:.5 G5:.5',
- 'G5:.75 A5:.25 Bb5:.5 A5:.5 G5:.75 F5:.25 E5:.5 D5:.5',
- 'E5:.5 G5:.5 C#5:1 -:.5 A4:.5 C5:.5 C#5:.5',
-]
-BATTLE_CHANGES=[DM,BB,G9,A7,DM,FM,GM,A7]
-
-
-def battle():
-    s=CombatScore('battle','A pulso y a color',156,2,40,'D minor / F major',
-        'pickup:2; A:8 hook; A′:8 answer; B:8 open sky; C:8 three strokes; A″:8 return & turnaround')
-    # One two-bar entrance: the three strokes, a held breath, the groove lands.
-    line(s,'lead',0,'D5:.75 F5:.25 E5:.5 A5:1 -:.5 A4:.5 C#5:.5',94)
-    line(s,'guitar',1,'D4:.5 -:.5 D4:.5 F4:.5 E4:.5 -:.5 A3:.5 C#4:.5',94)
-    for b in range(2):
-        bassline(s,b,DM,A7 if b==0 else DM,b)
-        comp(s,b,DM if b==0 else A7,b,.87)
-        groove(s,b,b,fill=b==1,crash=b==0)
-    # A is intentionally stated twice. Recognizing it is the point of the repeat.
-    open_sky=[
-      'A5:1.5 G5:.5 F5:1 E5:.5 F5:.5',
-      'G5:1.5 E5:.5 D5:1 -:.5 E5:.5',
-      'F5:1 A5:1 C6:1 D6:.75 -:.25',
-      'C6:1 A5:.5 G5:.5 F5:1 -:1',
-      'Bb5:1 A5:.5 G5:.5 F5:1 D5:.75 -:.25',
-      'E5:1 G5:.5 A5:.5 C6:1 B5:.5 A5:.5',
-      'G5:1.5 F5:.5 E5:1 C#5:.5 E5:.5',
-      'A5:2 -:1 A4:.5 C#5:.5',
-    ]
-    sky_changes=[FM,CM,BB,FM,GM,CM,A7,A7]
-    strokes=[
-      'D4:.5 -:.25 D4:.25 F4:.5 E4:.5 A4:1 -:1',
-      '-:1 D4:.5 F4:.5 E4:.5 C4:.5 D4:.5 -:.5',
-      'G4:.5 -:.25 G4:.25 Bb4:.5 A4:.5 D5:1 -:1',
-      '-:1 C#4:.5 E4:.5 A4:1 -:1',
-      'D4:.5 F4:.5 E4:1 A4:1 -:1',
-      'F4:.5 A4:.5 G4:1 C5:1 -:1',
-      'G4:.5 Bb4:.5 A4:.5 G4:.5 E4:1 -:1',
-      'C#4:.5 E4:.5 G4:.5 Bb4:.5 A4:1 -:.5 C#5:.5',
-    ]
-    returns=['-:2 -:.5 A4:.5 C5:.5 C#5:.5','-:2.5 A4:.5 D5:.5 F5:.5',
-             '-:2.5 D5:.5 E5:.5 G5:.5','-:3 A4:.5 C#5:.5']
-    for i in range(40):
-        b=i+2;k=i%8;sky=16<=i<24;dialogue=24<=i<32;final=i>=32
-        changes=sky_changes if sky else BATTLE_CHANGES
-        chord=changes[k];nxt=changes[(k+1)%8]
-        if k==7:nxt=sky_changes[0] if i==15 else DM
-        bassline(s,b,chord,nxt,i,lyric=sky,level=.97 if dialogue else 1)
-        groove(s,b,i,energy=.86 if sky else .90 if dialogue else 1,
-               fill=k==7 or (k==3 and final),crash=k==0)
-        comp(s,b,chord,i,.83 if sky else .94,voice='keys')
-        if sky:
-            line(s,'flute',b,open_sky[k],92,.97)
-            # Sustained string thirds hold the sky open; bass and drums keep moving.
-            for p in chord[1].split():s.note('strings',b*4,3.65,pitch(p)+12,65)
-            if k in [1,3,7]:line(s,'guitar',b,returns[k%4],68,.9)
-        elif dialogue:
-            line(s,'guitar',b,strokes[k],96,.88)
-            if k%2==0:line(s,'marimba',b,'-:3 D5:.25 F5:.25 E5:.25 A5:.25',77,.84)
-            else:line(s,'lead',b,['-:2 A5:.75 G5:.25 F5:.5 E5:.5','-:2 E5:.5 G5:.5 A5:.75 -:.25'][k%4//2],91)
-        else:
-            phrase=BATTLE_HOOK[k]
-            if i==13:phrase='F5:.75 G5:.25 A5:1 C6:.75 Bb5:.25 A5:.5 G5:.5'
-            if i==37:phrase='F5:.75 G5:.25 A5:.5 C6:1 D6:.75 C6:.25 A5:.5'
-            if i==38:phrase='Bb5:1 A5:.5 G5:.5 E5:.75 F5:.25 E5:.5 C#5:.5'
-            if i==39:phrase='D5:1.5 -:.5 A4:.5 C5:.5 C#5:.5 E5:.5'
-            line(s,'lead',b,phrase,99 if final else 95,.95)
-            # Answer only where the trumpet breathes; no constant competing line.
-            if k in [1,3,7]:line(s,'guitar',b,returns[k%4],76 if i<8 else 84,.89)
-            if i>=8 and k in [0,4]:
-                s.note('strings',b*4,2.9,'A4',59 if not final else 68)
-            if final and k in [1,5]:
-                line(s,'flute',b,'-:2 A5:.5 G5:.5 F5:.5 E5:.5',57,.92)
-    s.repeat();return s
 
 
 INK_HOOK=[

@@ -14,7 +14,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   headless: true, args:['--autoplay-policy=no-user-gesture-required']
  });
  try {
-  const page = await browser.newPage(); const errors = []; const requests = [];
+   // Fetch-failure checks below must reach page.route, rather than being served
+   // successfully by the game's service-worker cache after the network aborts.
+   const page = await browser.newPage({serviceWorkers:'block'}); const errors = []; const requests = [];
   page.on('pageerror', e => errors.push(e.message)); page.on('request', r=>requests.push(r.url()));
   await page.goto(base); await page.waitForFunction(()=>window.__chromara);
   assert.equal(requests.some(x=>x.includes('music_samples.js')), false, 'HTTP must not load the offline music bundle');
@@ -26,8 +28,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   await page.waitForFunction(()=>__chromara.Audio.src?.name==='map'); await delay(650);
   await page.evaluate(()=>__chromara.battle('1'));
   await page.waitForFunction(()=>__chromara.Game.state==='battle' && __chromara.Audio.src?.name==='battle',null,{timeout:20000});
-  assert.equal(await page.evaluate(()=>MUSIC_CUES.battle.title),'A pulso y a color');
-  assert.equal(await page.evaluate(()=>MUSIC_FALLBACK.battle.bpm),156);
+   assert.equal(await page.evaluate(()=>MUSIC_CUES.battle.title),'Tres gotas');
+   assert.equal(await page.evaluate(()=>MUSIC_FALLBACK.battle.bpm),160);
   assert(requests.some(x=>/battle\.opus\.ogg\?v=[a-f0-9]{12}$/.test(x)), 'new composition bypasses cached combat audio');
   const choreography = await page.evaluate(()=>{
    const A=__chromara.Audio, original=A.sfx, calls=[];__chromara.pause(true);

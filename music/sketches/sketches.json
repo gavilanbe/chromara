@@ -1,0 +1,461 @@
+{
+  "sketch1": {
+    "title": "Tres gotas",
+    "bpm": 160,
+    "key": "D dorian",
+    "duration": 28.2,
+    "form": "intro 2 · A 8 (trompeta) · A′ 8 (marimba contesta, flauta se suma)",
+    "maxWrittenPolyphony": 9,
+    "stemBalance": {
+      "bass": {
+        "program": 33,
+        "bank": 0,
+        "gain": 0.72,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -27.44,
+        "peakDB": -16.31,
+        "eightBarRMSDB": [
+          -29.08,
+          -28.48
+        ]
+      },
+      "hat": {
+        "program": 127,
+        "bank": 0,
+        "gain": 0.58,
+        "pan": 82,
+        "echoSend": 0,
+        "activeRMSDB": -45.92,
+        "peakDB": -29.16,
+        "eightBarRMSDB": [
+          -50.17,
+          -50.17
+        ]
+      },
+      "kick": {
+        "program": 125,
+        "bank": 0,
+        "gain": 0.74,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -27.48,
+        "peakDB": -17.28,
+        "eightBarRMSDB": [
+          -35.09,
+          -35.09
+        ]
+      },
+      "snare": {
+        "program": 124,
+        "bank": 0,
+        "gain": 0.66,
+        "pan": 66,
+        "echoSend": 0.04,
+        "activeRMSDB": -29.9,
+        "peakDB": -16.43,
+        "eightBarRMSDB": [
+          -35.25,
+          -35.24
+        ]
+      },
+      "tom": {
+        "program": 116,
+        "bank": 0,
+        "gain": 0.38,
+        "pan": 46,
+        "echoSend": 0.06,
+        "activeRMSDB": -28.89,
+        "peakDB": -15.79,
+        "eightBarRMSDB": [
+          -43.15,
+          -42.56
+        ]
+      },
+      "lead": {
+        "program": 56,
+        "bank": 0,
+        "gain": 1.15,
+        "pan": 58,
+        "echoSend": 0.13,
+        "activeRMSDB": -27.97,
+        "peakDB": -13.03,
+        "eightBarRMSDB": [
+          -28.82,
+          -28.32
+        ]
+      },
+      "ohat": {
+        "program": 126,
+        "bank": 0,
+        "gain": 0.4,
+        "pan": 82,
+        "echoSend": 0,
+        "activeRMSDB": -45.24,
+        "peakDB": -27.31,
+        "eightBarRMSDB": [
+          -56.0,
+          -56.0
+        ]
+      },
+      "crash": {
+        "program": 123,
+        "bank": 1,
+        "gain": 0.62,
+        "pan": 50,
+        "echoSend": 0.1,
+        "activeRMSDB": -42.77,
+        "peakDB": -23.79,
+        "eightBarRMSDB": [
+          -51.75,
+          -51.75
+        ]
+      },
+      "organ": {
+        "program": 17,
+        "bank": 0,
+        "gain": 0.3,
+        "pan": 44,
+        "echoSend": 0.08,
+        "activeRMSDB": -38.46,
+        "peakDB": -24.55,
+        "eightBarRMSDB": [
+          -44.03,
+          -43.34
+        ]
+      },
+      "marimba": {
+        "program": 12,
+        "bank": 0,
+        "gain": 0.7,
+        "pan": 84,
+        "echoSend": 0.08,
+        "activeRMSDB": -34.47,
+        "peakDB": -20.88,
+        "eightBarRMSDB": [
+          -180.0,
+          -44.51
+        ]
+      },
+      "flute": {
+        "program": 73,
+        "bank": 0,
+        "gain": 0.7,
+        "pan": 72,
+        "echoSend": 0.18,
+        "activeRMSDB": -29.03,
+        "peakDB": -20.52,
+        "eightBarRMSDB": [
+          -180.0,
+          -32.7
+        ]
+      }
+    }
+  },
+  "sketch2": {
+    "title": "Salpicaduras",
+    "bpm": 132,
+    "key": "E minor / dorian",
+    "duration": 33.92728125,
+    "form": "intro 2 · A 8 (flauta) · A′ 8 (marimba dobla, trompeta contesta)",
+    "maxWrittenPolyphony": 9,
+    "stemBalance": {
+      "bass": {
+        "program": 34,
+        "bank": 0,
+        "gain": 0.84,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -30.89,
+        "peakDB": -17.0,
+        "eightBarRMSDB": [
+          -31.66,
+          -31.07
+        ]
+      },
+      "tamb": {
+        "program": 119,
+        "bank": 0,
+        "gain": 0.55,
+        "pan": 34,
+        "echoSend": 0.03,
+        "activeRMSDB": -47.18,
+        "peakDB": -30.17,
+        "eightBarRMSDB": [
+          -54.64,
+          -54.64
+        ]
+      },
+      "hat": {
+        "program": 127,
+        "bank": 0,
+        "gain": 0.5,
+        "pan": 80,
+        "echoSend": 0,
+        "activeRMSDB": -48.56,
+        "peakDB": -31.48,
+        "eightBarRMSDB": [
+          -53.2,
+          -53.2
+        ]
+      },
+      "kick": {
+        "program": 125,
+        "bank": 0,
+        "gain": 0.7,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -28.59,
+        "peakDB": -18.47,
+        "eightBarRMSDB": [
+          -37.11,
+          -37.11
+        ]
+      },
+      "snare": {
+        "program": 124,
+        "bank": 0,
+        "gain": 0.6,
+        "pan": 66,
+        "echoSend": 0.04,
+        "activeRMSDB": -31.8,
+        "peakDB": -17.96,
+        "eightBarRMSDB": [
+          -37.81,
+          -37.8
+        ]
+      },
+      "tom": {
+        "program": 116,
+        "bank": 0,
+        "gain": 0.36,
+        "pan": 46,
+        "echoSend": 0.06,
+        "activeRMSDB": -30.64,
+        "peakDB": -19.4,
+        "eightBarRMSDB": [
+          -45.58,
+          -45.38
+        ]
+      },
+      "lead": {
+        "program": 73,
+        "bank": 0,
+        "gain": 0.8,
+        "pan": 60,
+        "echoSend": 0.16,
+        "activeRMSDB": -25.75,
+        "peakDB": -17.73,
+        "eightBarRMSDB": [
+          -26.52,
+          -25.92
+        ]
+      },
+      "crash": {
+        "program": 123,
+        "bank": 1,
+        "gain": 0.58,
+        "pan": 50,
+        "echoSend": 0.1,
+        "activeRMSDB": -43.74,
+        "peakDB": -24.77,
+        "eightBarRMSDB": [
+          -53.56,
+          -53.56
+        ]
+      },
+      "harp": {
+        "program": 46,
+        "bank": 0,
+        "gain": 0.46,
+        "pan": 88,
+        "echoSend": 0.16,
+        "activeRMSDB": -39.09,
+        "peakDB": -27.53,
+        "eightBarRMSDB": [
+          -43.27,
+          -42.77
+        ]
+      },
+      "marimba": {
+        "program": 12,
+        "bank": 0,
+        "gain": 0.74,
+        "pan": 80,
+        "echoSend": 0.07,
+        "activeRMSDB": -32.78,
+        "peakDB": -19.61,
+        "eightBarRMSDB": [
+          -180.0,
+          -35.08
+        ]
+      },
+      "lead2": {
+        "program": 56,
+        "bank": 0,
+        "gain": 0.82,
+        "pan": 62,
+        "echoSend": 0.12,
+        "activeRMSDB": -31.41,
+        "peakDB": -18.29,
+        "eightBarRMSDB": [
+          -180.0,
+          -39.63
+        ]
+      }
+    }
+  },
+  "sketch3": {
+    "title": "Tinta y brasa",
+    "bpm": 126,
+    "key": "D minor / harmonic cadences",
+    "duration": 35.48571875,
+    "form": "intro 2 · A 8 (flauta pregunta, trompeta responde) · A′ 8 (se superponen)",
+    "maxWrittenPolyphony": 13,
+    "stemBalance": {
+      "bass": {
+        "program": 38,
+        "bank": 0,
+        "gain": 0.7,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -27.51,
+        "peakDB": -16.76,
+        "eightBarRMSDB": [
+          -32.56,
+          -31.63
+        ]
+      },
+      "hat": {
+        "program": 127,
+        "bank": 0,
+        "gain": 0.54,
+        "pan": 82,
+        "echoSend": 0,
+        "activeRMSDB": -49.08,
+        "peakDB": -30.18,
+        "eightBarRMSDB": [
+          -51.75,
+          -51.75
+        ]
+      },
+      "kick": {
+        "program": 125,
+        "bank": 0,
+        "gain": 0.76,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -27.55,
+        "peakDB": -17.35,
+        "eightBarRMSDB": [
+          -36.2,
+          -36.2
+        ]
+      },
+      "snare": {
+        "program": 124,
+        "bank": 0,
+        "gain": 0.68,
+        "pan": 66,
+        "echoSend": 0.05,
+        "activeRMSDB": -29.93,
+        "peakDB": -16.17,
+        "eightBarRMSDB": [
+          -36.15,
+          -36.14
+        ]
+      },
+      "ohat": {
+        "program": 126,
+        "bank": 0,
+        "gain": 0.42,
+        "pan": 82,
+        "echoSend": 0,
+        "activeRMSDB": -46.31,
+        "peakDB": -28.38,
+        "eightBarRMSDB": [
+          -58.12,
+          -58.12
+        ]
+      },
+      "tom": {
+        "program": 116,
+        "bank": 0,
+        "gain": 0.38,
+        "pan": 46,
+        "echoSend": 0.06,
+        "activeRMSDB": -29.29,
+        "peakDB": -17.12,
+        "eightBarRMSDB": [
+          -45.1,
+          -44.23
+        ]
+      },
+      "crash": {
+        "program": 123,
+        "bank": 1,
+        "gain": 0.6,
+        "pan": 50,
+        "echoSend": 0.1,
+        "activeRMSDB": -43.45,
+        "peakDB": -24.47,
+        "eightBarRMSDB": [
+          -53.47,
+          -53.47
+        ]
+      },
+      "rhodes": {
+        "program": 4,
+        "bank": 0,
+        "gain": 0.5,
+        "pan": 44,
+        "echoSend": 0.1,
+        "activeRMSDB": -36.64,
+        "peakDB": -25.15,
+        "eightBarRMSDB": [
+          -43.5,
+          -43.49
+        ]
+      },
+      "flute": {
+        "program": 73,
+        "bank": 0,
+        "gain": 1.0,
+        "pan": 66,
+        "echoSend": 0.2,
+        "activeRMSDB": -27.76,
+        "peakDB": -17.79,
+        "eightBarRMSDB": [
+          -30.59,
+          -28.23
+        ]
+      },
+      "lead": {
+        "program": 56,
+        "bank": 0,
+        "gain": 1.15,
+        "pan": 60,
+        "echoSend": 0.14,
+        "activeRMSDB": -27.16,
+        "peakDB": -12.81,
+        "eightBarRMSDB": [
+          -30.83,
+          -29.67
+        ]
+      },
+      "strings": {
+        "program": 48,
+        "bank": 0,
+        "gain": 0.52,
+        "pan": 76,
+        "echoSend": 0.16,
+        "activeRMSDB": -40.8,
+        "peakDB": -26.26,
+        "eightBarRMSDB": [
+          -45.57,
+          -40.61
+        ]
+      }
+    }
+  }
+}

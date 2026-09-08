@@ -52,6 +52,25 @@ class Score:
         self.name, self.title, self.bpm, self.meter = name, title, bpm, meter
         self.intro, self.bars, self.key = intro, bars, key
         self.voices = {}
+        # Beat, MIDI controller, value; controller -1 denotes signed pitch bend.
+        # Kept separate from notes so older scores and the emergency synth retain
+        # their existing note format.
+        self.automation = {}
+
+    def control(self, voice, beat, controller, value):
+        assert beat >= 0 and -1 <= controller <= 127
+        value = round(value)
+        assert (-8192 <= value <= 8191) if controller == -1 else (0 <= value <= 127)
+        self.automation.setdefault(voice, []).append([beat, controller, value])
+
+    def curve(self, voice, controller, points):
+        """Write a deliberate continuous gesture, sampled at 1/32 of a beat."""
+        self.control(voice, points[0][0], controller, points[0][1])
+        for (start, a), (end, b) in zip(points, points[1:]):
+            assert end > start
+            steps = max(1, math.ceil((end-start)*32))
+            for j in range(1, steps+1):
+                self.control(voice, start+(end-start)*j/steps, controller, a+(b-a)*j/steps)
 
     def note(self, voice, beat, duration, note, velocity=75):
         if note != '-':
@@ -80,6 +99,8 @@ class Score:
         start, length = self.intro * self.meter, self.bars * self.meter
         for notes in self.voices.values():
             notes.extend([[t + length, d, p, v] for t, d, p, v in list(notes) if t >= start])
+        for controls in self.automation.values():
+            controls.extend([[t + length, c, v] for t, c, v in list(controls) if t >= start])
 
     def midi(self):
         mf = mido.MidiFile(ticks_per_beat=480)
@@ -96,12 +117,23 @@ class Score:
             track.append(mido.Message('program_change', channel=ch, program=program))
             for control, value in [(7, round(level * 110)), (10, pan), (91, round(send * 127))]:
                 track.append(mido.Message('control_change', channel=ch, control=control, value=value))
+            if any(c == -1 for _, c, _ in self.automation.get(voice, [])):
+                # Explicit two-semitone bend range, matching the audio renderer.
+                for control, value in [(101,0),(100,0),(6,2),(38,0),(101,127),(100,127)]:
+                    track.append(mido.Message('control_change', channel=ch, control=control, value=value))
             events = []
             for t, d, p, v in notes:
-                events.extend([(round(t * 480), 1, p, v), (round((t+d) * 480), 0, p, 0)])
+                events.extend([(round(t * 480), 2, p, v), (round((t+d) * 480), 0, p, 0)])
+            for t, c, v in self.automation.get(voice, []):
+                events.append((round(t*480), 1, c, v))
             last = 0
-            for tick, on, p, v in sorted(events):
-                track.append(mido.Message('note_on' if on else 'note_off', channel=ch, note=p, velocity=v, time=tick-last))
+            for tick, kind, p, v in sorted(events, key=lambda e: (e[0],e[1])):
+                if kind == 1:
+                    msg = (mido.Message('pitchwheel', channel=ch, pitch=v, time=tick-last) if p == -1 else
+                           mido.Message('control_change', channel=ch, control=p, value=v, time=tick-last))
+                else:
+                    msg = mido.Message('note_on' if kind == 2 else 'note_off', channel=ch, note=p, velocity=v, time=tick-last)
+                track.append(msg)
                 last = tick
         mf.save(MUSIC / (self.name + '.mid'))
 
@@ -233,6 +265,8 @@ class Synth:
             'fluid_synth_sfload': (integer, [ptr,string,integer]),
             'fluid_synth_program_select': (integer,[ptr,integer,integer,integer,integer]),
             'fluid_synth_cc': (integer,[ptr,integer,integer,integer]),
+            'fluid_synth_pitch_bend': (integer,[ptr,integer,integer]),
+            'fluid_synth_pitch_wheel_sens': (integer,[ptr,integer,integer]),
             'fluid_synth_noteon': (integer,[ptr,integer,integer,integer]),
             'fluid_synth_noteoff': (integer,[ptr,integer,integer]),
             'fluid_synth_all_sounds_off': (integer,[ptr,integer]),
@@ -250,22 +284,32 @@ class Synth:
         self.sf=self.lib.fluid_synth_sfload(self.synth,str(sf).encode(),0)
         if self.sf<0: raise RuntimeError('Could not load soundfont')
 
-    def render(self, notes, program, pan, seconds, beat, bank=0):
+    def render(self, notes, program, pan, seconds, beat, bank=0, automation=None):
         lib, synth = self.lib, self.synth
         lib.fluid_synth_all_sounds_off(synth,0)
         if lib.fluid_synth_program_select(synth,0,self.sf,bank,program)<0: raise RuntimeError(f'Missing program {bank}:{program}')
         lib.fluid_synth_cc(synth,0,7,100);lib.fluid_synth_cc(synth,0,10,pan)
+        # Every stem reuses channel zero: expressive controls must not leak into
+        # the following instrument (or into a subsequent legacy cue).
+        lib.fluid_synth_cc(synth,0,11,127);lib.fluid_synth_cc(synth,0,1,0)
+        lib.fluid_synth_pitch_wheel_sens(synth,0,2)
+        lib.fluid_synth_pitch_bend(synth,0,8192)
         events=[]
         for t,d,p,v in notes:
-            events.extend([(round(t*beat*SR),1,p,v),(round((t+d)*beat*SR),0,p,0)])
+            events.extend([(round(t*beat*SR),2,p,v),(round((t+d)*beat*SR),0,p,0)])
+        for t,c,v in automation or []:
+            events.append((round(t*beat*SR),1,c,v))
         out=np.zeros((round(seconds*SR),2),dtype=np.float32)
         cursor=0
-        for frame,on,p,v in sorted(events)+[(len(out),-1,0,0)]:
+        for frame,on,p,v in sorted(events, key=lambda e: (e[0],e[1]))+[(len(out),-1,0,0)]:
             frame=min(frame,len(out))
             if frame>cursor:
                 chunk=out[cursor:frame]
                 lib.fluid_synth_write_float(synth,len(chunk),chunk.ctypes.data,0,2,chunk.ctypes.data,1,2)
-            if on==1:lib.fluid_synth_noteon(synth,0,p,v)
+            if on==2:lib.fluid_synth_noteon(synth,0,p,v)
+            elif on==1:
+                if p == -1:lib.fluid_synth_pitch_bend(synth,0,v+8192)
+                else:lib.fluid_synth_cc(synth,0,p,v)
             elif on==0:lib.fluid_synth_noteoff(synth,0,p)
             cursor=frame
         return out
@@ -288,7 +332,7 @@ def render_score(score, synth, output):
     stems = {}
     for voice,notes in score.voices.items():
         program,level,pan,send,bank=voice_settings(score,voice)
-        dry=synth.render(notes,program,pan,seconds,beat,bank)*level
+        dry=synth.render(notes,program,pan,seconds,beat,bank,score.automation.get(voice))*level
         if getattr(score, 'record_stems', False):
             rms=np.sqrt(np.mean(dry**2,axis=1));active=rms[rms>.0001]
             stems[voice]={'program':program,'bank':bank,'gain':level,'pan':pan,'echoSend':send,
@@ -298,9 +342,12 @@ def render_score(score, synth, output):
                     for k in range(0,score.bars,8)]
             stems[voice]['eightBarRMSDB']=[round(float(20*np.log10(max(1e-9,np.sqrt(np.mean(block**2))))),2) for block in blocks]
         mix+=dry
-        for tap in range(1,5):
-            delay=round(beat/4*tap*SR)
-            mix[delay:]+=dry[:-delay, ::-1 if tap%2 else 1]*(send*.44**(tap-1))
+        taps = getattr(score, 'echo_taps', {}).get(voice,
+            [(beat/4*tap, .44**(tap-1), bool(tap%2)) for tap in range(1,5)])
+        for seconds_delay, amount, swap in taps:
+            delay=round(seconds_delay*SR)
+            if 0 < delay < len(dry):
+                mix[delay:]+=dry[:-delay, ::-1 if swap else 1]*(send*amount)
     # Gain is a single value for the whole cue: written phrases keep their dynamics.
     peak=float(np.max(np.abs(mix)))
     mix*=.75/max(peak,.0001)

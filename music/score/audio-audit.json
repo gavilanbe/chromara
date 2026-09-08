@@ -34,22 +34,21 @@
     ]
   },
   "battle": {
-    "duration": 126.153854,
-    "peakDBFS": -5.65,
-    "integratedLUFS": -18.99,
-    "truePeakDBTP": -5.6,
-    "loudnessRangeLU": 2.1,
-    "sha256": "6462e2030d31d41921d1b9b2d8dd12d441aab3c69a81f8ae71f23a4b17c20656",
-    "loopStart": 64.615375,
-    "loopEnd": 126.15384375,
-    "seamJump": 0.008716,
-    "localDerivativeRMS": 0.019844,
+    "duration": 99.0,
+    "peakDBFS": -2.69,
+    "integratedLUFS": -18.98,
+    "truePeakDBTP": -2.69,
+    "loudnessRangeLU": 2.8,
+    "sha256": "98e25341892e18277a07e2ef509372952f880d94e0895c30e839a32a270eb97f",
+    "loopStart": 51.0,
+    "loopEnd": 99.0,
+    "seamJump": 0.007814,
+    "localDerivativeRMS": 0.018037,
     "eightBarRMSDB": [
-      -22.5,
-      -22.5,
-      -21.4,
-      -23.8,
-      -22.0
+      -22.7,
+      -21.7,
+      -21.2,
+      -21.6
     ]
   },
   "boss": {
