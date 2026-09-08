@@ -68,7 +68,7 @@
   if (location.protocol === 'file:') scripts.push('music_samples.js');
   scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'font.js', 'sprites.js', 'world_art.js', 'rinse.js', 'field.js', 'scene.js', 'gui.js', 'battle.js', 'attacks.js', 'combat.js', 'battle_ui.js', 'settings.js', 'mobile.js', 'chapter_art.js', 'chapters.js', 'game.js');
   if (new URLSearchParams(location.search).has('escena')) scripts.push('tools/escenas.js'); // development captures only
-  const version = location.protocol === 'file:' ? Date.now() : 'cuaderno-1';
+  const version = location.protocol === 'file:' ? Date.now() : 'cuaderno-2';
   for (const src of scripts) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   // Installable and playable offline once hosted; file:// and development captures skip the worker.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
