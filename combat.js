@@ -57,8 +57,10 @@ function putCoat(t, col, turns = 2) {
 function interruptCharge(t, force = false) {
   if (!t.alive || t.kind !== 'enemy' || !t.intent || t.acting || t.atb < 55) return false;
   if (t.boss && !force && !t.status.expuesto) return false;
+  // The ink thread that announced the attack tears; a yellow scratch crosses the drop.
+  const thread = intentThreadPath(t, t.intent.all ? null : t.intent.target);
   t.atb = Math.min(t.atb, 38); t.intent = null; t.warned = false;
-  num(t, 'CORTE', '#f2c93a'); say('¡Carga interrumpida!', C('amarillo'));
+  interruptFx(t, thread);
   B.stats.interrupts++; Audio.sfx('scratch_long', { vol: .7 }); Audio.sfx('glass', { when: .06, vol: .45 });
   burst(t.wx, t.wy, t.def.h * .5, '#f4f0ea', 12, 1.3, 22, .12);
   return true;
@@ -67,8 +69,8 @@ function exposeBoss(t) {
   if (!t.boss || t.status.expuesto) return;
   applyStatus(t, 'expuesto', 2); t.shellHits = [];
   B.party.filter(p => p.alive).forEach(p => heal(p, 2, true));
-  say('¡Coraza abierta! Pigmento +2', C('amarillo')); Audio.sfx('glass');
-  burst(t.wx, t.wy, t.def.h * .6, '#f4f0ea', 20, 2, 28, .1);
+  Audio.sfx('glass'); B.flash = { col: '#f4f0ea', a: .3 }; B.hitstop = Math.max(B.hitstop, 4);
+  burst(t.wx, t.wy, t.def.h * .6, '#f4f0ea', 20, 2, 28, .1); shellCrackFx(t);
 }
 function bossPhaseCheck(t) {
   if (!t.boss || !t.alive) return;
@@ -77,7 +79,6 @@ function bossPhaseCheck(t) {
   t.bossPhase = next; t.shellHits = []; t.coat = null; delete t.status.expuesto;
   t.intent = null; t.atb = 20; t.warned = false;
   t.color = next === 2 ? 'violeta' : 'negro'; t.def.core = next === 2 ? C(t.color) : null;
-  say(t.name + (next === 2 ? ': núcleo expuesto' : ': borra el lienzo'), C('violeta'));
   B.phaseNotice = { name: t.data.phaseNames ? ['','I','II','III'][next]+' · '+t.data.phaseNames[next-1] : next === 2 ? 'II · NÚCLEO EXPUESTO' : 'III · EL ÚLTIMO BORRÓN', until: B.t + 150 };
   B.flash = { col: C('violeta'), a: .24 }; B.shake = 4; Audio.sfx('hum_down');
 }
@@ -91,7 +92,7 @@ function paintOnHit(t, col, action) {
   }
   if (reaction) {
     t.coat = null; B.stats.mixes++;
-    num(t, DATA.colors[reaction].name.toUpperCase(), C(reaction));
+    mixFx(t, action.previousCoat, col, reaction);
     Audio.sfx('mix', { colours: [0, 4, 7].filter((_, i) => PRIMARY[i] === col || PRIMARY[i] === action.previousCoat), vol: .6 });
     burst(t.wx, t.wy, 4, C(reaction), 16, 1.6, 30, .06);
     B.paintEvents.push({ t, col: reaction, action });
@@ -348,8 +349,11 @@ function* tracked(u, gen, users = [u], command = { type: 'attack' }, targets = [
   const revisions = users.map(x => ({ ...x.statusRevision }));
   const tier = command.type === 'tech' ? users.length : command.type === 'enemy' && u.intent?.all ? 2 : 0;
   if(!targets.length)targets=command.type==='enemy'?(u.intent?.all?alive(B.party):[u.intent?.target||alive(B.party)[0]].filter(Boolean)):validTargets(command,u).slice(0,1);
-  B.currentAction = { users, targets:targets.slice(), command, tier, painted: new Set(), seen: Game.seenTechs.has(command.techId), title: command.type === 'enemy' ? u.intent?.name || 'Ataque' : actionName(command, u) };
+  // Only named strokes earn a stamp: techniques and the boss's set pieces. Plain hits and items are read from the motion alone.
+  const stamp = command.type === 'tech' || (command.type === 'enemy' && u.boss && !!u.intent && u.intent.kind !== 'attack');
+  B.currentAction = { users, targets:targets.slice(), command, tier, stamp, painted: new Set(), seen: Game.seenTechs.has(command.techId), title: command.type === 'enemy' ? u.intent?.name || 'Ataque' : actionName(command, u) };
   beginActionCamera(B.currentAction);
+  if (tier >= 1) techVignette(B.currentAction);
   users.forEach(x => { x.acting = true; x.warned = false; x.guard = null; });
   try { yield* wait(12); yield* gen; flushPaintEvents(); yield* wait(20); }
   finally {
@@ -363,14 +367,13 @@ function* tracked(u, gen, users = [u], command = { type: 'attack' }, targets = [
   }
 }
 function* actSupport(u, type, targets) {
-  say(u.name + ': ' + (type === 'reload' ? 'Recargar' : ROLE_ACTIONS[u.id].name), C(u.color));
   yield* anticipate(u, 8);
   if (type === 'reload') { heal(u, 6, true); sparkle(u.wx, u.wy, u.def.h); }
   else if (u.id === 'carmin') {
     u.guard = { target: targets[0], charges: 1 };
     if (Game.studies.relevo) heal(targets[0], 3, true);
     Audio.sfx('scratch'); mark({ kind: 'path', pts: [[u.wx, u.wy, 2], [targets[0].wx, targets[0].wy, 2]], col: C('rojo'), w: 2, life: 35, under: true });
-    num(targets[0], 'CUBIERTO', C('rojo'));
+    guardFlash(u, targets[0]);
   } else if (u.id === 'ambar') {
     const t = targets[0]; const cut = interruptCharge(t, true);
     damage(t, baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn, .65), u.color, u.name);
@@ -382,7 +385,7 @@ function* actSupport(u, type, targets) {
   flushPaintEvents(); yield* wait(18); u.pose = 'idle';
 }
 function* bossSpecial(u, intent) {
-  say(u.name + ': ' + intent.name, C('violeta')); u.pose = 'charge';
+  u.pose = 'charge';
   const pc=partyC();setActionShot('source',[u],{dist:92,turn:-.12});
   for (let i = 0; i < 20; i++) { if (i % 3 === 0) burst(u.wx, u.wy, 2, C('negro'), 4, 1, 22, -.03); yield; }
   setActionShot('target',intent.all?alive(B.party):[intent.target?.alive?intent.target:alive(B.party)[0]],{dist:84,turn:.16,headroom:18});
@@ -390,9 +393,10 @@ function* bossSpecial(u, intent) {
     const t = intent.target.alive ? intent.target : alive(B.party)[0];
     if (t) {
       stream(t, u, C(t.color), 14, 20); Audio.sfx('squeeze'); yield* wait(20);
-      const stolen = Math.min(3, t.mp); t.mp -= stolen; num(t, '-' + stolen + ' MP', C(t.color));
+      const stolen = Math.min(3, t.mp); t.mp -= stolen; num(t, '-' + stolen, C(t.color));
       u.color = DATA.complement[t.color]; u.def.core = C(u.color); damage(t, 12, 'negro');
-      say('Núcleo ' + DATA.colors[u.color].name + ' · débil a ' + DATA.colors[t.color].name);
+      // The stolen colour settles in the core; rings of its complement show where the shell is soft now.
+      coreSwapFx(u, t.color);
     }
   } else {
     const wave = { k: 0 }, f = fx(999, () => { const c = PJ([lerp(u.wx, pc[0], wave.k), lerp(u.wy, pc[1], wave.k), 0]); g.fillStyle = '#292339'; g.beginPath(); g.ellipse(c[0], c[1], (20 + wave.k * 60) * c[2], (5 + wave.k * 18) * c[2], 0, 0, 6.29); g.fill(); g.strokeStyle = '#aaa0bd'; g.lineWidth = 1; g.stroke(); }, true);
@@ -411,5 +415,5 @@ function retryBattle() {
   B.unitScale = B.propScale = 1; B.puddle.k = 1;
   B.units.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; u.pose = u.alive ? 'idle' : 'ko'; });
   OW.hideFoe = null; OW.scare = null; camSet(SCENE.rest); setState('battle');
-  Audio.play(r.foe.boss ? 'boss' : 'battle'); say('Un nuevo trazo.');
+  Audio.play(r.foe.boss ? 'boss' : 'battle');
 }

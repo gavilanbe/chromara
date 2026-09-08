@@ -80,7 +80,7 @@ function paintMotes(x, y, col, count = 5) {
 }
 function observeBattleFeedback() {
   if (BUI.party !== B.party) {
-    BUI.party = B.party; BUI.cards.clear(); BUI.motes.length = 0; BUI.selection = ''; BUI.lastMenu = null; BUI.action = null; BUI.closing = null; BUI.message = null; BUI.selectedAt = BUI.openedAt = BUI.actionAt = BUI.deniedAt = BUI.resultAt = -99; BUI.serial = 0; BUI.cursor = null; BUI.reticle = null; BUI.listY = null; BUI.showResult = false; BUI.brushAngle = null;
+    BUI.party = B.party; BUI.cards.clear(); BUI.motes.length = 0; BUI.selection = ''; BUI.lastMenu = null; BUI.action = null; BUI.closing = null; BUI.message = null; BUI.selectedAt = BUI.openedAt = BUI.actionAt = BUI.deniedAt = BUI.resultAt = -99; BUI.serial = 0; BUI.cursor = null; BUI.reticle = null; BUI.listY = null; BUI.showResult = false; BUI.brushAngle = null; BUI.boss = null;
     B.party.forEach(u => BUI.cards.set(u, { hp:u.hp, mp:u.mp, trail:u.hp, ready:u.atb>=100, step:B.t, hit:-99, heal:-99, squeeze:-99, readyAt:-99, koAt:-99 }));
   }
   B.party.forEach((u, i) => {
@@ -181,6 +181,23 @@ function drawATBBrush(x,y,u,c,reserved) {
   if(reserved){g.fillStyle='#e4d3f0';g.fillRect(tip+5,y,5,1);g.fillRect(tip+7,y-1,1,5);}
 }
 function unitStateLabels(u) { const labels=Object.keys(u.status).filter(k=>STATUS_INFO[k]).map(k=>STATUS_INFO[k][0]+u.status[k]);if(u.guard?.charges)labels.push('P1');return labels; }
+// Card states are tiny material glyphs with one pip per remaining action: a drip, a smudge, a pencil frame, a red flourish, a shield arc.
+function drawStatusIcons(u,x,y) {
+  const items=[];
+  if(u.status.lento)items.push(['lento',u.status.lento]);if(u.status.tiznado)items.push(['tiznado',u.status.tiznado]);if(u.status.contorno)items.push(['contorno',u.status.contorno]);if(u.status.firmado)items.push(['firmado',u.status.firmado]);
+  if(u.guard?.charges)items.push(['guard',u.guard.charges]);
+  if(!items.length)return;
+  maskingLabel(x,y,Math.min(23,items.length*8+1),10);
+  items.slice(0,3).forEach(([kind,turns],i)=>{
+    const ix=x+2+i*8,iy=y+1;
+    if(kind==='lento'){g.fillStyle='#6a4d8a';g.fillRect(ix+2,iy,1,2);g.fillRect(ix+1,iy+2,3,3);g.fillStyle='#b796d0';g.fillRect(ix+1,iy+3,1,1);}
+    else if(kind==='tiznado'){g.fillStyle='#1e1a2c';g.fillRect(ix,iy+2,5,2);g.fillRect(ix+1,iy+1,2,1);g.fillRect(ix+3,iy+4,2,1);}
+    else if(kind==='contorno'){g.fillStyle='#4a4460';g.fillRect(ix,iy,2,1);g.fillRect(ix+3,iy,2,1);g.fillRect(ix,iy+4,2,1);g.fillRect(ix+3,iy+4,2,1);g.fillRect(ix,iy+2,1,1);g.fillRect(ix+4,iy+2,1,1);}
+    else if(kind==='firmado'){const c=C('rojo');g.fillStyle=c;g.fillRect(ix,iy+3,1,2);g.fillRect(ix+1,iy+1,1,2);g.fillRect(ix+2,iy+3,1,2);g.fillRect(ix+3,iy,1,3);g.fillRect(ix+4,iy+3,1,1);}
+    else{const c=C('rojo');g.fillStyle=c;g.fillRect(ix+3,iy,2,1);g.fillRect(ix+2,iy+1,1,3);g.fillRect(ix+3,iy+4,2,1);g.fillStyle=ramp(c).hi;g.fillRect(ix+3,iy+1,1,1);}
+    g.fillStyle='#79435b';for(let k=0;k<Math.min(3,turns);k++)g.fillRect(ix+k*2,iy+7,1,1);
+  });
+}
 function drawPartyCards() {
   if (BUI.party !== B.party) observeBattleFeedback();
   B.party.forEach((u, i) => {
@@ -208,8 +225,9 @@ function drawPartyCards() {
     if (Prefs.shake && uiAge(c.hit, 20) < 1) { g.fillStyle = '#c4384a'; g.globalAlpha = 1 - uiAge(c.hit, 20); for (let k = 0; k < 4; k++) g.fillRect(x + 48 + ((k * 13) % 26), y + 1 + ((k * 7) % 5), 1 + (k & 1), 1); g.globalAlpha = 1; }
     paintTube(x+79,y+5,u,c,cost);
     maskingLabel(x+79,y-4,24,9,cost? '#f7dfad':UI_PAPER); textCenter(cost ? '-'+cost : 'MP', x+91,y-3,cost>u.mp?'#a12f42':UI_INK);
-    const states = unitStateLabels(u);
-    if (states.length) { maskingLabel(x+1,y+14,23,9);smallText(states[0]+(states.length>1?'+':''),x+4,y+15,'#79435b'); }
+    drawStatusIcons(u,x+1,y+14);
+    // An enemy's ink thread reaches the portrait too: a drop hangs from the sticker while the attack is announced.
+    if (u.alive && B.enemies.some(e => e.alive && e.intent && !e.acting && (e.intent.all || e.intent.target === u))) { const wob = Prefs.shake ? Math.round(Math.sin(B.t * .3)) : 0; g.fillStyle = '#2a2438'; g.fillRect(x+3, y-4+wob, 1, 2); g.fillRect(x+2, y-2+wob, 3, 3); g.fillRect(x+3, y+1+wob, 1, 1); g.fillStyle = '#8c8ab0'; g.fillRect(x+2, y-1+wob, 1, 1); }
     drawATBBrush(x+1,174,u,c,reserved);
     if(ready&&Prefs.shake&&uiAge(c.readyAt,24)<1){g.fillStyle=KIT_LIGHT;g.fillRect(x+4,148-bounce,2,2);g.fillRect(x+20,148+bounce,1,2);}
     if (!u.alive) { const k = uiIn(c.koAt, 14); g.save(); g.translate(x+13, y+12); g.rotate(-.2 * k); g.scale(1 + (1 - k) * .8, 1 + (1 - k) * .8); maskingLabel(-10,-5,20,10,'#f3d9d9');smallText('KO',-6,-3,'#a12f42'); g.restore(); }
@@ -416,34 +434,50 @@ function drawReservation() {
   const label=DATA.techs[r.p.techId].name+' / '+battleKey('release')+' soltar',w=textWidth(label)+14;
   maskingLabel(317-w,131,w,13,'#e4d5ee');smallText(label,324-w,134,'#674875');uiHit(317-w,129,w,18,cancelReservation);
 }
-function intentLabel(u) { return String.fromCharCode(65+u.idx)+': '+u.intent.name+' > '+(u.intent.all?'grupo':u.intent.target.name); }
+// The stamp is the one word the action keeps: a technique's name, brushed on and lifted away before the stroke ends.
+function drawActionStamp(action) {
+  if(!action.stamp)return;
+  const age=B.t-BUI.actionAt,life=70;if(age>life+12)return;
+  const col=C(action.command?.techId?DATA.techs[action.command.techId].color||action.users[0].color:action.users[0].color),w=rotuloWidth(action.title)+34,x=Math.round((W-w)/2),pop=uiPop(BUI.actionAt,12),out=clamp((age-life)/12,0,1);
+  g.save();g.globalAlpha*=1-out;g.translate(0,Prefs.shake?Math.round(out*-12):0);
+  brushBand(x,3,w,17+Math.round(pop*2),KIT_INK);paintDab(x+10,11,4,col,pop);bigText(action.title,x+19,7,col,{progress:Prefs.shake?age*7:null,outline:'#0b0912'});
+  g.fillStyle=col;g.fillRect(x+4,19,Math.round((w-8)*Math.min(1,(age+3)/10)),2);
+  g.restore();
+}
+// The boss keeps her name and nothing else in words: three phase dabs, her present core and a long stroke of ink for health.
+function drawBossBand(boss) {
+  const c=BUI.boss||(BUI.boss={trail:boss.hp,phase:boss.bossPhase,phaseAt:-99,core:boss.def.core,coreAt:-99,step:B.t});
+  if(c.phase!==boss.bossPhase){c.phase=boss.bossPhase;c.phaseAt=B.t;}
+  if(c.core!==boss.def.core){c.core=boss.def.core;c.coreAt=B.t;}
+  if(c.step!==B.t){c.trail=Prefs.shake?lerp(c.trail,boss.hp,1-Math.pow(.9,Math.max(1,B.t-c.step))):boss.hp;if(boss.hp>c.trail)c.trail=boss.hp;c.step=B.t;}
+  const jolt=Prefs.shake&&uiAge(c.phaseAt,14)<1?Math.round(Math.sin((B.t-c.phaseAt)*1.6)*2*(1-uiAge(c.phaseAt,14))):0;
+  g.save();g.translate(jolt,0);
+  brushBand(3,3,260,16,KIT_INK);bigText(boss.name,11,5,'#dbbae8',{outline:'#0b0912'});
+  const nx=11+rotuloWidth(boss.name)+12;
+  for(let i=1;i<=3;i++)paintDab(nx+i*9,11,3,i<=boss.bossPhase?'#b38bc3':'#4a3f57',i===boss.bossPhase?uiPop(c.phaseAt,16)*2:0);
+  const bx=nx+42,bw=Math.max(20,240-bx);
+  g.fillStyle='#4a3f57';g.fillRect(bx,9,bw,4);g.fillStyle='#8f6f95';g.fillRect(bx,9,Math.round(bw*clamp(c.trail/boss.maxhp,0,1)),4);
+  const n=Math.round(bw*clamp(boss.hp/boss.maxhp,0,1));g.fillStyle='#b38bc3';g.fillRect(bx,9,n,4);g.fillStyle='#dbbae8';g.fillRect(bx,9,Math.max(0,n-1),1);
+  if(boss.def.core)paintDab(252,11,4,boss.def.core,uiPop(c.coreAt,16)*2);
+  g.restore();
+}
 function drawBattleHeader() {
   const action=B.currentAction;
-  if(action){
-    // The stroke's name is brushed on from left to right on an ink band.
-    const col=C(action.command?.techId?DATA.techs[action.command.techId].color||action.users[0].color:action.users[0].color),w=rotuloWidth(action.title)+26,x=Math.round((W-w)/2),pop=uiPop(BUI.actionAt,12),age=B.t-BUI.actionAt;
-    brushBand(x,3,w,17+Math.round(pop*2),KIT_INK);bigText(action.title,x+13,7,col,{progress:Prefs.shake?age*7:null,outline:'#0b0912'});
-    g.fillStyle=col;g.fillRect(x+4,19,Math.round((w-8)*Math.min(1,(age+3)/10)),2);return;
-  }
+  if(action){drawActionStamp(action);return;}
   drawClock();
-  const boss=alive(B.enemies).find(u=>u.boss),incoming=alive(B.enemies).filter(u=>u.intent).sort((a,b)=>b.atb-a.atb)[0];
-  const m=B.menu,msgAge=B.msg?B.t-(BUI.messageAt??B.t):0,written=B.msg?{progress:Prefs.shake?msgAge*1.1:null,wet:B.msg.col&&B.msg.col!=='#f4f0ea'?B.msg.col:null}:null;
-  if(boss){
-    brushBand(3,3,260,28,KIT_INK);bigText(boss.name,11,6,'#dbbae8',{outline:'#0b0912'});smallText(['','Fase I','Fase II','Fase III'][boss.bossPhase],11+rotuloWidth(boss.name)+8,8,'#b9a5c4');textRight(boss.hp+'/'+boss.maxhp,255,8,'#dbbae8');
-    const intent=incoming?intentLabel(incoming):['','Coraza: combina colores','Núcleo abierto','Último borrón'][boss.bossPhase];
-    smallText(B.msg?.s||intent,11,20,'#eed298',B.msg?written:null);g.fillStyle='#b38bc3';g.fillRect(8,30,Math.round(250*boss.hp/boss.maxhp),2);
-  }else if(B.msg||incoming){
-    const label=B.msg?.s||intentLabel(incoming),lines=wrapSmall(label,242).slice(0,2),w=Math.min(260,Math.max(...lines.map(textWidth))+16);
-    const drop=Math.round((1-uiIn(B.msg?BUI.messageAt:-999,12))*-8);g.save();g.translate(0,drop);
-    maskingLabel(3,3,w,lines.length*10+5);
-    if(B.msg){writtenLines(lines,11,7,UI_INK,written.progress??Infinity,{wet:written.wet,nib:!!Prefs.shake});}
-    else{lines.forEach((line,i)=>smallText(line,11,7+i*10,UI_INK));if(incoming){g.fillStyle='#e8b96a';g.fillRect(8,lines.length*10+4,Math.max(0,Math.round((w-10)*clamp((incoming.atb-55)/45,0,1))),1);}}
+  const boss=alive(B.enemies).find(u=>u.boss),m=B.menu,msgAge=B.msg?B.t-(BUI.messageAt??B.t):0,written=B.msg?{progress:Prefs.shake?msgAge*1.1:null,wet:B.msg.col&&B.msg.col!=='#f4f0ea'?B.msg.col:null}:null;
+  if(boss)drawBossBand(boss);
+  // Below the band only the painter's own choices speak: a refused command or the well being pointed at.
+  const y=boss?20:3,pad=boss?3:5;
+  if(B.msg){
+    const lines=wrapSmall(B.msg.s,242).slice(0,boss?1:2),w=Math.min(260,Math.max(...lines.map(textWidth))+16);
+    const drop=Math.round((1-uiIn(BUI.messageAt,12))*-8);g.save();g.translate(0,drop);
+    maskingLabel(3,y,w,lines.length*10+pad);writtenLines(lines,11,y+3,UI_INK,written.progress??Infinity,{wet:written.wet,nib:!!Prefs.shake});
     g.restore();
   }else if(m?.level==='cmd'){
-    // While choosing a tool, the top of the page explains what the chosen well does.
-    const hint=paletteToolHint(commandRows(m.unit)[m.idx],m.unit),lines=wrapSmall(hint,236).slice(0,2),w=Math.max(...lines.map(textWidth))+16,at=BUI.selectedAt;
+    const hint=paletteToolHint(commandRows(m.unit)[m.idx],m.unit),lines=wrapSmall(hint,236).slice(0,boss?1:2),w=Math.max(...lines.map(textWidth))+16,at=BUI.selectedAt;
     g.save();g.globalAlpha*=uiFade(at,8);g.translate(0,Math.round((1-uiIn(at,12))*-6));
-    maskingLabel(3,3,w,lines.length*10+5);lines.forEach((line,i)=>smallText(line,11,7+i*10,UI_MUTED));
+    maskingLabel(3,y,w,lines.length*10+pad);lines.forEach((line,i)=>smallText(line,11,y+3+i*10,UI_MUTED));
     g.restore();
   }
 }
@@ -465,13 +499,33 @@ function drawTacticalGround() {
     const c = project(u.wx, u.wy, 0); if (!c) continue;
     const col = C(u.coat.col), w = (u.def.w * .55 + 5) * c[2];
     g.fillStyle = ramp(col).sh; g.globalAlpha = .7; g.beginPath(); g.ellipse(c[0], c[1] + 3, w, w * .32, 0, 0, 6.29); g.fill(); g.globalAlpha = 1;
-    g.fillStyle = u.coat.turns > 1 ? ramp(col).hi : '#c8bfa7'; g.fillRect(Math.round(c[0] - w * .5), Math.round(c[1]), 6, 1);
-    if (u.coat.turns === 1) { g.strokeStyle = '#625749'; g.lineWidth = 1; g.beginPath(); g.moveTo(c[0] - 4, c[1] + 1); g.lineTo(c[0], c[1] + 4); g.lineTo(c[0] + 4, c[1] + 2); g.stroke(); }
+    // Wet paint keeps for as many enemy actions as there are dabs left at the front of the ring.
+    for (let i = 0; i < Math.min(3, u.coat.turns); i++) paintDab(Math.round(c[0] - w * .45 + 3 + i * 6), Math.round(c[1] + 4), 2, col);
   }
+  drawIntentThreads();
   const guardian = B.party.find(u => u.alive && u.guard?.charges);
   if (guardian && guardian.guard.target.alive) {
     const a = PJ([guardian.wx, guardian.wy, 0]), b = PJ([guardian.guard.target.wx, guardian.guard.target.wy, 0]);
     g.strokeStyle = '#c56463'; g.lineWidth = 1; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); g.setLineDash([]);
+  }
+}
+// Every announced attack is an ink thread crawling along the ground from the drop to whoever it has chosen;
+// the thread lengthens with the charge and, near the end, rings the target's feet.
+function drawIntentThreads() {
+  if (B.phase !== 'fight') return;
+  for (const u of B.enemies) {
+    if (!u.alive || !u.intent || u.acting) continue;
+    const k = clamp((u.atb - 55) / 45, 0, 1), targets = u.intent.all ? alive(B.party) : [u.intent.target].filter(x => x?.alive), col = u.boss ? '#5a3f78' : '#2a2438';
+    for (const t of targets) {
+      const pts = intentThreadPath(u, t), n = pts.length - 1, reach = k * n, crawl = Prefs.shake ? (B.t >> 2) : 0;
+      for (let i = 0; i < n; i++) {
+        const seg = clamp(reach - i, 0, 1); if (seg <= 0) break;
+        const a = PJ(pts[i]), b = PJ(pts[i + 1]); if (((i + crawl) & 1) && seg >= 1) continue; // dashed: the ink beads along
+        pstroke(a[0], a[1], lerp(a[0], b[0], seg), lerp(a[1], b[1], seg), Math.max(1, 2 * a[2]), col, 1, 0, false);
+      }
+      const tip = PJ(pointAt(pts, k)); g.fillStyle = col; g.beginPath(); g.ellipse(tip[0], tip[1], Math.max(1, 3 * tip[2]), Math.max(1, 2 * tip[2]), 0, 0, 6.29); g.fill(); g.fillStyle = '#8c8ab0'; g.fillRect(Math.round(tip[0]) - 1, Math.round(tip[1]) - 1, 1, 1);
+      if (k > .7) { const c = PJ([t.wx, t.wy, 0]), w = t.def.w * .6 * c[2] + 3, ph = Prefs.shake ? (B.t % 22) / 22 : .3; g.strokeStyle = col; g.globalAlpha = .75 * (1 - ph); g.lineWidth = 1; g.beginPath(); g.ellipse(c[0], c[1] + 1, Math.max(1, w * (1 + ph * .5)), Math.max(1, w * .4 * (1 + ph * .5)), 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }
+    }
   }
 }
 function drawTacticalMarkers() {
@@ -479,17 +533,10 @@ function drawTacticalMarkers() {
   const m = B.currentAction ? null : B.menu, targeting = m?.level === 'target', selected = targeting ? selectedTargets(m) : [];
   for (const u of B.enemies) {
     if (!u.alive||!cameraShowsUnit(u)) continue;
-    const hx = Math.round(u.x - (targeting ? 12 : 16)), hy = Math.round(u.y + 5);
+    const hx = Math.round(u.x - (targeting ? 12 : 10)), hy = Math.round(u.y + 5);
     if(hy<31||hy>145||u.x<15||u.x>305)continue;
-    // One small label below the feet replaces the stacked letters and alerts.
-    const bx = targeting ? hx : clamp(hx, m ? m.level==='cmd'?124:117 : 3, W - (u.coat ? 49 : 35));
-    if (!targeting) {
-      brushBand(bx, hy, u.coat ? 47 : 33, 10, KIT_INK);
-      smallText(String.fromCharCode(65 + u.idx), bx + 3, hy + 2, u.intent ? '#ffe09c' : KIT_LIGHT);
-      if (u.intent) { g.fillStyle = '#e8b96a'; g.fillRect(bx + 10, hy + 7, Math.max(0, Math.round(18 * (u.atb - 55) / 45)), 1); }
-      if (u.coat) smallText(COLOR_LETTER[u.coat.col] + u.coat.turns, bx + 33, hy + 2, ramp(C(u.coat.col)).hi);
-    }
-    const px = targeting ? bx + 1 : bx + 10, py = targeting ? hy + 1 : hy + 3, width = targeting ? 22 : 18;
+    // Only a short ink stroke of health sits below the feet; letters, coats and warnings live on the drop and the ground.
+    const bx = hx, px = bx + 1, py = hy + 1, width = targeting ? 22 : 18;
     g.fillStyle = KIT_INK; g.fillRect(px - 1, py - 1, width + 2, 4);
     g.fillStyle = '#574360'; g.fillRect(px, py, width, 2);
     g.fillStyle = selected.includes(u) ? '#ffe2a0' : '#c3a0cb'; g.fillRect(px, py, Math.round(width * u.hp / u.maxhp), 2);
@@ -544,9 +591,9 @@ function drawBattleResults() {
   g.restore();
 }
 const GUIDE_PAGES = [
-  { title:'Pintar y reaccionar',lines:['Núcleo: afinidad del enemigo.','Complementario x2. Mismo color x0.5.','La capa dura 2 acciones del enemigo.','Pincel y Preparar: dura 3 acciones.','Rojo + amarillo: daño y salpicadura.','Amarillo + azul: raíces y cura grupal.','Rojo + azul: interrumpe y firma.'] },
+  { title:'Pintar y reaccionar',lines:['Núcleo: afinidad del enemigo.','Complementario x2. Mismo color x0.5.','Capa: el aro guarda una gota por acción.','Pincel y Preparar: dura 3 acciones.','Rojo + amarillo: daño y salpicadura.','Amarillo + azul: raíces y cura grupal.','Rojo + azul: interrumpe y firma.','Hilo de tinta: a quién va a atacar.'] },
   { title:'Tiempo y herramientas',lines:['Brocha llena: turno. Tubo: MP.','-N en el tubo: coste. MIX: reservada.','Liberar conserva el ATB de cada gota.','Paleta: cuatro direcciones o rueda.','Toca para elegir; otra vez para abrir.','Otra gota: su retrato o {swap}.','Volver conserva tu última selección.','Objetivo: flechas o toca su nombre.'] },
-  { title:'Leer a La Tinta',lines:['I: roba MP. Su núcleo cambia de color.','Reacción o 3 primarios: rompe coraza.','Abrirla: +2 MP para cada gota viva.','II: núcleo abierto. Vigila la marea.','III: vuelve la coraza y borra capas.','Arcoíris brilla con la coraza abierta.','L: lento. T: tizne. C: contorno.','F: firmado. P1: protege un golpe.'] },
+  { title:'Leer a La Tinta',lines:['I: roba MP. Su núcleo cambia de color.','Reacción o 3 primarios: rompe coraza.','Abrirla: +2 MP para cada gota viva.','II: núcleo abierto. Vigila la marea.','III: vuelve la coraza y borra capas.','Arcoíris brilla con la coraza abierta.','Gotea: lento. Tizne: pega menos.','Perfil: recibe -40%. Rúbrica: +30%.'] },
 ];
 const BINDING_NAMES = { ok:'Confirmar', back:'Volver', swap:'Cambiar gota', release:'Liberar mezcla', options:'Opciones', journal:'Estudios', help:'Guía', up:'Arriba', down:'Abajo', left:'Izquierda', right:'Derecha', ring:'Herramientas' };
 function switchArtOverlay(type) {

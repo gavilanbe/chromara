@@ -39,7 +39,7 @@ function damage(target, raw, col, src, opt = {}) {
   let cover = false;
   if (target.kind === 'party' && action?.users[0].kind === 'enemy') {
     const guardian = B.party.find(p => p.alive && p.guard?.charges && p.guard.target === target);
-    if (guardian && !action.command?.all && !action.users[0].intent?.all) { guardian.guard.charges--; target = guardian; cover = true; num(target, 'PROTEGE', C('rojo')); Audio.sfx('rub'); }
+    if (guardian && !action.command?.all && !action.users[0].intent?.all) { guardian.guard.charges--; guardFlash(guardian, target); target = guardian; cover = true; Audio.sfx('rub'); }
   }
   cameraImpact(target);
   if (action) action.previousCoat = target.coat?.col;
@@ -52,6 +52,8 @@ function damage(target, raw, col, src, opt = {}) {
   num(target, dealt, mult >= 2 ? '#f2c93a' : mult < 1 ? '#b4acc8' : '#f4f0ea', mult >= 2);
   const tier = action?.tier || 0, weight = tier >= 3 ? 1.6 : tier >= 1 ? 1.1 : .6;
   impactFx(target, C(col), weight * (mult >= 2 ? 1.25 : 1), opt);
+  // The page itself flinches: a technique's decisive blow on its one target freezes as an ink impact frame.
+  if (tier >= 1 && action.command.type !== 'enemy' && action.targets.length === 1 && action.targets.includes(target) && opt.accent !== 'tap') impactFrame(target, C(col), weight);
   Audio.sfx(target.kind === 'party' || col === 'negro' ? 'ink_hit' : mult >= 2 ? 'hitweak' : mult < 1 ? 'resist' : 'hit', { pan: target.kind === 'enemy' ? -.4 : .4, vol: tier ? .85 : .6 });
   const stop = opt.accent === 'tap' ? 2 : opt.accent === 'finish' ? 8 : tier >= 3 ? 9 : tier ? 5 : 4;
   B.hitstop = Math.max(B.hitstop, stop); B.shake = Math.max(B.shake, opt.accent === 'tap' ? 1 : tier >= 3 ? 7 : tier ? 4 : 2);
@@ -164,7 +166,7 @@ function* transitionGen(foe) {
     yield;
   }
   B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); B.enemies.forEach(u => { u.wz = 0; });
-  B.tr = null; OW.hideFoe = null; OW.scare = null; B.phase = 'fight'; B.fightStart = B.t; say('¡Gotas Negras!', '#8c8ab0'); Audio.sfx('banner'); setState('battle');
+  B.tr = null; OW.hideFoe = null; OW.scare = null; B.phase = 'fight'; B.fightStart = B.t; Audio.sfx('banner'); setState('battle');
 }
 // Copia del mapa congelado para la fase 'blot': se muestra fuera de la ventana de tinta, con el borde blando y desaturado
 let MAPC = null, MAPG = null; // se crea al primer uso (W y H viven en game.js, que carga después)
@@ -207,7 +209,7 @@ function* bossTransitionGen(foe) {
   T.overworld = false; T.stage = 'tide'; camSet(SCENE.rest); B.unitScale = 1; B.propScale = 1; B.puddle.k = 1;
   B.enemies.forEach(u => { u.wz = 0; }); B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; u.pose = 'idle'; });
   Audio.sfx('splash', { vol: .6 }); for (let i = 0; i < 50; i++) { T.k = i / 50; if (i === 10) Audio.sfx('slow_drip'); yield; }
-  B.tr = null; OW.hideFoe = null; B.phase = 'fight'; B.fightStart = B.t; say(DATA.enemies[foe.enemies[0]].name.toUpperCase(), '#8c8ab0'); Audio.sfx('banner'); setState('battle');
+  B.tr = null; OW.hideFoe = null; B.phase = 'fight'; B.fightStart = B.t; Audio.sfx('banner'); setState('battle');
 }
 // Dibujo de la transición sobre el mapa cenital (fases 1-3) y de la mancha/gotas sobre la escena (4-5)
 function drawTransitionFx() {
@@ -297,6 +299,138 @@ function drawGoop(u) {
   for (const d of G.drips) { const x = Math.round(u.x + d.dx * s), y = Math.round(top + u.def.h * s * d.y0), L = Math.round(d.len * s); g.fillStyle = rp.base; g.fillRect(x, y, 2, L); g.fillStyle = rp.hi; g.fillRect(x, y, 1, Math.max(1, L - 3)); g.fillStyle = rp.sh; g.fillRect(x - 1, y + L - 1, 4, 3); g.fillStyle = rp.base; g.fillRect(x, y + L, 2, 1); }
   g.globalAlpha = 1;
 }
+// =====================================================================
+// 4b. Lenguaje visual del combate: lo que pasa se ve, no se lee. Estados, avisos y reacciones sin palabras.
+// Todo aquí es decoración determinista: nunca toca HP, ATB, posiciones ni el azar del combate.
+// =====================================================================
+// La brocha en pantalla puede pintarse varias veces por tick; las estelas sólo guardan posiciones nuevas.
+function propGhosts(n = 5) {
+  const samples = [];
+  return {
+    push(img, x, y, a, fac, px, py, scale) { if (!Prefs.shake) return; const last = samples[samples.length - 1]; if (last && Math.hypot(last.x - x, last.y - y) < 3 && Math.abs(last.a - a) < .08) return; samples.push({ img, x, y, a, fac, px, py, scale }); if (samples.length > n) samples.shift(); },
+    draw() { samples.forEach((q, i) => drawProp(q.img, q.x, q.y, q.a, q.fac, q.px, q.py, q.scale, .1 + .28 * ((i + 1) / samples.length))); },
+  };
+}
+// Fotograma de impacto: la página se queda en blanco un instante, la silueta del golpeado se tiñe del color
+// del golpe y unas líneas de tinta convergen en él. Se congela con el hit-stop y se disuelve en cinco frames.
+function impactFrame(t, col, power = 1) {
+  if (!Prefs.flash || !Prefs.shake) return;
+  const frame = (B.t / 9 + t.idx * 2 | 0) % 4, rnd = seeded(23 + t.idx * 7 + (B.stats.actions | 0)), rays = Array.from({ length: 18 }, () => ({ a: rnd() * 6.28, len: .3 + rnd() * .25, w: rnd() < .3 ? 2 : 1 }));
+  const f = fx(5, () => {
+    const q = f.t / 5, s = t.sc * B.unitScale * (t.kind === 'enemy' ? (t.boss ? 1.35 : 1.6) : 1), cx = t.x, cy = t.y - t.def.h * s * .5;
+    g.fillStyle = '#f1e9d6'; g.globalAlpha = Math.min(.9, .6 + power * .2) * Prefs.flash * (1 - q * .6); g.fillRect(0, 0, W, H); g.globalAlpha = .85 - q * .5;
+    // Pencil speed lines: they start at the page's edge and stop well short of the body, so the silhouette stays clean.
+    for (const r of rays) { const x1 = cx + Math.cos(r.a) * 210, y1 = cy + Math.sin(r.a) * 130, k = r.len * (1 - q * .4); pstroke(lerp(x1, cx, k), lerp(y1, cy, k), x1, y1, r.w, '#14121c', 1, 0, true); }
+    const info = unitSpriteInfo(t, frame); drawSprite(tintSprite(info.spr, col, 1), cx, t.y, s * (1.1 + power * .04) * info.sx, t.kind === 'enemy' && t.facingLeft, info.sy);
+    g.globalAlpha = 1;
+  });
+  return f;
+}
+// Salpicadura hacia la cámara: la pintura llega hasta el cristal y chorrea. Sólo con flashes activados.
+function lensSplatter(col, n = 6, seed = 3) {
+  if (!Prefs.flash) return;
+  const rnd = seeded(seed * 31 + (B.stats.actions | 0)), blobs = Array.from({ length: n }, () => ({ x: 34 + rnd() * 252, y: 26 + rnd() * 96, r: 3 + rnd() * 8, d: rnd() * 6.28, drip: 3 + rnd() * 11, sat: Array.from({ length: 3 }, () => ({ a: rnd() * 6.28, d: 1.2 + rnd() * .9, r: .15 + rnd() * .25 })) }));
+  const f = fx(28, () => {
+    const q = f.t / 28, grow = Math.min(1, f.t / 4); g.globalAlpha = Math.min(1, (1 - q) * 1.8) * Math.min(1, .55 + Prefs.flash * .45);
+    for (const b of blobs) {
+      const r = b.r * grow; g.fillStyle = col; g.beginPath(); g.ellipse(b.x, b.y, r, r * .8, b.d, 0, 6.29); g.fill();
+      for (const s of b.sat) { const sr = Math.max(.5, r * s.r); g.beginPath(); g.ellipse(b.x + Math.cos(s.a) * r * s.d, b.y + Math.sin(s.a) * r * s.d * .8, sr, sr * .8, s.a, 0, 6.29); g.fill(); }
+      g.fillStyle = ramp(col).sh; g.fillRect(Math.round(b.x - 1), Math.round(b.y + r * .5), 2, Math.round(b.drip * q)); g.fillStyle = ramp(col).hi; g.fillRect(Math.round(b.x - r * .4), Math.round(b.y - r * .4), 2, 1);
+    }
+    g.globalAlpha = 1;
+  });
+  return f;
+}
+// Viñeta de técnica: los bordes de la página se oscurecen con el color del trazo mientras dura la acción.
+function techVignette(action) {
+  if (!Prefs.flash) return;
+  const col = C(action.command?.techId ? DATA.techs[action.command.techId].color || action.users[0].color : action.users[0].color), dark = mixHex(col, '#14121c', .8);
+  const f = fx(9999, () => {
+    const done = B.currentAction !== action; if (done && f.out == null) f.out = f.t;
+    const k = Math.min(1, f.t / 14) * (f.out == null ? 1 : Math.max(0, 1 - (f.t - f.out) / 10)); if (k <= 0) { f.dur = 0; return; }
+    for (let i = 0; i < 3; i++) { const d = 3 + i * 4; g.fillStyle = dark; g.globalAlpha = .12 * k * Math.min(1, .6 + Prefs.flash); g.fillRect(0, 0, W, d); g.fillRect(0, H - d, W, d); g.fillRect(0, 0, d, H); g.fillRect(W - d, 0, d, H); }
+    g.globalAlpha = 1;
+  });
+  return f;
+}
+// Reacción de pintura: dos gotas se juntan sobre el golpeado y se funden en el color resultante, que chorrea.
+function mixFx(t, colA, colB, result) {
+  const a = C(colA || colB), b = C(colB), r = C(result);
+  const f = fx(34, () => {
+    const c = PJ([t.wx, t.wy, t.def.h * 1.15]), s = Math.max(.6, c[2]), k = clamp(f.t / 10, 0, 1), e = k * k * (3 - 2 * k), merged = f.t >= 10, done = clamp((f.t - 12) / 8, 0, 1), fade = f.t > 26 ? (34 - f.t) / 8 : 1;
+    g.save(); g.globalAlpha *= fade;
+    if (!merged) { paintDab(c[0] - 13 * s * (1 - e), c[1], 4 * s, a); paintDab(c[0] + 13 * s * (1 - e), c[1], 4 * s, b); }
+    else { const rr = (4 + done * 3) * s; paintDab(c[0], c[1] - done * 2, rr, r, f.t < 14 ? 2 : 0); if (f.t < 14) { g.fillStyle = '#fff8e6'; g.fillRect(Math.round(c[0] - rr), Math.round(c[1]) - 1, Math.round(rr * 2), 2); } g.fillStyle = ramp(r).sh; g.fillRect(Math.round(c[0]), Math.round(c[1] + rr * .6), 2, Math.round(done * 9 * s)); }
+    g.restore();
+  });
+  return f;
+}
+// Escudo de Carmín: un arco de brocha roja delante del protegido. La versión persistente late; al cubrir un golpe, estalla.
+function guardArc(u, s, alpha = 1, grow = 1, col = C('rojo')) {
+  const front = PJ([u.wx + B.axis.dx * u.def.w * .5, u.wy + B.axis.dy * u.def.w * .5, u.def.h * .5]), right = front[0] >= u.x, rx = Math.max(1, 4 * s * grow), ry = Math.max(1, u.def.h * .55 * s * grow), a0 = right ? -1.35 : 1.8, a1 = right ? 1.35 : 4.5;
+  g.save(); g.globalAlpha *= alpha; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.ellipse(front[0], front[1], rx, ry, 0, a0, a1); g.stroke();
+  g.strokeStyle = ramp(col).hi; g.lineWidth = 1; g.beginPath(); g.ellipse(front[0], front[1], Math.max(1, rx - 1), Math.max(1, ry - 2), 0, a0, a0 + 1.1); g.stroke(); g.restore();
+}
+function guardFlash(guardian, protectedUnit) {
+  const f = fx(18, () => { const q = f.t / 18, s = protectedUnit.sc * B.unitScale; guardArc(protectedUnit, s, 1 - q, 1 + q * .9); if (guardian !== protectedUnit) guardArc(guardian, guardian.sc * B.unitScale, (1 - q) * .8, 1 + q * .5); });
+  return f;
+}
+// Hilo de tinta: el camino que la Gota Negra anuncia hacia su objetivo (o el centro del grupo).
+function intentThreadPath(u, target) {
+  const to = target ? [target.wx, target.wy] : partyC(), pts = [], n = 9, dx = to[0] - u.wx, dy = to[1] - u.wy, L = Math.hypot(dx, dy) || 1, px = -dy / L, py = dx / L;
+  for (let i = 0; i <= n; i++) { const k = i / n, sway = Math.sin(k * 6.28 * 1.5 + u.idx) * 6 * Math.sin(k * 3.14); pts.push([u.wx + dx * k + px * sway, u.wy + dy * k + py * sway, 0]); }
+  return pts;
+}
+// Corte: un rasguño amarillo cruza a la gota y su hilo de tinta se deshace en gotitas.
+function interruptFx(t, thread) {
+  const y = C('amarillo'), h = t.def.h;
+  mark({ kind: 'path', pts: [[t.wx - 16, t.wy + 6, h * .95], [t.wx + 4, t.wy - 3, h * .5], [t.wx - 5, t.wy + 3, h * .42], [t.wx + 16, t.wy - 6, 2]], w: 3, col: y, grow: 4, life: 32, jit: 1 });
+  mark({ kind: 'path', pts: [[t.wx - 15, t.wy + 7, h * .95], [t.wx + 5, t.wy - 2, h * .5], [t.wx - 4, t.wy + 4, h * .42], [t.wx + 17, t.wy - 5, 2]], w: 1, col: '#fff3c0', grow: 4, life: 26 });
+  if (!thread) return;
+  const rnd = seeded(5 + t.idx), dots = []; for (let i = 0; i <= 12; i++) dots.push({ p: pointAt(thread, i / 12), vx: (rnd() - .5) * 1.8, vy: (rnd() - .5) * .9, vz: .4 + rnd() * .8 });
+  const f = fx(18, () => { const q = f.t / 18; g.globalAlpha = 1 - q; g.fillStyle = '#2a2438'; for (const d of dots) { const c = PJ([d.p[0] + d.vx * f.t, d.p[1] + d.vy * f.t, d.vz * f.t * (1 - q)]); g.fillRect(Math.round(c[0]), Math.round(c[1]), 2, 2); } g.globalAlpha = 1; }, true);
+}
+// Coraza abierta: las grietas saltan del cuerpo de la jefa como esquirlas claras.
+function shellCrackFx(t) {
+  const rnd = seeded(17), bits = Array.from({ length: 10 }, () => ({ a: rnd() * 6.28, d: 6 + rnd() * 14, w: 3 + rnd() * 5, rot: rnd() * 3 }));
+  const f = fx(26, () => { const c = PJ([t.wx, t.wy, t.def.h * .55]), q = f.t / 26, e = 1 - (1 - q) ** 2; g.globalAlpha = 1 - q; g.fillStyle = '#f4f0ea'; for (const b of bits) { const x = c[0] + Math.cos(b.a) * b.d * e * 3 * c[2], y = c[1] + Math.sin(b.a) * b.d * e * 2 * c[2] + q * q * 14; g.save(); g.translate(x, y); g.rotate(b.rot + q * 2); g.fillRect(-b.w * .5, -1, b.w, 2); g.restore(); } g.globalAlpha = 1; });
+}
+// Núcleo cambiado: anillos del color que ahora hiere a la jefa (el complementario del robado) se abren desde su núcleo.
+function coreSwapFx(u, weakCol) {
+  const col = C(weakCol);
+  const f = fx(40, () => { const c = PJ([u.wx, u.wy, u.def.h * .5]), q = f.t / 40; for (let i = 0; i < 3; i++) { const k = clamp(q * 1.6 - i * .25, 0, 1); if (k <= 0) continue; g.strokeStyle = i === 1 ? ramp(col).hi : col; g.lineWidth = Math.max(1, 2.5 - k * 1.5); g.globalAlpha = 1 - k; g.beginPath(); g.ellipse(c[0], c[1], (5 + k * 46) * c[2], (3 + k * 28) * c[2], 0, 0, 6.29); g.stroke(); } g.globalAlpha = 1; if (f.t < 12) { g.fillStyle = ramp(col).hi; g.fillRect(Math.round(c[0] - 6 + (f.t % 4) * 3), Math.round(c[1] - 8 - f.t), 1, 1); } });
+}
+// Limpieza: la goma de la pluma borra los estados con un pase blanco de izquierda a derecha.
+function cleanWipeFx(a) {
+  const f = fx(16, () => { const c = PJ([a.wx, a.wy, 0]), s = c[2] * a.sc, w = a.def.w * .6 * s, h = a.def.h * s, q = f.t / 16, x = c[0] - w + q * w * 2; g.globalAlpha = .85 * Math.sin(q * 3.14); g.fillStyle = '#fff8e6'; g.fillRect(Math.round(x - 2), Math.round(c[1] - h), 4, Math.round(h)); g.fillStyle = '#e86a8a'; g.fillRect(Math.round(x - 1), Math.round(c[1] - h) - 3, 2, 2); g.globalAlpha = 1; });
+}
+// Marcas de estado sobre la unidad: se leen sin letras y cuentan sus acciones restantes con materia (gotas, motas, muescas).
+function drawStatusMarks(u, s) {
+  if (!u.alive) return;
+  const st = u.status, top = u.y - u.def.h * s, hw = Math.max(3, u.def.w * .5 * s), t = B.t;
+  if (st.lento) { // pintura pesada: tantas gotas colgando como acciones le quedan; cada una cae y vuelve a formarse
+    const base = u.kind === 'party' ? ramp(C(u.color)).sh : '#5a4d7a', hi = u.kind === 'party' ? C(u.color) : '#8c8ab0', n = Math.min(3, st.lento);
+    for (let i = 0; i < n; i++) { const ph = ((t * .018) + i * .37) % 1, x = Math.round(u.x + (i - (n - 1) / 2) * hw * .7), y0 = Math.round(u.y - u.def.h * s * .38), L = Math.round(2 + ph * ph * u.def.h * s * .4); g.fillStyle = base; g.fillRect(x, y0, 2, L); g.fillStyle = hi; g.fillRect(x, y0, 1, Math.max(1, L - 2)); g.fillStyle = base; g.fillRect(x - 1, y0 + L, 4, 2); if (ph > .9) g.fillRect(x - 2, u.y, 6, 1); }
+    g.fillStyle = base; g.globalAlpha = .4; g.beginPath(); g.ellipse(u.x, u.y + 2, hw * .9, Math.max(1, 2.5 * s), 0, 0, 6.29); g.fill(); g.globalAlpha = 1;
+  }
+  if (st.tiznado) { // tizne en la cara y motas de hollín que suben (una por acción restante)
+    const y = top + u.def.h * s * .42, rnd = seeded(41 + u.idx); g.fillStyle = '#1e1a2c';
+    for (let i = 0; i < 4; i++) { const dx = (rnd() - .5) * hw * .9, dy = (rnd() - .5) * 4 * s, r = Math.max(1, (.9 + rnd() * 1.1) * s); g.beginPath(); g.ellipse(u.x + dx, y + dy, r * 1.6, r, rnd() * 3, 0, 6.29); g.fill(); }
+    g.fillStyle = '#4a4460'; for (let i = 0; i < Math.min(3, st.tiznado); i++) { const k = ((t * .025) + i * .33) % 1; g.fillRect(Math.round(u.x - hw * .5 + i * hw * .5), Math.round(y - 5 - k * 12), 1, 1); }
+  }
+  if (st.contorno) { drawContorno(u); g.fillStyle = '#4a4460'; for (let i = 0; i < Math.min(3, st.contorno); i++) g.fillRect(Math.round(u.x + hw + 5 - i * 3), Math.round(top - 8), 2, 1); } // muescas de lápiz: acciones que quedan
+  if (st.firmado) { // rúbrica roja junto a la cabeza: firmado, recibe más
+    const x0 = Math.round(u.x + hw + 2), y0 = Math.round(top + 1 + (Prefs.shake ? Math.sin(t * .12) : 0)), col = C('rojo');
+    pstroke(x0, y0 + 5, x0 + 3, y0, 1, col); pstroke(x0 + 3, y0, x0 + 5, y0 + 5, 1, col); pstroke(x0 + 5, y0 + 5, x0 + 9, y0 + 1, 2, col); pstroke(x0 + 1, y0 + 7, x0 + 11, y0 + 6, 1, col);
+    g.fillStyle = col; for (let i = 0; i < Math.min(3, st.firmado); i++) g.fillRect(x0 + 12 + i * 2, y0 + 6, 1, 1);
+  }
+  if (st.expuesto) { // coraza agrietada: grietas claras que respiran sobre el cuerpo
+    const rnd = seeded(9 + u.idx); g.globalAlpha = .55 + (Prefs.shake ? .3 * Math.sin(t * .28) : .2);
+    for (let i = 0; i < 5; i++) { let x = u.x + (rnd() - .5) * hw * 1.4, y = top + rnd() * u.def.h * s * .8; for (let j = 0; j < 3; j++) { const nx = x + (rnd() - .5) * 9 * s, ny = y + rnd() * 5 * s; pstroke(x, y, nx, ny, 1, '#f4f0ea'); x = nx; y = ny; } }
+    g.globalAlpha = 1;
+  }
+  if (u.kind === 'party' && B.party.some(p => p.alive && p.guard?.charges && p.guard.target === u)) guardArc(u, s, .75 + (Prefs.shake ? .25 * Math.sin(t * .2) : 0));
+}
 // --- Corrutinas de movimiento en el mundo. yield = un frame.
 function* wait(n) { for (let i = 0; i < n; i++) yield; }
 function* wtween(u, x1, y1, n) { const x0 = u.wx, y0 = u.wy; for (let i = 1; i <= n; i++) { const t = i / n, e = t * (2 - t); u.wx = lerp(x0, x1, e); u.wy = lerp(y0, y1, e); yield; } }
@@ -366,14 +500,16 @@ function drawProp(img, x, y, a, fac, px = 1, py = 5, scale = 1, alpha = 1) { g.s
 // La herramienta protagonista: aparece con destello, recorre un camino de mundo con la punta dejando su trazo y se retira.
 function* toolStroke(o) {
   const img = propSprite(o.kind, o.color), P = PROP[o.kind], sc = o.scale || 1, p0 = o.pts[0], fac = o.fac || 1;
-  const st = {k:0,lift:0,lead:o.from ? 0 : 1};
+  const st = {k:0,lift:0,lead:o.from ? 0 : 1}, ghosts = propGhosts();
   const f = fx(999, () => {
     let wp = pointAt(o.pts, st.k);
     if (st.lead < 1) wp = [lerp(o.from[0], p0[0], st.lead),lerp(o.from[1], p0[1], st.lead),lerp(o.from[2] || 0, p0[2] || 0, st.lead) + Math.sin(st.lead * Math.PI) * 12];
     const [x,y,s] = PJ(wp), next = PJ(pointAt(o.pts, Math.min(1, st.k + .04))), prev = PJ(pointAt(o.pts, Math.max(0, st.k - .04)));
     const tilt = Math.atan2(next[1] - prev[1], Math.abs(next[0] - prev[0]) + 1) * .22;
-    const l = st.lift, pressure = Math.sin(st.k * Math.PI) * (o.kind === 'brocha' ? .12 : .045);
-    drawProp(img, x - fac * l * 1.5, y - l * 2.5, P.a + (o.a || 0) + tilt - l * .05, fac, P.tip[0], P.tip[1], sc * s * (1 + pressure), l ? Math.max(0, 1 - l / 10) : o.from ? Math.min(1, st.lead * 3) : 1);
+    const l = st.lift, pressure = Math.sin(st.k * Math.PI) * (o.kind === 'brocha' ? .12 : .045), a = P.a + (o.a || 0) + tilt - l * .05, scale = sc * s * (1 + pressure);
+    // La herramienta deja estela cuando corre: se lee el gesto completo, no sólo su punta.
+    if (!l) ghosts.push(img, x, y, a, fac, P.tip[0], P.tip[1], scale); ghosts.draw();
+    drawProp(img, x - fac * l * 1.5, y - l * 2.5, a, fac, P.tip[0], P.tip[1], scale, l ? Math.max(0, 1 - l / 10) : o.from ? Math.min(1, st.lead * 3) : 1);
   });
   f.tool = o.kind; f.stroke = st;
   if (o.from) for (let i = 1; i <= 10; i++) { const k = i / 10; st.lead = k * k * (3 - 2 * k); yield; }
@@ -518,17 +654,20 @@ function drawUnit(u) {
   const recoil = recoilPose(u); if (u.recoil && u.recoil.t < 3 && Prefs.flash) spr = tintSprite(spr, u.recoil.col, .45 * Prefs.flash);
   g.save(); g.translate(recoil.x, recoil.y);
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
-  const sqz = (u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1) * (warn ? 1 + Math.sin(B.t * .55) * .045 : 1); drawSprite(spr, u.x, u.y - (ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0), s * info.sx * sqz * recoil.sx * (u.gesture?.sx ?? 1), flip, info.sy * (u.sqz ? 1.1 : 1) * recoil.sy * (u.gesture?.sy ?? 1));
+  const sqz = (u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1) * (warn ? 1 + Math.sin(B.t * .55) * .045 : 1);
+  const bob = ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0, SX = s * info.sx * sqz * recoil.sx * (u.gesture?.sx ?? 1), SY = info.sy * (u.sqz ? 1.1 : 1) * recoil.sy * (u.gesture?.sy ?? 1);
+  // Aura de carga: mientras toma impulso, su color rebosa el contorno (los enemigos exhalan tinta clara).
+  if (u.pose === 'charge' && u.alive && B.phase === 'fight') {
+    const glow = tintSprite(spr, u.kind === 'party' ? C(u.color) : '#8c8ab0', 1), pulse = .3 + (Prefs.shake ? .25 * Math.sin(B.t * .45) : .1), reach = Prefs.shake ? 2 : 1;
+    g.save(); g.globalAlpha *= pulse; for (const [ox, oy] of [[-reach, 0], [reach, 0], [0, -reach], [0, reach]]) drawSprite(glow, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore();
+  }
+  drawSprite(spr, u.x, u.y - bob, SX, flip, SY);
   if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
   g.restore();
   if (clip) g.restore();
   g.globalAlpha = 1;
-
-  if (u.status.tiznado && u.alive) { g.fillStyle = '#2a2438'; g.fillRect(u.x - 3, u.y - u.def.h * s - 6, 6, 2); }
-  if (u.status.lento && u.alive) smallText('L' + u.status.lento, clamp(u.x + 6, 2, 306), clamp(u.y - u.def.h * s - 9, 44, 123), '#f3d2ee');
-  if (u.status.contorno && u.alive) drawContorno(u);
-  if (u.status.firmado && u.alive) { const c = project(u.wx, u.wy, 0); if (c) { g.fillStyle = C('rojo'); g.fillRect(u.x + 8, u.y - u.def.h * s - 4, 2, 5); g.fillRect(u.x + 6, u.y - u.def.h * s - 2, 2, 1); g.fillRect(u.x + 10, u.y - u.def.h * s - 6, 2, 1); } }
+  drawStatusMarks(u, s);
 }
 function drawGroundLayer() {
   // charco de tinta de los enemigos (aparece al drenar la mancha)
