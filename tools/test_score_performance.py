@@ -10,6 +10,7 @@ import mido
 import numpy as np
 from compose_score import Score, Synth
 from battle_tres_gotas import battle
+from boss_la_mancha import boss
 
 
 class PerformanceTests(unittest.TestCase):
@@ -40,7 +41,10 @@ class PerformanceTests(unittest.TestCase):
         self.assertEqual(first,second)
 
     def test_battle_events_fit_loop_and_do_not_retrigger_held_pitches(self):
-        s=battle();end=(s.intro+2*s.bars)*s.meter
+        for make in (battle,boss):self.check_score(make())
+
+    def check_score(self,s):
+        end=(s.intro+2*s.bars)*s.meter
         for voice,notes in s.voices.items():
             previous={}
             for t,d,p,v in sorted(notes):
@@ -51,6 +55,7 @@ class PerformanceTests(unittest.TestCase):
                 previous[p]=t+d
         for voice,events in s.automation.items():
             self.assertTrue(all(0<=t<end for t,_,_ in events),voice)
+        if s.name!='battle':return
         # The identity of Tres gotas: three hammered eighths on one pitch open the hook.
         lead=sorted(s.voices['lead'])
         drops=[(a,b,c) for a,b,c in zip(lead,lead[1:],lead[2:])

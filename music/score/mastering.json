@@ -24,12 +24,12 @@
     "bytes": 1328884
   },
   "boss": {
-    "inputLUFS": -17.33,
-    "inputTruePeakDB": -2.61,
-    "gainDB": -1.67,
+    "inputLUFS": -18.54,
+    "inputTruePeakDB": -2.74,
+    "gainDB": -0.46,
     "estimatedOutputLUFS": -19.0,
-    "estimatedTruePeakDB": -4.28,
-    "bytes": 1908117
+    "estimatedTruePeakDB": -3.2,
+    "bytes": 1900857
   },
   "victory": {
     "inputLUFS": -14.52,

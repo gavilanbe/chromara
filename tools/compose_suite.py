@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CHROMARA: a thematic suite, nine scenes (v4; boss v5; colour battle v6).
+"""CHROMARA: a thematic suite, nine scenes (v4; battle «Tres gotas» v7; boss «La mancha» v6).
 
 The Prism cell is D-F-E-A; colour opens F to F#. Ink folds A-F-Eb-D.
 The shared long-short / middle / leap contour matters as much as the pitches.
@@ -11,7 +11,9 @@ import json
 from pathlib import Path
 from compose_score import (ROOT, MUSIC, SR, PALETTE, Score, Synth, pitch,
                            render_score, make_sfx, atelier, prelude, restored, voice_settings)
-from combat_score import battle, boss, PERCUSSION
+from combat_score import PERCUSSION
+from battle_tres_gotas import battle
+from boss_la_mancha import boss
 
 PALETTE.update({
     'piano': (0,.72,60,.13), 'rhodes': (4,.66,86,.20),

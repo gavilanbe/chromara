@@ -31,7 +31,7 @@ Se han **recompuesto los seis temas principales**, incluida la batalla. Estuche,
 | Estuche | [Lo que duerme en el estuche](atelier.mp3) | 108 bpm, 3/4; marimba curiosa, oboe que contesta, arpa y pizzicato |
 | Batalla | [Tres gotas](battle.mp3) | 160 bpm; tres corcheas martilleadas, salto y caída con puntillo sobre un riff de bajo dórico; marimba contesta, flauta a terceras, luz en Re mayor con arpa, bajo y batería solos y subida hasta el bucle |
 | Diálogo | [Debajo del color](prelude.mp3) | 72 bpm; oboe cercano, pedal, silencios y segunda bemol; espacio para leer |
-| La Tinta | [La página se resiste](boss.mp3) | 152 bpm; declaración de trompa, persecución de cuerda, secuencia ascendente, recuerdo del mapa con pulso, duelo de motivos y regreso reforzado |
+| La Tinta | [La mancha](boss.mp3) | 150 bpm; el bajo martillea las tres gotas en Re grave con vecinas cromáticas, pisada La–Fa–Mi♭–Re en trompa y cuerda, la tinta se extiende por Mi♭, Fa y Sol menor, el contorno a solas en piano, línea y color en contrapunto y ascenso hasta el bucle |
 | Victoria | [El color encuentra su sitio](victory.mp3) | 160 bpm; cuatro compases que resuelven el gesto de batalla en Re mayor; comienza tras la disolución |
 | Derrota | [Una página sin terminar](gameover.mp3) | 76 bpm; la frase pierde el salto, el Mi desciende a Mi♭ y queda sobre Re |
 | Mundo recuperado | [La línea también es color](restored.mp3) | 100 bpm; la melodía del mapa abre su tercera, las voces cantan juntas y permanece un recuerdo menor |
@@ -72,7 +72,7 @@ python tools/pack_music.py --render-dir /tmp/chromara-renders
 python tools/audit_audio.py
 ```
 
-`battle_tres_gotas.py` contiene la batalla v7 (véase [COMBATES.md](COMBATES.md)); `battle_theme.py` conserva la v6 y su audio está en `archive/v6-que-no-se-apague/`. `combat_score.py` conserva la jefa v5; `compose_suite.py` reúne la suite; `compose_score.py` aporta el renderizador y las tres escenas incorporadas en v3. Se exportan nueve MIDI. Los seis WAV principales también están actualizados para escucharlos directamente; los otros tres WAV son intermediarios regenerables. Los informes y gráficos v2 están archivados en `archive/v2/`.
+`battle_tres_gotas.py` contiene la batalla v7 (véase [COMBATES.md](COMBATES.md)); `battle_theme.py` conserva la v6 y su audio está en `archive/v6-que-no-se-apague/`. `boss_la_mancha.py` contiene La Tinta v6; `combat_score.py` conserva la v5 y su audio está en `archive/v5-la-pagina-se-resiste/`. `compose_suite.py` reúne la suite; `compose_score.py` aporta el renderizador y las tres escenas incorporadas en v3. Se exportan nueve MIDI. Los seis WAV principales también están actualizados para escucharlos directamente; los otros tres WAV son intermediarios regenerables. Los informes y gráficos v2 están archivados en `archive/v2/`.
 
 Para las comprobaciones del navegador y los demos, con Playwright instalado y un servidor local en el puerto 8765:
 

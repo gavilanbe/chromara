@@ -1,6 +1,6 @@
-# CHROMARA — batalla v7, La Tinta v5
+# CHROMARA — batalla v7, La Tinta v6
 
-[Batalla: Tres gotas](battle.mp3) · [La Tinta: La página se resiste](boss.mp3) · [Batalla anterior (v6)](archive/v6-que-no-se-apague/battle.mp3)
+[Batalla: Tres gotas](battle.mp3) · [La Tinta: La mancha](boss.mp3) · anteriores: [batalla v6](archive/v6-que-no-se-apague/battle.mp3), [La Tinta v5](archive/v5-la-pagina-se-resiste/boss.mp3)
 
 ## Tres gotas · 160 bpm
 
@@ -32,22 +32,30 @@ Trompeta y ritmo reciben reflexiones cortas; flauta, arpa y cuerdas, reflejos m�
 
 Los tres bocetos que precedieron a esta versión están en `sketches/` (MP3 y MIDI; partitura en `tools/battle_sketches.py`): «Tres gotas», «Salpicaduras» (12/8) y «Tinta y brasa» (126 bpm).
 
-## La página se resiste · 152 bpm
+## La mancha · 150 bpm
 
-La Tinta entra con una declaración de trompa y el motivo **La–Fa–Mi♭–Re**. Su ostinato acompaña los cambios de acorde. El motivo se reconoce en la persecución de cuerda y regresa después de una secuencia que eleva la tensión. El recuerdo del mapa conserva bajo y pulso; después los motivos de color y tinta se contestan entre metales.
+La Tinta trazó cada línea de Chromara y nadie mira ya el contorno: orgullo herido, no caos. La partitura está en `tools/boss_la_mancha.py`; la v5 «La página se resiste» se conserva en `tools/combat_score.py` y su audio en `archive/v5-la-pagina-se-resiste/`.
+
+**El bajo martillea las tres gotas en Re grave**: la Tinta les roba el ritmo a las protagonistas y lo pisa con vecinas cromáticas (Mi♭, Do♯) en 3+3+2, con el piano doblando los acentos. **Su motivo es una pisada, La–Fa–Mi♭–Re** (larga, corta, larga, larga) en trompa y cuerda a la octava, sobre un pedal de Re frigio que no se mueve durante seis compases. Las gotas contestan con su propia frase y el Mi natural choca contra el Mi♭ del bajo.
 
 | Primera vuelta | Momento |
 |---|---|
-| 0:00 | Llamada de trompa, coro y batería |
-| 0:06 | A: motivo de La Tinta sobre el desplazamiento 3+3+2 |
-| 0:19 | A′: respuesta en cuerda con ataque definido |
-| 0:32 | B: secuencia en Do menor que asciende hacia la dominante de Re |
-| 0:44 | C: el piano recuerda el mapa; Mi acaba cayendo a Mi♭ |
-| 0:57 | D: las dos células se contestan |
-| 1:09 | A″: vuelve La Tinta, reforzada en puntos concretos |
-| 1:22 | Comienza la vuelta que se repite |
+| 0:00 | Llamada: dos racimos de coro sobre redoble de timbales, después el riff solo con timbales de batería |
+| 0:06 | A: la pisada de la Tinta sobre el pedal |
+| 0:19 | A′: la trompeta contesta con las gotas en los huecos |
+| 0:32 | B: la tinta se extiende; el riff sube por Mi♭, Fa, Sol menor, Si♭ y La7 y el motivo con él |
+| 0:45 | C: el contorno a solas, la línea en piano sobre un riff susurrado; la marimba responde con las gotas |
+| 0:58 | D: línea y color a la vez, la canción de la trompeta en contrapunto con la pisada |
+| 1:10 | E: dos ascensos cromáticos, un suspiro agudo en Sol menor y redoble con las tres voces gritando las gotas sobre La7 |
+| 1:23 | Segunda vuelta, que el juego utiliza como bucle |
 
-Duración del archivo: 2:38. Ciclo musical: 48 compases, aproximadamente 1:16.
+Duración del archivo: 2:40. Ciclo musical: 48 compases, 76,8 segundos.
+
+### Interpretación
+
+Duraciones y velocidades escritas por nota, como en la batalla. El coro crece con CC11 en los racimos de la llamada y al principio de cada frase; en C baja a un fondo. En E hay un crescendo escrito de CC11 en trompa, cuerda y trompeta que se reinicia antes del bucle. Sólo el Do agudo de la canción en D recibe una subida inicial de afinación. Los redobles y remates nunca pisan el golpe siguiente del mismo tambor.
+
+Los tres bocetos previos están en `sketches/boss1..3` (partitura en `tools/boss_sketches.py`): «La mancha», «Contorno roto» (7/8) y «Trazo y sombra» (100 bpm, coral).
 
 ## Mezcla y comprobaciones
 
@@ -60,12 +68,12 @@ Estas comprobaciones verifican partitura, señal e integración. No son una valo
 ## Reconstrucción de esta revisión
 
 ```sh
-python tools/compose_suite.py --soundfont '/ruta/Chrono Trigger.sf2' --render-dir /tmp/chromara-tres-gotas --cues battle
-python tools/pack_music.py --render-dir /tmp/chromara-tres-gotas --cues battle
+python tools/compose_suite.py --soundfont '/ruta/Chrono Trigger.sf2' --render-dir /tmp/chromara-tres-gotas --cues battle boss
+python tools/pack_music.py --render-dir /tmp/chromara-tres-gotas --cues battle boss
 python tools/audit_audio.py
 ```
 
-La selección parcial actualiza sólo la batalla. Copiar también el WAV de la carpeta de render a `music/battle.wav`. `tools/compose_score.py` renderiza instrumentos, controles y eco. `pack_music.py` publica Opus, MP3 y los manifiestos HTTP/offline. `tools/render_audio_previews.cjs --music-only` actualiza el recorrido del leitmotif, con el servidor local activo.
+La selección parcial actualiza sólo los combates. Copiar también los WAV de la carpeta de render a `music/`. `tools/compose_score.py` renderiza instrumentos, controles y eco. `pack_music.py` publica Opus, MP3 y los manifiestos HTTP/offline. `tools/render_audio_previews.cjs --music-only` actualiza el recorrido del leitmotif, con el servidor local activo.
 
 ```sh
 CHROMARA_TEST_SF2='/ruta/Chrono Trigger.sf2' python tools/test_score_performance.py

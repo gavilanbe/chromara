@@ -1,4 +1,4 @@
-"""CHROMARA boss score (v5); the normal battle is authored in battle_tres_gotas.py (v7).
+"""CHROMARA boss score v5 «La página se resiste», superseded by boss_la_mancha.py (v6); kept for comparison.
 
 All pitches and rhythms are written here. No random note/chord generation.
 The colour cell D–F–E–A and Ink's A–F–Eb–D remain in the melodic foreground.

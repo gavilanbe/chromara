@@ -52,23 +52,23 @@
     ]
   },
   "boss": {
-    "duration": 157.89475,
-    "peakDBFS": -4.0,
-    "integratedLUFS": -18.98,
-    "truePeakDBTP": -4.0,
-    "loudnessRangeLU": 3.8,
-    "sha256": "fae0558949c0ce02ddb9f89f65c8351515507d343482d20c6c88a63587cb6483",
-    "loopStart": 82.10525,
-    "loopEnd": 157.89475,
-    "seamJump": 0.015638,
-    "localDerivativeRMS": 0.021615,
+    "duration": 160.0,
+    "peakDBFS": -3.33,
+    "integratedLUFS": -18.99,
+    "truePeakDBTP": -3.33,
+    "loudnessRangeLU": 5.4,
+    "sha256": "f66c1614a5ed3bf9c9b86e6338a184f605fe6217dc8fe462d3b0d9b8ba17ebab",
+    "loopStart": 83.2,
+    "loopEnd": 160.0,
+    "seamJump": 0.005336,
+    "localDerivativeRMS": 0.015663,
     "eightBarRMSDB": [
       -22.0,
-      -21.7,
-      -21.6,
-      -24.0,
-      -21.8,
-      -20.1
+      -21.1,
+      -21.0,
+      -25.1,
+      -20.1,
+      -20.0
     ]
   },
   "victory": {

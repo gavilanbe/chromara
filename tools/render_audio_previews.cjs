@@ -28,7 +28,7 @@ const excerpts = [
  ['title',0,8,'La promesa: faltaba el salto; aparecen los tres colores'],
  ['map',9.6,9.6,'El papel gris: Re–Fa–Mi–La'],
   ['battle',0,15,'Tres gotas: el riff, las tres notas martilleadas y su caída'],
- ['boss',meta.boss.intro_s,8,'La Tinta: La–Fa–Mi♭–Re'],
+ ['boss',meta.boss.intro_s,8,'La Tinta: la pisada La–Fa–Mi♭–Re sobre el bajo que martillea las gotas'],
  ['restored',9.6,9.6,'El mapa recuperado: Re–Fa♯–Mi–La'],
  ['victory',0,7.7,'La resolución'],
 ];
