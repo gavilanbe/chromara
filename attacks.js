@@ -500,8 +500,8 @@ function pixFlower(x, y, k, s, t, seed = 0) {
   pixDisc(x, y, Math.max(1, r * .38), OR.base, OR.out, '#fff3c0'); if (r > 5) { g.fillStyle = OR.sh; g.fillRect(Math.round(x + 1), Math.round(y + 1), 1, 1); }
 }
 // Haz de luz tramado (damero de 2 px) del sol a la semilla; el damero corre hacia abajo con t.
-function drawSunbeam(sx, sy, tx, ty, w0, w1, t, alpha) {
-  const len = Math.hypot(tx - sx, ty - sy), steps = Math.max(1, Math.round(len / 2)), prev = g.globalAlpha; g.globalAlpha = prev * alpha; g.fillStyle = '#fbe28a';
+function drawSunbeam(sx, sy, tx, ty, w0, w1, t, alpha, col = '#fbe28a') {
+  const len = Math.hypot(tx - sx, ty - sy), steps = Math.max(1, Math.round(len / 2)), prev = g.globalAlpha; g.globalAlpha = prev * alpha; g.fillStyle = col;
   for (let i = 0; i <= steps; i++) { const k = i / steps, cx = sx + (tx - sx) * k, cy = sy + (ty - sy) * k, w = lerp(w0, w1, k); for (let x = -w; x <= w; x += 2) if (((Math.round(x / 2) + i + (t >> 2)) & 1) === 0) g.fillRect(Math.round(cx + x), Math.round(cy), 2, 2); }
   g.globalAlpha = prev;
 }
@@ -675,35 +675,73 @@ function* techEclipse(users, t, tech, col) { // Carmín levanta un sol rojo y A�
   for (let i = 0; i < 14; i++) { B.particles.push({ wx: red.wx + R(-10, 10), wy: red.wy, wz: red.def.h + 30 - i * 2, vx: 0, vy: 0, vz: -R(.6, 1.4), g: .02, col: C('rojo'), t: 0, life: 18 }); B.particles.push({ wx: blue.wx + R(-10, 10), wy: blue.wy, wz: blue.def.h + 30 - i * 2, vx: 0, vy: 0, vz: -R(.6, 1.4), g: .02, col: C('azul'), t: 0, life: 18 }); yield; }
   users.forEach(u => u.pose = 'idle'); yield* wait(10); camReset();
 }
-function* techArcoiris(users, targets, tech, col) { // los tres suben en triángulo y vierten su color en un orbe blanco; nace un prisma que recibe la luz y la abre en seis haces hasta cada enemigo; un arco cruza el cielo y llueve color
-  const ec = enemyC(), pc = partyC(), mid = [(ec[0] + pc[0]) / 2, (ec[1] + pc[1]) / 2]; camFocus(mid[0], mid[1], { dist: 120, turn: 0, h: 60, pitch: .42, f: 170, hy:104,subjects:users,points:[[mid[0],mid[1],72,25]] }); // cámara baja mirando al cielo: la órbita y el prisma quedan en plano
-  const RB = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].map(C);
+// ---- Arcoíris: luz de píxel. Polígonos rasterizados por filas (sin antialias), damero para el cristal y el arco pintado por columnas.
+// Polígono de píxel: se rellena por filas; con dither sólo pinta un damero (cristal translúcido sin alpha).
+function pixPoly(pts, col, dither = 0) {
+  const n = pts.length; let y0 = Infinity, y1 = -Infinity; for (const p of pts) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  if (!Number.isFinite(y0) || !Number.isFinite(y1)) return; y0 = Math.max(-2, Math.round(y0)); y1 = Math.min(H + 2, Math.round(y1)); g.fillStyle = col;
+  for (let y = y0; y <= y1; y++) {
+    const xs = []; for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; if ((a[1] <= y) !== (b[1] <= y)) xs.push(a[0] + (y - a[1]) / (b[1] - a[1]) * (b[0] - a[0])); } xs.sort((p, q) => p - q);
+    for (let i = 0; i + 1 < xs.length; i += 2) { const xa = Math.round(xs[i]), xb = Math.round(xs[i + 1]); if (!dither) g.fillRect(xa, y, Math.max(1, xb - xa), 1); else for (let x = xa + ((xa + y) & 1); x < xb; x += 2) g.fillRect(x, y, 1, 1); }
+  }
+}
+// Contorno de píxel de un polígono: cuadrados de 1 px por cada arista.
+function pixOutline(pts, col, w = 1) { for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; pstroke(a[0], a[1], b[0], b[1], w, col, 1, 0, false); } }
+// Estallido de anillos dentados de colores (del exterior al interior) rasterizados; el anillo interior se apaga el primero.
+function drawColorBlast(x, y, r, q, t, cols) {
+  if (r < 1) return; const n = 20, jag = a => 1 + .12 * Math.sin(a * 5 + t * .7) + .08 * Math.sin(a * 9 - t * .5);
+  cols.forEach((c, j) => { const rr = r * (1 - j / cols.length) * (j === cols.length - 1 ? 1 - q * .6 : 1); if (rr < 1) return; const pts = []; for (let i = 0; i < n; i++) { const a = i / n * 6.28, d = rr * jag(a); pts.push([x + Math.cos(a) * d, y - rr * .2 + Math.sin(a) * d * .8]); } pixPoly(pts, c); });
+}
+// Arco de píxel pintado por columnas: bandas concéntricas con borde de tinta y brillo arriba; se revela de izquierda a derecha hasta k.
+function drawRainbowArc(cx, cy, rx, ry, band, k, cols, alpha = 1) {
+  const xEnd = cx - rx * Math.cos(Math.PI * clamp(k, 0, 1)), prev = g.globalAlpha, ink = '#2a2438', kr = ry / rx; g.globalAlpha = prev * alpha;
+  for (let x = Math.round(cx - rx); x <= xEnd; x++) {
+    const u = x - cx; let last = null;
+    cols.forEach((c, j) => { const ro = rx - j * band, ri = ro - band; if (Math.abs(u) >= ro) return; const yo = Math.round(cy - ro * kr * Math.sqrt(1 - (u / ro) ** 2)), yi = Math.abs(u) >= ri ? Math.round(cy) : Math.round(cy - ri * kr * Math.sqrt(1 - (u / ri) ** 2));
+      if (j === 0) { g.fillStyle = ink; g.fillRect(x, yo - 1, 1, 1); } g.fillStyle = c; g.fillRect(x, yo, 1, Math.max(1, yi - yo)); g.fillStyle = ramp(c).hi; g.fillRect(x, yo, 1, 1); last = yi; });
+    if (last !== null) { g.fillStyle = ink; g.fillRect(x, last, 1, 1); }
+  }
+  g.globalAlpha = prev;
+}
+// Arcoíris, el prisma: los tres suben en espiral vertiendo su color en una gota que se vuelve blanca; la página queda en blanco y la gota
+// cristaliza en un prisma de píxel que recibe la luz desde arriba y la abre en seis haces hasta cada enemigo; se pintan de todos los
+// colores y estallan; luego el arco cruza el cielo columna a columna y llueve color sobre el campo.
+function* techArcoiris(users, targets, tech, col) {
+  const ec = enemyC(), pc = partyC(), mid = [(ec[0] + pc[0]) / 2, (ec[1] + pc[1]) / 2]; camFocus(mid[0], mid[1], { dist: 120, turn: 0, h: 60, pitch: .42, f: 170, hy: 104, subjects: users, points: [[mid[0], mid[1], 72, 25]] }); // cámara baja mirando al cielo: la órbita y el prisma quedan en plano
+  const RB = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].map(C), INK = '#241e32', PAPER = '#f4f0ea';
   users.forEach(u => u.pose = 'charge'); Audio.sfx('charge', { semi: 0 }); Audio.sfx('charge', { semi: 4, when: .1 }); Audio.sfx('charge', { semi: 7, when: .2 });
-  const home = users.map(u => [u.wx, u.wy]), orb = { wz: 72, r: 0, white: 0 };
-  const orbFx = fx(999, () => { if (orb.r <= 0) return; const c = PJ([mid[0], mid[1], orb.wz]), r = orb.r * c[2]; g.fillStyle = orb.white > 0 ? `rgba(244,240,234,${orb.white})` : 'rgba(244,240,234,.5)'; g.beginPath(); g.arc(c[0], c[1], r, 0, 6.29); g.fill(); users.forEach((u, j) => { g.globalAlpha = .7 * (1 - orb.white); g.fillStyle = C(u.color); g.beginPath(); g.arc(c[0] + Math.cos(orbFx.t * .2 + j * 2.09) * r * .4, c[1] + Math.sin(orbFx.t * .2 + j * 2.09) * r * .4, r * .45, 0, 6.29); g.fill(); }); g.globalAlpha = 1; g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.arc(c[0], c[1], r + 1, 0, 6.29); g.stroke(); });
-  // 1) suben en triángulo girando cada vez más rápido y vierten su color
-  for (let i = 0; i < 56; i++) { const k = i / 56; users.forEach((u, j) => { const a = k * k * 18 + j * 2.09, r = lerp(34, 16, k); u.wx = lerp(home[j][0], mid[0] + Math.cos(a) * r, Math.min(1, k * 3)); u.wy = lerp(home[j][1], mid[1] + Math.sin(a) * r * .6, Math.min(1, k * 3)); u.wz = 18 + k * 48 + Math.sin(a) * 4; if (i > 14 && i % 2 === 0) B.particles.push({ wx: u.wx, wy: u.wy, wz: u.wz + u.def.h * .5, tx: mid[0], ty: mid[1], tz: orb.wz, col: C(u.color), t: 0, life: 12, dur: 12, arc: 0, stream: true }); }); if (i > 14) orb.r = Math.min(14, orb.r + .5); yield; }
-  Audio.sfx('mix', { colours: users.map(u => SEMI[u.id] ?? 0) }); B.slowmo = 10; for (let i = 1; i <= 10; i++) { orb.white = i / 10; orb.r = 14 + i; yield; }
-  camFocus(ec[0], ec[1], { dist: 130, turn: -.15, h: 64, pitch: .5, hy:96,f:165,subjects:targets,points:[[mid[0],mid[1],72,25]] }); // giro suave hacia los enemigos con el prisma aún alto en plano
-  // 2) papel: la pantalla se vuelve hoja en blanco y el orbe cristaliza en un prisma
+  const home = users.map(u => [u.wx, u.wy]), orb = { wz: 72, r: 0, white: 0 }, trails = users.map(ghostsOf);
+  // La gota es pintura de verdad: borde de tinta, los tres pigmentos giran dentro y el blanco crece desde el centro hasta cubrirlos.
+  const orbFx = fx(999, () => { if (orb.r <= 0) return; const c = PJ([mid[0], mid[1], orb.wz]), r = Math.max(1, orb.r * c[2]);
+    pixDisc(c[0], c[1], r, PAPER, INK); users.forEach((u, j) => { const a = orbFx.t * .2 + j * 2.09, d = r * .4 * (1 - orb.white); pixDisc(c[0] + Math.cos(a) * d, c[1] + Math.sin(a) * d * .8, Math.max(1, r * .42), C(u.color)); });
+    if (orb.white > 0) pixDisc(c[0], c[1], r * orb.white, PAPER); g.fillStyle = '#ffffff'; g.fillRect(Math.round(c[0] - r * .5), Math.round(c[1] - r * .6), Math.max(2, Math.round(r * .4)), 1); g.fillStyle = INK; g.fillRect(Math.round(c[0] + r * .2), Math.round(c[1] + r * .85), 2, Math.max(1, Math.round(r * .25))); });
+  // 1) suben en triángulo girando cada vez más rápido, con estela, y vierten su color
+  for (let i = 0; i < 56; i++) { const k = i / 56; users.forEach((u, j) => { const a = k * k * 18 + j * 2.09, r = lerp(34, 16, k); u.wx = lerp(home[j][0], mid[0] + Math.cos(a) * r, Math.min(1, k * 3)); u.wy = lerp(home[j][1], mid[1] + Math.sin(a) * r * .6, Math.min(1, k * 3)); u.wz = 18 + k * 48 + Math.sin(a) * 4; if (i > 10 && i % 2 === 0) trails[j].add(); if (i > 14 && i % 2 === 0) B.particles.push({ wx: u.wx, wy: u.wy, wz: u.wz + u.def.h * .5, tx: mid[0], ty: mid[1], tz: orb.wz, col: C(u.color), t: 0, life: 12, dur: 12, arc: 0, stream: true }); }); if (i > 14) orb.r = Math.min(14, orb.r + .5); yield; }
+  Audio.sfx('mix', { colours: users.map(u => SEMI[u.id] ?? 0) }); B.slowmo = 10; for (let i = 1; i <= 10; i++) { orb.white = i / 10; orb.r = 14 + i; yield; } trails.forEach(t => t.end());
+  camFocus(ec[0], ec[1], { dist: 130, turn: -.15, h: 64, pitch: .5, hy: 96, f: 165, subjects: targets, points: [[mid[0], mid[1], 72, 25]] }); // giro suave hacia los enemigos con el prisma aún alto en plano
+  // 2) papel: la pantalla se vuelve hoja en blanco y la gota cristaliza en un prisma de cristal tramado
   const paper = overlay(999, '#f1e9d6', .82, 12, 18); B.flash = { col: '#ffffff', a: .9 }; Audio.sfx('glass'); Audio.sfx('rainbow');
   orbFx.dur = 0; const pr = { spin: 0, k: 0, beams: 0 }, prismP = () => PJ([mid[0], mid[1], orb.wz]);
   const prism = fx(999, () => { const c = prismP(), s = c[2] * 18, a = pr.spin, pts = [[0, -1.1], [1, .7], [-1, .7]].map(([x, y]) => [c[0] + (x * Math.cos(a) - y * Math.sin(a)) * s, c[1] + (x * Math.sin(a) + y * Math.cos(a)) * s * .9]);
-    // luz blanca que entra desde arriba
-    if (pr.k > 0) { g.globalAlpha = .55 * pr.k; g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(c[0] - 3, -2); g.lineTo(c[0] + 3, -2); g.lineTo(c[0] + 1, c[1] - s); g.lineTo(c[0] - 1, c[1] - s); g.closePath(); g.fill(); g.globalAlpha = 1; }
-    g.fillStyle = 'rgba(244,240,234,.85)'; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); g.lineTo(pts[1][0], pts[1][1]); g.lineTo(pts[2][0], pts[2][1]); g.closePath(); g.fill(); g.strokeStyle = '#2a2438'; g.lineWidth = 1.5; g.stroke(); g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.beginPath(); g.moveTo(pts[0][0] + 2, pts[0][1] + 4); g.lineTo(pts[2][0] + 5, pts[2][1] - 3); g.stroke();
-    // seis haces abriéndose hasta cada enemigo
-    if (pr.beams > 0) for (const t of targets) { const e = PJ([t.wx, t.wy, 0]), w = t.def.w * .6 * e[2]; for (let j = 0; j < 6; j++) { const q = clamp(pr.beams - j * .06, 0, 1); if (q <= 0) continue; const x0 = c[0] + (j - 2.5) * 2, y0 = c[1] + 4, x1 = lerp(x0, e[0] + (j - 2.5) * (w / 3), q), y1 = lerp(y0, e[1] - 2, q); g.globalAlpha = .55 + .2 * Math.sin(prism.t * .4 + j); g.fillStyle = RB[j]; g.beginPath(); g.moveTo(x0 - 1, y0); g.lineTo(x0 + 1, y0); g.lineTo(x1 + w / 6 * .8, y1); g.lineTo(x1 - w / 6 * .8, y1); g.closePath(); g.fill(); } g.globalAlpha = 1; }
+    // luz blanca tramada que entra desde arriba
+    if (pr.k > 0) drawSunbeam(c[0], -2, c[0], c[1] - s * .9, 4, 2, prism.t, .75 * pr.k, '#ffffff');
+    // seis haces abriéndose hasta cada enemigo, con chispas que corren por ellos
+    if (pr.beams > 0) { const rnd = seeded(41 + (prism.t >> 1)); for (const t of targets) { const e = PJ([t.wx, t.wy, 0]), w = t.def.w * .6 * e[2]; for (let j = 0; j < 6; j++) { const q = clamp(pr.beams - j * .06, 0, 1); if (q <= 0) continue; const x0 = c[0] + (j - 2.5) * 2, y0 = c[1] + 4, x1 = lerp(x0, e[0] + (j - 2.5) * (w / 3), q), y1 = lerp(y0, e[1] - 2, q), hw = w / 6 * .8 * q; g.globalAlpha = .8; pixPoly([[x0 - 1, y0], [x0 + 1, y0], [x1 + hw, y1], [x1 - hw, y1]], RB[j]); g.globalAlpha = 1; if (rnd() < .5) { const m = rnd(); g.fillStyle = '#ffffff'; g.fillRect(Math.round(lerp(x0, x1, m)), Math.round(lerp(y0, y1, m)), 1, 1); } } } }
+    // el prisma: cristal tramado sobre el papel, aristas de tinta, brillo blanco en la arista izquierda y una chispa que gira
+    pixPoly(pts, '#c9c4d4'); pixPoly(pts, '#ffffff', 1); pixOutline(pts, INK, 1); pstroke(pts[0][0] - 1, pts[0][1] + 3, pts[2][0] + 2, pts[2][1] - 2, 1, '#ffffff', 1, 0, false);
+    const sa = prism.t * .3, sx = c[0] + Math.cos(sa) * s * .35, sy = c[1] + Math.sin(sa) * s * .3; g.fillStyle = '#ffffff'; g.fillRect(Math.round(sx) - 2, Math.round(sy), 5, 1); g.fillRect(Math.round(sx), Math.round(sy) - 2, 1, 5);
   });
   for (let i = 1; i <= 16; i++) { pr.spin += .35; pr.k = i / 16; yield; }
   for (let i = 1; i <= 24; i++) { pr.spin += .12; pr.beams = i / 20; if (i % 4 === 0) Audio.sfx('cursor', { semi: [0, 2, 4, 5, 7, 9][(i / 4 - 1) % 6], vol: .5 }); yield; }
-  // 3) los enemigos se pintan de arriba abajo con todos los colores y estallan
-  B.slowmo = 12; for (let i = 0; i < 30; i++) { for (const t of targets) { t.goop = null; goop(t, RB[i % 6], 30); if (i === 12) { B.shake = 6; damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Arcoíris'); } if (i % 3 === 0) burst(t.wx, t.wy, t.def.h * .6, RB[i % 6], 6, 1.6, 22, .05); } pr.spin += .2; yield; }
-  // 4) el arco cruza el cielo y llueve color; charcos de seis colores
-  prism.dur = 0; paper.dur = Math.min(paper.dur, paper.t + 30); B.rainbow = 40; Audio.sfx('rainbow'); Audio.sfx('heal_bells', { when: .4 }); camFocus(mid[0], mid[1], { dist:110,turn:.2,h:64,pitch:.5,hy:100,f:175,subjects:targets }); // el arco ocupa el cielo sin empequeñecer ambos bandos
-  const arc = fx(90, () => { const k = clamp(arc.t / 30, 0, 1), fade = arc.t > 70 ? (90 - arc.t) / 20 : 1; g.globalAlpha = fade * .9; RB.forEach((cc, j) => { g.strokeStyle = cc; g.lineWidth = 4; g.beginPath(); g.ellipse(W / 2, 128, 150 - j * 4, 104 - j * 4, 0, Math.PI, Math.PI + Math.PI * k); g.stroke(); }); const rnd = seeded(arc.t >> 2); g.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) { const a = Math.PI + rnd() * Math.PI * k, r = 150 - rnd() * 24; const x = W / 2 + Math.cos(a) * r, y = 128 + Math.sin(a) * r * .69; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; });
+  // 3) los enemigos se pintan de arriba abajo con todos los colores y estallan en anillos de color; la pintura llega hasta la cámara
+  B.slowmo = 12; const blasts = [];
+  const bf = fx(999, () => { for (const b of blasts) { const q = (bf.t - b.at) / 22; if (q < 0 || q > 1) continue; const c = PJ([b.t.wx, b.t.wy, b.t.def.h * .6]); g.globalAlpha = q > .5 ? (1 - q) * 2 : 1; drawColorBlast(c[0], c[1], (6 + (1 - (1 - q) ** 3) * 34) * c[2], q, bf.t, RB); g.globalAlpha = 1; } });
+  for (let i = 0; i < 30; i++) { for (const t of targets) { t.goop = null; goop(t, RB[i % 6], 30); if (i === 12) { B.shake = 6; B.hitstop = 5; impactFrame(t, INK, 1.3); blasts.push({ t, at: bf.t }); damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Arcoíris'); } if (i % 3 === 0) burst(t.wx, t.wy, t.def.h * .6, RB[i % 6], 6, 1.6, 22, .05); } if (i === 13) { lensSplatter(RB[0], 3, 5); lensSplatter(RB[2], 3, 6); lensSplatter(RB[4], 3, 7); } pr.spin += .2; yield; }
+  // 4) el arco cruza el cielo columna a columna y llueve color; charcos de seis colores
+  prism.dur = 0; paper.dur = Math.min(paper.dur, paper.t + 30); B.rainbow = 40; Audio.sfx('rainbow'); Audio.sfx('heal_bells', { when: .4 }); camFocus(mid[0], mid[1], { dist: 110, turn: .2, h: 64, pitch: .5, hy: 100, f: 175, subjects: targets }); // el arco ocupa el cielo sin empequeñecer ambos bandos
+  const arc = fx(90, () => { const k = clamp(arc.t / 30, 0, 1), fade = arc.t > 70 ? (90 - arc.t) / 20 : 1; drawRainbowArc(W / 2, 128, 150, 104, 4, k, RB, fade * .92); const rnd = seeded(arc.t >> 2); g.globalAlpha = fade; g.fillStyle = '#ffffff'; for (let i = 0; i < 6; i++) { const a = Math.PI + rnd() * Math.PI * k, r = 150 - rnd() * 24; const x = Math.round(W / 2 + Math.cos(a) * r), y = Math.round(128 + Math.sin(a) * r * .69); g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3); } g.globalAlpha = 1; });
   for (let i = 0; i < 40; i++) { for (let j = 0; j < 3; j++) B.particles.push({ wx: ec[0] + R(-70, 70), wy: ec[1] + R(-30, 30), wz: 80 + R(0, 20), vx: 0, vy: 0, vz: -R(1.5, 2.5), g: .05, col: RB[RI(0, 5)], t: 0, life: 40, size: 2 }); if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-60, 60), ec[1] + R(-24, 24), 0], w: R(6, 12), col: RB[i / 5 % 6 | 0], grow: 8, life: 200, under: true }); yield; }
-  users.forEach((u, j) => { u.pose = 'happy'; }); for (let i = 1; i <= 14; i++) { users.forEach((u, j) => { const k = i / 14; u.wx = lerp(u.wx, u.hx, .2); u.wy = lerp(u.wy, u.hy, .2); u.wz = Math.max(0, (1 - k) * 30 * (1 - k)); }); yield; }
+  bf.dur = 0; users.forEach((u, j) => { u.pose = 'happy'; }); for (let i = 1; i <= 14; i++) { users.forEach((u, j) => { const k = i / 14; u.wx = lerp(u.wx, u.hx, .2); u.wy = lerp(u.wy, u.hy, .2); u.wz = Math.max(0, (1 - k) * 30 * (1 - k)); }); yield; }
   users.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); yield* wait(20); users.forEach(u => u.pose = 'idle'); camReset();
 }
 // =====================================================================
