@@ -640,27 +640,27 @@ function* actItem(u, itemId, target) {
 // Enemigos: cada forma ataca como lo que es
 // =====================================================================
 function* enemyAttack(u, t) {
-  const shape = u.data.shape;
+  const shape = u.data.shape, quick = !u.boss;
   setActionShot('source',[u],{dist:83,turn:-.18,headroom:14});
   if (shape === 'round') { // salta alto y se estampa contra el objetivo (planchazo)
-    yield* anticipate(u, 14); setActionShot('target',[t],{dist:84,turn:.2,headroom:26}); u.pose = 'attack'; const sh = shadowFx(t.wx, t.wy, 4, 999);
-    for (let i = 1; i <= 20; i++) { const k = i / 20; u.wx = lerp(u.hx, t.wx, k); u.wy = lerp(u.hy, t.wy - 2, k); u.wz = Math.sin(k * Math.PI) * 60; sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((4 + k * 16) * c[2])); }; yield; }
-    sh.dur = 0; u.wz = 0; B.shake = 6; Audio.sfx('ink_tide', { vol: .7 }); hitBasic(u, t); goop(t, C('negro'), 60); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: 12, col: C('negro'), seed: 7, life: 90, under: true });
-    yield* wait(16); yield* whop(u, u.hx, u.hy, 12, 22);
+    yield* anticipate(u, quick ? 12 : 14); setActionShot('target',[t],{dist:84,turn:.2,headroom:26}); u.pose = 'attack'; const sh = shadowFx(t.wx, t.wy, 4, 999), flight = quick ? 16 : 20;
+    for (let i = 1; i <= flight; i++) { const k = i / flight; u.wx = lerp(u.hx, t.wx, k); u.wy = lerp(u.hy, t.wy - 2, k); u.wz = Math.sin(k * Math.PI) * 60; sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((4 + k * 16) * c[2])); }; yield; }
+    sh.dur = 0; u.wz = 0; B.shake = quick ? 3 : 6; Audio.sfx('ink_tide', { vol: .7 }); hitBasic(u, t); goop(t, C('negro'), 60); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: 12, col: C('negro'), seed: 7, life: 90, under: true });
+    yield* wait(quick ? 6 : 16); yield* whop(u, u.hx, u.hy, quick ? 10 : 12, 22);
   } else if (shape === 'splash') { // escupe tres pegotes en arco
     yield* anticipate(u, 10); setActionShot('target',[t],{dist:80,turn:-.12,headroom:24}); u.pose = 'attack'; for (let k = 0; k < 3; k++) { Audio.sfx('ink_jet', { pan: -.3 }); const p = { wx: u.wx, wy: u.wy, wz: u.def.h * .5, tx: t.wx + R(-4, 4), ty: t.wy + R(-3, 3), tz: t.def.h * .5, col: C('negro'), t: 0, life: 12, dur: 12, arc: 26, stream: true, size: 3 }; B.particles.push(p); u.wz = 4; yield* wait(5); u.wz = 0; yield* wait(9); burst(t.wx, t.wy, t.def.h * .5, C('negro'), 5, 1.2, 14, .1); if (k === 2) { hitBasic(u, t); goop(t, C('negro'), 60); lensSplatter('#1e1a2c', 5, 7); } else { t.pose = 'hurt'; t.poseT = 6; } }
-    yield* wait(8);
+    yield* wait(quick ? 4 : 8);
   } else if (shape === 'tall') { // embiste atravesando al objetivo y deja un tachón en el suelo
     yield* anticipate(u, 12); setActionShot('target',[t],{dist:78,turn:.24,headroom:10}); u.pose = 'attack'; Audio.sfx('dash'); const gh = ghostsOf(u); const to = fwdOf(t, -22);
     mark({ kind: 'path', pts: [[u.wx, u.wy, 0], [t.wx - 6, t.wy + 4, 0], [t.wx + 6, t.wy - 4, 0], [to[0], to[1], 0]], w: 4, col: C('negro'), grow: 8, life: 100, jit: 2, under: true });
     for (let i = 1; i <= 11; i++) { const k = i / 11; u.wx = lerp(u.hx, to[0], k); u.wy = lerp(u.hy, to[1], k); gh.add(); if (i === 6) { hitBasic(u, t); goop(t, C('negro'), 60); } yield; }
-    gh.end(); yield* wait(14); yield* whop(u, u.hx, u.hy, 12, 12);
+    gh.end(); yield* wait(quick ? 6 : 14); yield* whop(u, u.hx, u.hy, quick ? 10 : 12, 12);
   } else { // charco: se aplasta y manda una ola de tinta por el suelo
     yield* anticipate(u, 12); setActionShot('target',[t],{dist:82,turn:.18,headroom:12}); u.pose = 'hurt'; u.poseT = 24; Audio.sfx('ink_jet'); const wv = fx(999, () => { const k = clamp(wv.t / 22, 0, 1), c = PJ([lerp(u.wx, t.wx, k), lerp(u.wy, t.wy, k), 0]); g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(c[0], c[1], (14 + k * 8) * c[2], 6 * c[2], 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4460'; g.fillRect(Math.round(c[0] - 8 * c[2]), Math.round(c[1] - 8 * c[2]), Math.round(16 * c[2]), 2); }, true);
     for (let i = 0; i < 22; i++) { B.particles.push({ wx: lerp(u.wx, t.wx, i / 22), wy: lerp(u.wy, t.wy, i / 22), wz: 2, vx: 0, vy: 0, vz: R(.5, 1.5), g: .08, col: C('negro'), t: 0, life: 16 }); yield; }
-    wv.dur = 0; hitBasic(u, t); goop(t, C('negro'), 70); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: 14, col: '#1e1a2c', grow: 4, life: 100, under: true }); yield* wait(12);
+    wv.dur = 0; hitBasic(u, t); goop(t, C('negro'), 70); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: 14, col: '#1e1a2c', grow: 4, life: 100, under: true }); yield* wait(quick ? 6 : 12);
   }
-  u.pose = 'idle'; u.wz = 0; yield* wait(14); camReset();
+  u.pose = 'idle'; u.wz = 0; yield* wait(quick ? 6 : 14); camReset();
 }
 function* actEnemy(u) {
   u.acts++;

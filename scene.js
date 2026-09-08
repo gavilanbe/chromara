@@ -183,8 +183,8 @@ function setActionShot(phase,subjects,o={}) {
   const a=B.currentAction;if(!a||Prefs.camera==='fija')return;
   const old=SCENE.shot,party=subjects.every(u=>u.kind==='party');
   // Incoming attacks and healing look at the team's faces, from the enemy side.
-  const base=party&&(a.support||a.command.type==='enemy'||phase==='target')?cameraPartyYaw():SCENE.rest.yaw;
-  const turn=(o.turn??0)*(Prefs.camera==='suave'?.65:1);
+  const base=a.basicEnemy||party&&(a.support||a.command.type==='enemy'||phase==='target')?cameraPartyYaw():SCENE.rest.yaw;
+  const turn=(o.turn??0)*(a.basicEnemy?.2:Prefs.camera==='suave'?.65:1);
   SCENE.shot={action:a,phase,subjects:[...subjects],at:B.t,baseYaw:base+turn,options:o,impactAt:-999,
     direction:(B.stats.actions%2?1:-1)*(party?-1:1),held:false};
   if(old?.action===a&&old.phase===phase)SCENE.shot.direction=old.direction;
@@ -199,12 +199,12 @@ function updateActionCamera() {
     subjects=[...new Set([...subjects,...nearby])];
   }
   const t=clamp((B.t-shot.at)/64,0,1),ease=t*t*(3-2*t);
-  const orbit=(Prefs.camera==='cinema'?.48:.24)*(a.support?.65:1);
+  const orbit=(Prefs.camera==='cinema'?.48:.24)*(a.basicEnemy?.2:a.support?.65:1);
   const yaw=shot.baseYaw+shot.direction*orbit*ease;
-  const impact=clamp((B.t-shot.impactAt)/22,0,1),push=Prefs.shake?Math.sin(impact*Math.PI)*.045:0;
+  const impact=clamp((B.t-shot.impactAt)/22,0,1),push=Prefs.shake&&!a.basicEnemy?Math.sin(impact*Math.PI)*.045:0;
   const o=shot.options,large=a.tier>=2;
   const pose=fitCameraSubjects(subjects,{...o,yaw,dist:clamp(o.dist??(a.support?78:82),65,large?125:98),h:o.h??49,
-    zoom:(large?1.12:1.25)+push,headroom:o.headroom??actionHeadroom(a)});
+    zoom:(large?1.12:a.basicEnemy?1.18:1.25)+push,headroom:o.headroom??actionHeadroom(a)});
   camGo(pose,o.ease??.17);
 }
 function cameraImpact(target) {

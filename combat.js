@@ -1,6 +1,7 @@
 // Tactical rules and commands. All previews use the same rules as execution.
 'use strict';
 const PRIMARY = ['rojo', 'amarillo', 'azul'];
+const COMBAT_PACE = { recovery: 60, intentAt: 55, urgentAt: 85 };
 const STATUS_INFO = {
   lento: ['L', 'Lento: velocidad -40%'], tiznado: ['T', 'Tiznado: ataque -30%'],
   contorno: ['C', 'Contorno: daño recibido -40%'], firmado: ['F', 'Firmado: daño recibido +30%'],
@@ -284,8 +285,15 @@ function planEnemy(u) {
   let kind = u.ai === 'tiznar' && u.acts % 2 === 0 ? 'tiznar' : 'attack';
   if (u.boss) kind = u.bossPhase === 1 ? (u.acts % 2 === 0 ? 'steal' : 'attack') : u.bossPhase === 2 ? (u.acts % 2 === 0 ? 'tide' : 'attack') : (u.acts % 3 === 2 ? 'erase' : 'tide');
   const names = { attack: { round: 'Planchazo', splash: 'Saliva de tinta', tall: 'Embestida', blob: 'Ola de tinta' }[u.data.shape], tiznar: 'Tiznar', steal: 'Robar pigmento', tide: 'Marea negra', erase: 'Borrar el lienzo' };
-  u.intent = { kind, name: u.data.intentNames?.[kind] || names[kind], target, all: kind === 'tide' || kind === 'erase' }; u.warned = true;
-  Audio.sfx('enemy_soon', { vol: u.boss ? .7 : .4 });
+  u.intent = { kind, name: u.data.intentNames?.[kind] || names[kind], target, all: kind === 'tide' || kind === 'erase' }; u.warned = false;
+}
+// Only the next attacker asks for urgent attention. Frozen clocks and the
+// shared recovery keep intentions readable without pulsing over other actions.
+function urgentEnemy() {
+  if (B.phase !== 'fight' || B.enemyRecovery > 0 || B.currentAction || B.actions.length || B.actQueue.length) return null;
+  const next = alive(B.enemies).filter(u => !u.acting && u.intent).sort((a, b) =>
+    (100 - a.atb) / (a.spd * statusMult(a, 'lento')) - (100 - b.atb) / (b.spd * statusMult(b, 'lento')))[0];
+  return next && next.atb >= COMBAT_PACE.urgentAt ? next : null;
 }
 function battleClockStopped() {
   // A full brush never holds up the other painters. Wait only pauses a detailed
@@ -332,15 +340,21 @@ function updateBattleClock() {
   if (B.actions.length || B.actQueue.length) return;
   if (B.menu) updateBattleMenu();
   if (B.actions.length || B.actQueue.length || battleClockStopped() || B.t - B.fightStart < 40) return;
+  const recovering = B.enemyRecovery > 0;
+  // A second of usable decision time, also at 1.5x/2x. Menus in Wait,
+  // overlays and every action freeze this allowance rather than spending it.
+  if (recovering) B.enemyRecovery = Math.max(0, B.enemyRecovery - 1 / Prefs.speed);
   for (const u of alive(B.units)) {
-    if (u.acting) continue;
+    if (u.acting || recovering && u.kind === 'enemy') continue;
     const before = u.atb; u.atb = Math.min(100, u.atb + u.spd * statusMult(u, 'lento') * ATB_RATE);
     if (u.kind === 'party' && before < 100 && u.atb >= 100) { u.readyAt = B.t; Audio.sfx('ready', semiOf(u)); }
-    if (u.kind === 'enemy' && u.atb >= 55 && !u.intent) planEnemy(u);
+    if (u.kind === 'enemy' && u.atb >= COMBAT_PACE.intentAt && !u.intent) planEnemy(u);
   }
   rebuildReadyQueue();
   if (tickReservation()) return;
-  const e = alive(B.enemies).find(u => u.atb >= 100 && !u.acting);
+  const urgent = urgentEnemy();
+  if (urgent && !urgent.warned) { urgent.warned = true; Audio.sfx('enemy_soon', { vol: urgent.boss ? .7 : .3 }); }
+  const e = !recovering && alive(B.enemies).find(u => u.atb >= 100 && !u.acting);
   if (e) { if (!e.intent) planEnemy(e); e.atb = 0; e.acting = true; B.actQueue.push(tracked(e, actEnemy(e), [e], { type: 'enemy' })); B.busy = true; return; }
   if (!B.menu && B.queue.length) openCmd(B.queue[0]);
 }
@@ -351,11 +365,12 @@ function* tracked(u, gen, users = [u], command = { type: 'attack' }, targets = [
   if(!targets.length)targets=command.type==='enemy'?(u.intent?.all?alive(B.party):[u.intent?.target||alive(B.party)[0]].filter(Boolean)):validTargets(command,u).slice(0,1);
   // Only named strokes earn a stamp: techniques and the boss's set pieces. Plain hits and items are read from the motion alone.
   const stamp = command.type === 'tech' || (command.type === 'enemy' && u.boss && !!u.intent && u.intent.kind !== 'attack');
-  B.currentAction = { users, targets:targets.slice(), command, tier, stamp, painted: new Set(), seen: Game.seenTechs.has(command.techId), title: command.type === 'enemy' ? u.intent?.name || 'Ataque' : actionName(command, u) };
+  const basicEnemy = command.type === 'enemy' && !u.boss && u.intent?.kind === 'attack';
+  B.currentAction = { users, targets:targets.slice(), command, tier, stamp, basicEnemy, painted: new Set(), seen: Game.seenTechs.has(command.techId), title: command.type === 'enemy' ? u.intent?.name || 'Ataque' : actionName(command, u) };
   beginActionCamera(B.currentAction);
   if (tier >= 1) techVignette(B.currentAction);
   users.forEach(x => { x.acting = true; x.warned = false; x.guard = null; });
-  try { yield* wait(12); yield* gen; flushPaintEvents(); yield* wait(20); }
+  try { yield* wait(basicEnemy ? 6 : 12); yield* gen; flushPaintEvents(); yield* wait(basicEnemy ? 8 : 20); }
   finally {
     users.forEach((x, i) => {
       x.acting = false; x.gesture = null;
@@ -363,6 +378,7 @@ function* tracked(u, gen, users = [u], command = { type: 'attack' }, targets = [
       if (x.kind === 'enemy') { if (x.coat && --x.coat.turns <= 0) x.coat = null; x.intent = null; }
     });
     if (command.techId) Game.seenTechs.add(command.techId);
+    if (command.type === 'enemy') { B.enemyRecovery = COMBAT_PACE.recovery; B.recoveringEnemy = u; }
     B.stats.actions++; B.currentAction = null; rebuildReadyQueue(); camReset();
   }
 }

@@ -87,6 +87,7 @@ function initBattle(foe) {
   SCENE.shot=null;SCENE.orbit=SCENE.orbitGoal=null;
   const retry = { foe, inventory: { ...Game.inventory }, party: Party.map(p => ({ ...p.cur })) };
   Object.assign(B, { foe, retry, viewKey: null, party: [], enemies: [], queue: [], menu: null, actions: [], actQueue: [], busy: false, particles: [], nums: [], puddles: [], fx: [], marks: [], shake: 0, hitstop: 0, flash: null, phase: 'trans', t: 0, msg: null, msgT: 0, result: null, rainbow: 0, tr: { overworld: true }, gen: null, exiting: false, slowmo: 0, fightStart: 0, stepAcc: 0, reservation: null, currentAction: null, paintEvents: [], phaseNotice: null, stats: { actions: 0, mixes: 0, interrupts: 0, damageTaken: 0 } });
+  B.enemyRecovery = 0; B.recoveringEnemy = null;
   B.party = Party.map(unitFromParty);
   const n = foe.enemies.length; B.enemies = foe.enemies.map((id, i) => unitFromEnemy(id, i, n, foe.enemies));
   B.units = [...B.enemies, ...B.party];
@@ -645,8 +646,8 @@ function drawUnit(u) {
   }
   if (u.erasing && (B.t >> 1) & 1) g.globalAlpha = .35;
   const gp = project(u.wx, u.wy, 0); if (!u.dead && gp && u.wz > -u.def.h * .9) shadow(gp[0], gp[1], Math.max(3, Math.round(u.shadowW * gp[2] * B.unitScale * (1 - clamp(u.wz / 120, 0, .6)))));
-  // aviso de que va a actuar (ATB ≥ 82, junto al sonido enemy_soon): un aro de tinta se cierra bajo él y el sprite late y destella
-  const warn = u.kind === 'enemy' && u.warned && u.alive && !u.acting && B.phase === 'fight', wq = (B.t % 22) / 22;
+  // El hilo anuncia la intención; sólo el próximo atacante late al final de su carga.
+  const warn = u.kind === 'enemy' && urgentEnemy() === u, wq = Prefs.shake ? (B.t % 36) / 36 : .5;
   if (warn && gp) { const pa = g.globalAlpha, rw = u.def.w * .6 * s + 6, k = 1.7 - wq * .7; g.strokeStyle = '#0b0912'; g.lineWidth = 1.5; g.globalAlpha = .75 * (1 - wq); g.beginPath(); g.ellipse(gp[0], gp[1] + 1, rw * k, rw * .42 * k, 0, 0, 6.29); g.stroke(); g.globalAlpha = pa; }
   // emergiendo del charco: se recorta por debajo del suelo
   let clip = false; if (u.wz < 0 && gp) { g.save(); g.beginPath(); g.rect(0, 0, W, gp[1] + 1); g.clip(); clip = true; }
@@ -656,8 +657,9 @@ function drawUnit(u) {
   const recoil = recoilPose(u); if (u.recoil && u.recoil.t < 3 && Prefs.flash) spr = tintSprite(spr, u.recoil.col, .45 * Prefs.flash);
   g.save(); g.translate(recoil.x, recoil.y);
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
-  const sqz = (u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1) * (warn ? 1 + Math.sin(B.t * .55) * .045 : 1);
-  const bob = ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0, SX = s * info.sx * sqz * recoil.sx * (u.gesture?.sx ?? 1), SY = info.sy * (u.sqz ? 1.1 : 1) * recoil.sy * (u.gesture?.sy ?? 1);
+  const recovery = Prefs.shake && u === B.recoveringEnemy && !u.acting ? .1 * (B.enemyRecovery / COMBAT_PACE.recovery) ** 2 : 0;
+  const sqz = (u.sqz ? 1 - u.sqz * .25 * (1 + Math.sin(B.t * .8) * .3) : 1) * (warn && Prefs.shake ? 1 + Math.sin(B.t * .28) * .025 : 1) * (1 + recovery);
+  const bob = ready ? Math.abs(Math.sin(B.t * .25)) * 2 | 0 : 0, SX = s * info.sx * sqz * recoil.sx * (u.gesture?.sx ?? 1), SY = info.sy * (u.sqz ? 1.1 : 1) * (1 - recovery) * recoil.sy * (u.gesture?.sy ?? 1);
   // Aura de carga: mientras toma impulso, su color rebosa el contorno (los enemigos exhalan tinta clara).
   if (u.pose === 'charge' && u.alive && B.phase === 'fight') {
     const glow = tintSprite(spr, u.kind === 'party' ? C(u.color) : '#8c8ab0', 1), pulse = .3 + (Prefs.shake ? .25 * Math.sin(B.t * .45) : .1), reach = Prefs.shake ? 2 : 1;

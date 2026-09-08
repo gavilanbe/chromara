@@ -1,7 +1,7 @@
 // Chromara service worker: the shell installs for offline play; everything else
 // is fetched from the network first and kept as a fallback copy. Bump the cache
 // name whenever the shipped files change so old copies are dropped.
-const CACHE = 'chromara-la-mancha-8';
+const CACHE = 'chromara-combat-breath-9';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './mobile.css', './chromara-cuaderno.ttf', './chromara-rotulo.ttf',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './data.js', './music.js', './music_cues.js', './music_fallback.js', './sfx_samples.js', './sfx.js', './audio.js', './font.js', './sprites.js', './world_art.js',

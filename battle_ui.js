@@ -513,19 +513,22 @@ function drawTacticalGround() {
 // the thread lengthens with the charge and, near the end, rings the target's feet.
 function drawIntentThreads() {
   if (B.phase !== 'fight') return;
+  const urgent = urgentEnemy();
   for (const u of B.enemies) {
     if (!u.alive || !u.intent || u.acting) continue;
-    const k = clamp((u.atb - 55) / 45, 0, 1), targets = u.intent.all ? alive(B.party) : [u.intent.target].filter(x => x?.alive), col = u.boss ? '#5a3f78' : '#2a2438';
+    const k = clamp((u.atb - COMBAT_PACE.intentAt) / (100 - COMBAT_PACE.intentAt), 0, 1), targets = u.intent.all ? alive(B.party) : [u.intent.target].filter(x => x?.alive), col = u.boss ? '#5a3f78' : '#2a2438', imminent = u === urgent;
+    g.save(); g.globalAlpha *= imminent ? .85 : .4;
     for (const t of targets) {
-      const pts = intentThreadPath(u, t), n = pts.length - 1, reach = k * n, crawl = Prefs.shake ? (B.t >> 2) : 0;
+      const pts = intentThreadPath(u, t), n = pts.length - 1, reach = k * n, crawl = imminent && Prefs.shake ? (B.t >> 3) : 0;
       for (let i = 0; i < n; i++) {
         const seg = clamp(reach - i, 0, 1); if (seg <= 0) break;
         const a = PJ(pts[i]), b = PJ(pts[i + 1]); if (((i + crawl) & 1) && seg >= 1) continue; // dashed: the ink beads along
-        pstroke(a[0], a[1], lerp(a[0], b[0], seg), lerp(a[1], b[1], seg), Math.max(1, 2 * a[2]), col, 1, 0, false);
+        pstroke(a[0], a[1], lerp(a[0], b[0], seg), lerp(a[1], b[1], seg), Math.max(1, (imminent ? 2 : 1) * a[2]), col, 1, 0, false);
       }
       const tip = PJ(pointAt(pts, k)); g.fillStyle = col; g.beginPath(); g.ellipse(tip[0], tip[1], Math.max(1, 3 * tip[2]), Math.max(1, 2 * tip[2]), 0, 0, 6.29); g.fill(); g.fillStyle = '#8c8ab0'; g.fillRect(Math.round(tip[0]) - 1, Math.round(tip[1]) - 1, 1, 1);
-      if (k > .7) { const c = PJ([t.wx, t.wy, 0]), w = t.def.w * .6 * c[2] + 3, ph = Prefs.shake ? (B.t % 22) / 22 : .3; g.strokeStyle = col; g.globalAlpha = .75 * (1 - ph); g.lineWidth = 1; g.beginPath(); g.ellipse(c[0], c[1] + 1, Math.max(1, w * (1 + ph * .5)), Math.max(1, w * .4 * (1 + ph * .5)), 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }
+      if (imminent) { const c = PJ([t.wx, t.wy, 0]), w = t.def.w * .6 * c[2] + 3, ph = Prefs.shake ? (B.t % 36) / 36 : .3; g.strokeStyle = col; g.globalAlpha = .65 * (1 - ph); g.lineWidth = 1; g.beginPath(); g.ellipse(c[0], c[1] + 1, Math.max(1, w * (1 + ph * .5)), Math.max(1, w * .4 * (1 + ph * .5)), 0, 0, 6.29); g.stroke(); g.globalAlpha = .85; }
     }
+    g.restore();
   }
 }
 function drawTacticalMarkers() {
