@@ -315,13 +315,15 @@ function propGhosts(n = 5) {
 // del golpe y unas líneas de tinta convergen en él. Se congela con el hit-stop y se disuelve en cinco frames.
 function impactFrame(t, col, power = 1) {
   if (!Prefs.flash || !Prefs.shake) return;
-  const frame = (B.t / 9 + t.idx * 2 | 0) % 4, rnd = seeded(23 + t.idx * 7 + (B.stats.actions | 0)), rays = Array.from({ length: 18 }, () => ({ a: rnd() * 6.28, len: .3 + rnd() * .25, w: rnd() < .3 ? 2 : 1 }));
+  const list = (Array.isArray(t) ? t : [t]).filter(Boolean); if (!list.length) return;
+  const frame = (B.t / 9 + list[0].idx * 2 | 0) % 4, rnd = seeded(23 + list[0].idx * 7 + (B.stats.actions | 0)), rays = Array.from({ length: 18 }, () => ({ a: rnd() * 6.28, len: .3 + rnd() * .25, w: rnd() < .3 ? 2 : 1 }));
+  const scaleOf = u => u.sc * B.unitScale * (u.kind === 'enemy' ? (u.boss ? 1.35 : 1.6) : 1);
   const f = fx(5, () => {
-    const q = f.t / 5, s = t.sc * B.unitScale * (t.kind === 'enemy' ? (t.boss ? 1.35 : 1.6) : 1), cx = t.x, cy = t.y - t.def.h * s * .5;
+    const q = f.t / 5, cx = list.reduce((a, u) => a + u.x, 0) / list.length, cy = list.reduce((a, u) => a + u.y - u.def.h * scaleOf(u) * .5, 0) / list.length;
     g.fillStyle = '#f1e9d6'; g.globalAlpha = Math.min(.9, .6 + power * .2) * Prefs.flash * (1 - q * .6); g.fillRect(0, 0, W, H); g.globalAlpha = .85 - q * .5;
-    // Pencil speed lines: they start at the page's edge and stop well short of the body, so the silhouette stays clean.
+    // Pencil speed lines: they start at the page's edge and stop well short of the bodies, so the silhouettes stay clean.
     for (const r of rays) { const x1 = cx + Math.cos(r.a) * 210, y1 = cy + Math.sin(r.a) * 130, k = r.len * (1 - q * .4); pstroke(lerp(x1, cx, k), lerp(y1, cy, k), x1, y1, r.w, '#14121c', 1, 0, true); }
-    const info = unitSpriteInfo(t, frame); drawSprite(tintSprite(info.spr, col, 1), cx, t.y, s * (1.1 + power * .04) * info.sx, t.kind === 'enemy' && t.facingLeft, info.sy);
+    for (const u of list) { const s = scaleOf(u), info = unitSpriteInfo(u, frame); drawSprite(tintSprite(info.spr, col, 1), u.x, u.y, s * (1.1 + power * .04) * info.sx, u.kind === 'enemy' && u.facingLeft, info.sy); }
     g.globalAlpha = 1;
   });
   return f;

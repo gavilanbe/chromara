@@ -329,45 +329,144 @@ function* chargeAndFuse(users, wx, wy, wz, col, frames = 26) { // anillos bajo l
   const rings = fx(999, () => { for (const u of users) { const [x, y, s] = PJ([u.wx, u.wy, 0]); g.strokeStyle = C(u.color); g.globalAlpha = .6; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, (10 + Math.sin(rings.t * .3) * 3) * s, 4 * s, 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; } }, true);
   for (let i = 0; i < frames; i++) { users.forEach((u, k) => { u.wz = Math.abs(Math.sin((i + k * 4) * .35)) * 5; if (i % 3 === k % 3) B.particles.push({ wx: u.wx + R(-8, 8), wy: u.wy + R(-4, 4), wz: R(0, u.def.h), vx: 0, vy: 0, vz: R(.6, 1.4), g: -.02, col: cols[k], t: 0, life: 20 }); }); yield; }
   users.forEach(u => stream(u, { wx, wy, def: { h: wz * 2 } }, C(u.color), 12, 16));
-  const orb = { wx, wy, wz, r: 4, t: 0 }, of = fx(999, () => { const [x, y, s] = PJ([orb.wx, orb.wy, orb.wz]); const c = orb.t < 12 ? cols[(orb.t >> 1) % cols.length] : col; g.fillStyle = ramp(c).base; g.beginPath(); g.arc(x, y, orb.r * s, 0, 6.29); g.fill(); g.fillStyle = ramp(c).hi; g.fillRect(x - 2, y - orb.r * s * .6, 2, 2); orb.t++; });
+  // El orbe es una gota de pintura de verdad: borde de tinta, los pigmentos giran dentro hasta fundirse en el color nuevo, brillo húmedo y un goterón.
+  const orb = { wx, wy, wz, r: 4, t: 0 }, of = fx(999, () => {
+    const [x, y, s] = PJ([orb.wx, orb.wy, orb.wz]), r = Math.max(1, orb.r * s), mixk = clamp((orb.t - 8) / 12, 0, 1), wob = 1 + (orb.t > 16 ? Math.sin(orb.t * 1.3) * .08 : 0);
+    g.fillStyle = '#241e32'; g.beginPath(); g.ellipse(x, y + 1, r + 1, (r + 1) * .9 * wob, 0, 0, 6.29); g.fill();
+    g.save(); g.beginPath(); g.ellipse(x, y, r, r * .9 * wob, 0, 0, 6.29); g.clip();
+    g.fillStyle = ramp(col).sh; g.fillRect(x - r, y - r, r * 2, r * 2);
+    cols.forEach((c, i) => { const a = orb.t * .22 + i * 6.28 / cols.length, d = r * .42 * (1 - mixk); g.fillStyle = c; g.beginPath(); g.ellipse(x + Math.cos(a) * d, y + Math.sin(a) * d * .7, r * .78, r * .66, a, 0, 6.29); g.fill(); });
+    g.globalAlpha = mixk; g.fillStyle = ramp(col).base; g.fillRect(x - r, y - r, r * 2, r * 2); g.globalAlpha = 1;
+    g.restore();
+    g.fillStyle = mixk > .5 ? ramp(col).hi : '#fff8e6'; g.fillRect(Math.round(x - r * .5), Math.round(y - r * .55), Math.max(2, Math.round(r * .5)), Math.max(1, Math.round(r * .18)));
+    if (mixk > .6) { g.fillStyle = ramp(col).base; g.fillRect(Math.round(x + r * .2), Math.round(y + r * .8), 2, Math.round((mixk - .6) * 12 * s)); }
+    orb.t++;
+  });
   for (let i = 0; i < 24; i++) { orb.r = 4 + i * .45; if (i > 16) orb.r += Math.sin(i * 2) * 1.5; yield; } Audio.sfx('mix', { colours: users.map(u => SEMI[u.id] ?? 0) }); B.flash = { col: col, a: .4 }; burst(wx, wy, wz, col, 18, 1.8, 24, 0); B.slowmo = 14; B.hitstop = 6; B.shake = 3;
   users.forEach(u => { u.wz = 0; }); rings.dur = 0;
   return { of, orb };
 }
 function* fuseAt(users, wx, wy, wz, col) { const r = yield* chargeAndFuse(users, wx, wy, wz, col, 34); return r; }
-// Llama dibujada en pantalla: capas rojo → naranja → amarillo con lengua que parpadea. (x,y) = base, w/h tamaño, t = tiempo
-function drawFlame(x, y, w, h, t, seed = 0) {
-  const f1 = Math.sin(t * .6 + seed) * .12, f2 = Math.sin(t * .9 + seed * 2) * .1, lean = Math.sin(t * .35 + seed) * w * .15;
-  const layer = (col, kw, kh, dy) => { g.fillStyle = col; g.beginPath(); g.moveTo(x - w * kw, y - dy); g.quadraticCurveTo(x - w * kw * 1.1 + lean * .3, y - h * kh * .55 - dy, x + lean, y - h * kh * (1 + f1) - dy); g.quadraticCurveTo(x + w * kw * 1.1 + lean * .3, y - h * kh * .55 - dy, x + w * kw, y - dy); g.closePath(); g.fill(); };
-  layer('#7a2a1a', 1, 1.05, 0); layer(C('rojo'), .92, .95, 0); layer(C('naranja'), .68, .72 + f2, 1); layer(C('amarillo'), .42, .45 + f2, 2); layer('#fff3c0', .2, .2, 3);
+// Fuego de píxel: tres lenguas que suben por filas con borde rojo, cuerpo naranja, corazón amarillo y núcleo claro.
+// El temblor sale de (t, seed): dibujar dos veces el mismo frame da el mismo fuego. (x,y) = base; w/h = tamaño en pantalla.
+function drawFire(x, y, w, h, t, seed = 0, alpha = 1) {
+  if (w < 1 || h < 2) return;
+  const cols = ['#7a2a1a', C('rojo'), C('naranja'), C('amarillo'), '#fff3c0'], tongues = [[0, 1, seed * 1.7], [-.34, .58, seed * 1.7 + 2.1], [.32, .64, seed * 1.7 + 4.2]];
+  const prev = g.globalAlpha; g.globalAlpha = prev * alpha;
+  for (const [off, size, ph] of tongues) {
+    const th = h * size * (1 + .14 * Math.sin(t * .37 + ph)), tw = w * (.4 + .6 * size), cx = x + off * w;
+    for (let r = 0; r < th; r++) {
+      const k = r / th, sway = Math.sin(t * .45 + k * 7 + ph) * tw * .28 * k, wk = tw * (1 - k) * (.72 + .28 * Math.sin(k * 9 + t * .5 + ph)), px = cx + sway, py = Math.round(y - r);
+      const band = (ww, c) => { if (ww < .5) return; g.fillStyle = c; g.fillRect(Math.round(px - ww), py, Math.max(1, Math.round(ww * 2)), 1); };
+      band(wk, k > .88 ? cols[0] : cols[1]); band(wk * .7, cols[2]); if (k < .78) band(wk * .42, cols[3]); if (k < .45) band(wk * .18, cols[4]);
+    }
+  }
+  g.globalAlpha = prev;
 }
-function* techLlamarada(users, targets, tech, col) { // la cerilla: el lápiz raspa la brocha, saltan chispas, prende una bola de fuego que los dos lanzan; anillo de fuego, columnas bajo cada enemigo, humo y suelo chamuscado
-  const red = users.find(u => u.id === 'carmin') || users[0], yel = users.find(u => u.id === 'ambar') || users[1] || users[0], mid = centroid(users), ec = enemyC(), OR = C('naranja');
+// Estallido: anillos dentados que se abren; el núcleo claro se apaga el primero y deja el fuego rojo.
+function drawBlast(x, y, r, q, t) {
+  if (r < 1) return; const n = 20, jag = a => 1 + .12 * Math.sin(a * 5 + t * .7) + .08 * Math.sin(a * 9 - t * .5);
+  const ring = (rr, col) => { if (rr < 1) return; g.fillStyle = col; g.beginPath(); for (let i = 0; i <= n; i++) { const a = i / n * 6.28, d = rr * jag(a), px = x + Math.cos(a) * d, py = y - rr * .2 + Math.sin(a) * d * .8; if (i) g.lineTo(px, py); else g.moveTo(px, py); } g.closePath(); g.fill(); };
+  ring(r, '#7a2a1a'); ring(r * .9, C('rojo')); ring(r * .72, C('naranja')); ring(r * .5 * (1 - q * .5), C('amarillo')); if (q < .6) ring(r * .3 * (1 - q / .6), '#fff3c0');
+}
+// Humo: bocanadas que suben, se abren y se apagan del gris al negro.
+function smokeColumn(wx, wy, wz, n = 10, dur = 60, spread = 8, seed = 2) {
+  const rnd = seeded(seed * 5 + (B.stats.actions | 0)), puffs = Array.from({ length: n }, (_, i) => ({ dx: (rnd() - .5) * spread, dy: (rnd() - .5) * spread * .5, at: i * (dur / n) * .5, r: 3 + rnd() * 4, drift: (rnd() - .5) * .4, rise: .5 + rnd() * .5, ph: rnd() * 6 }));
+  const f = fx(dur + 36, () => { for (const p of puffs) { const age = f.t - p.at; if (age < 0 || age > 36) continue; const q = age / 36, c = PJ([wx + p.dx + Math.sin(age * .2 + p.ph) * 2, wy + p.dy, wz + age * p.rise]), r = Math.max(1, (p.r + q * 7) * c[2]); g.globalAlpha = (1 - q) * .75; g.fillStyle = q < .4 ? '#4a4460' : '#2a2438'; g.beginPath(); g.ellipse(c[0] + p.drift * age, c[1], r, r * .8, 0, 0, 6.29); g.fill(); g.fillStyle = '#6a6480'; g.fillRect(Math.round(c[0] + p.drift * age - r * .4), Math.round(c[1] - r * .5), 2, 1); } g.globalAlpha = 1; });
+  return f;
+}
+// Ascuas hacia la cámara: chispas en pantalla que salen del impacto y caen apagándose.
+function emberStorm(sx, sy, n = 26, seed = 4) {
+  if (!Prefs.shake) return;
+  const rnd = seeded(seed * 13 + (B.stats.actions | 0)), embers = Array.from({ length: n }, () => ({ a: rnd() * 6.28, v: 2 + rnd() * 5, g: .06 + rnd() * .08, s: rnd() < .3 ? 2 : 1, life: 16 + rnd() * 16, c: rnd() }));
+  const f = fx(34, () => { for (const e of embers) { if (f.t > e.life) continue; const q = f.t / e.life, x = sx + Math.cos(e.a) * e.v * f.t, y = sy + Math.sin(e.a) * e.v * f.t * .7 + e.g * f.t * f.t; g.globalAlpha = 1 - q * q; g.fillStyle = q < .3 ? '#fff3c0' : q < .6 ? C('amarillo') : e.c < .5 ? C('naranja') : C('rojo'); g.fillRect(Math.round(x), Math.round(y), e.s, e.s); } g.globalAlpha = 1; });
+}
+// Llamarada, la cerilla: rojo y amarillo se funden en naranja; Ámbar se planta junto a Carmín y raspa el lápiz por las cerdas
+// cargadas de rojo hasta que prende; Carmín batea la bola con la brocha; el estallido abre una onda por el suelo que va
+// encendiendo a cada enemigo por orden, envuelto en fuego por delante y por detrás, con humo, ascuas y el suelo chamuscado.
+function* techLlamarada(users, targets, tech, col) {
+  const red = users.find(u => u.id === 'carmin') || users[0], yel = users.find(u => u.id === 'ambar') || users[1] || users[0], mid = centroid(users), ec = enemyC();
+  const OR = C('naranja'), YE = C('amarillo'), RE = C('rojo'), dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Llamarada');
+  // 1) fusión de pigmentos
   camFocus(mid[0], mid[1], { dist: 96, turn: .35, h: 52, pitch: .55, hy: 84, ease: .1 }); users.forEach(u => u.pose = 'charge');
   const { of } = yield* fuseAt(users, mid[0], mid[1], 22, OR); yield* wait(4); of.dur = 0;
-  // la cerilla: brocha quieta cargada de rojo, el lápiz raspa a lo largo de las cerdas
-  const bro = propSprite('brocha', C('rojo')), lap = propSprite('lapiz', C('amarillo')), st = { k: 0, fire: 0, hold: 1 }, fireP = () => PJ([mid[0], mid[1], 22]);
-  const pf = fx(999, () => { const c = fireP(), s = c[2], tipX = c[0] + 10 * s, tipY = c[1] - 4 * s; if (st.hold) { drawProp(bro, c[0] - 46 * s, c[1] + 6 * s, -.18, 1, 1, 11, 1.1 * s); drawProp(lap, c[0] - 8 * s + st.k * 30 * s, c[1] - 30 * s + st.k * 14 * s, 1.05, 1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], 1.15 * s); } if (st.fire > 0) { g.globalAlpha = .35 * st.fire; g.fillStyle = OR; g.beginPath(); g.arc(tipX, tipY, (10 + st.fire * 18) * s, 0, 6.29); g.fill(); g.globalAlpha = 1; drawFlame(tipX, tipY + 6 * s, (6 + st.fire * 14) * s, (14 + st.fire * 30) * s, pf.t, 1); } }); // brocha tumbada con las cerdas a la derecha; el lápiz baja y raspa a lo largo de ellas
-  for (let r = 0; r < 3; r++) { Audio.sfx('scratch_long', { vol: .8 }); for (let i = 1; i <= 8; i++) { st.k = i / 8; B.shake = i > 5 ? 1 : 0; for (let j = 0; j < 2; j++) B.particles.push({ wx: mid[0] + 4 + R(-4, 4), wy: mid[1], wz: 22 + R(0, 8), vx: R(-.8, .8), vy: R(-.4, .4), vz: R(.6, 2.2), g: .05, col: j ? C('amarillo') : '#fff3c0', t: 0, life: 12, size: 1 }); yield; } for (let i = 1; i <= 4; i++) { st.k = 1 - i / 4; yield; } }
-  Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .1 }); B.flash = { col: OR, a: .3 }; B.slowmo = 8;
-  for (let i = 1; i <= 18; i++) { st.fire = i / 18; users.forEach(u => u.wz = Math.sin(i * .5) * 2); if (i % 2 === 0) B.particles.push({ wx: mid[0] + R(-6, 6), wy: mid[1] + R(-3, 3), wz: 28 + st.fire * 20, vx: R(-.3, .3), vy: 0, vz: R(1, 2.2), g: -.02, col: i % 4 ? OR : C('amarillo'), t: 0, life: 20, size: 2 }); yield; }
-  st.hold = 0; users.forEach(u => { u.wz = 0; u.pose = 'attack'; });
-  // lanzamiento: la bola de fuego describe un arco hasta el centro de los enemigos dejando ascuas; la cámara la sigue
-  camFocus(ec[0], ec[1], { dist: 110, turn: -.2, h: 58, pitch: .58, ease: .07 }); Audio.sfx('whip'); Audio.sfx('drop_fall', { when: .1 });
-  const ball = { wx: mid[0], wy: mid[1], wz: 22 }, bf = fx(999, () => { const c = PJ([ball.wx, ball.wy, ball.wz]); g.globalAlpha = .3; g.fillStyle = OR; g.beginPath(); g.arc(c[0], c[1], 22 * c[2], 0, 6.29); g.fill(); g.globalAlpha = 1; drawFlame(c[0], c[1] + 8 * c[2], 16 * c[2], 34 * c[2], bf.t, 2); });
-  pf.dur = 0; for (let i = 1; i <= 24; i++) { const k = i / 24; ball.wx = lerp(mid[0], ec[0], k); ball.wy = lerp(mid[1], ec[1], k); ball.wz = 22 + Math.sin(k * Math.PI) * 60 - k * 20; for (let j = 0; j < 2; j++) B.particles.push({ wx: ball.wx + R(-4, 4), wy: ball.wy + R(-2, 2), wz: ball.wz + R(-4, 4), vx: R(-.4, .4), vy: 0, vz: R(-.4, .8), g: -.01, col: j ? OR : C('amarillo'), t: 0, life: 16, size: 2 }); yield; }
-  bf.dur = 0;
-  // impacto: estallido, anillo de fuego por el suelo y columnas de fuego bajo cada enemigo
-  Audio.sfx('fwoom'); Audio.sfx('impact_sub', { vol: .8 }); Audio.sfx('crackle', { when: .2 }); B.flash = { col: '#fff3c0', a: .7 }; B.shake = 9; B.hitstop = 8; B.slowmo = 14;
-  burst(ec[0], ec[1], 6, C('amarillo'), 24, 3, 30, .1); burst(ec[0], ec[1], 6, OR, 24, 2.2, 36, .06);
-  const ring = fx(30, () => { const c = PJ([ec[0], ec[1], 0]), q = ring.t / 30; g.strokeStyle = OR; g.lineWidth = 4 * (1 - q * .6); g.globalAlpha = 1 - q; g.beginPath(); g.ellipse(c[0], c[1], (8 + q * 130) * c[2], (3 + q * 50) * c[2], 0, 0, 6.29); g.stroke(); g.strokeStyle = C('amarillo'); g.lineWidth = 2; g.beginPath(); g.ellipse(c[0], c[1], (4 + q * 110) * c[2], (2 + q * 42) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
-  const heat = overlay(70, OR, .16, 6, 30);
-  const pillars = targets.map((t, j) => ({ t, seed: j * 3 + 1, k: 0 })), pil = fx(999, () => { for (const p of pillars) { if (p.k <= 0) continue; const c = PJ([p.t.wx, p.t.wy, 0]); g.globalAlpha = Math.min(1, p.k * 2); drawFlame(c[0], c[1] + 2, (14 + p.k * 10) * c[2], (30 + p.k * 40) * c[2], pil.t, p.seed); g.globalAlpha = 1; } });
-  for (let i = 0; i < 44; i++) { pillars.forEach((p, j) => { p.k = clamp((i - j * 3) / 10, 0, 1) * (i > 30 ? (44 - i) / 14 : 1); }); for (const t of targets) { if (i % 2 === 0) B.particles.push({ wx: t.wx + R(-t.def.w * .4, t.def.w * .4), wy: t.wy + R(-4, 4), wz: R(10, 50), vx: R(-.3, .3), vy: 0, vz: R(.6, 1.6), g: -.03, col: i % 3 ? '#4a4460' : '#2a2438', t: 0, life: 30, size: 2 }); if (i === 8) { damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Llamarada'); goop(t, OR, 90); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * .9, col: '#3a2a22', grow: 8, life: 260, under: true }); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: t.def.w * .5, col: '#1e1a2c', grow: 6, life: 260, seed: 5, under: true }); } } if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-50, 50), ec[1] + R(-20, 20), 0], w: R(4, 9), col: i % 10 ? '#5a2a2a' : OR, grow: 4, life: 200, under: true }); yield; }
-  pil.dur = 0;
-  // ascuas que quedan flotando
-  for (let i = 0; i < 16; i++) { B.particles.push({ wx: ec[0] + R(-60, 60), wy: ec[1] + R(-24, 24), wz: R(0, 10), vx: R(-.2, .2), vy: 0, vz: R(.3, .8), g: -.01, col: i & 1 ? OR : C('amarillo'), t: 0, life: 40, size: 1 }); yield; }
-  yield* wait(12); users.forEach(u => u.pose = 'idle'); camReset();
+  // 2) la cerilla: la brocha de Carmín, tumbada y cargada de rojo; Ámbar salta a su lado con el lápiz
+  const bro = propSprite('brocha', RE), lap = propSprite('lapiz', YE), st = { k: 0, fire: 0, hold: 1, scrape: 0, swing: 0, lift: 0 };
+  camFocus(red.wx, red.wy, { dist: 72, turn: .3, h: 40, ease: .1, subjects: users, headroom: 22 });
+  const [sx, sy] = side(red, -20); yield* whop(yel, sx, sy, 8, 12); yel.pose = 'attack';
+  // La brocha se apoya en Carmín (mango a su izquierda, cerdas hacia los enemigos); todo lo demás se mide desde su pivote.
+  const K = .8, brushAt = () => { const c = PJ(above(red, .55)), s = c[2]; return { x: c[0] - 20 * s, y: c[1] + 2 * s - st.lift * s, s, a: -.18 - st.swing }; };
+  const local = (b, lx, ly) => [b.x + (lx * Math.cos(b.a) - ly * Math.sin(b.a)) * K * b.s, b.y + (lx * Math.sin(b.a) + ly * Math.cos(b.a)) * K * b.s];
+  const tipAt = () => { const b = brushAt(), [x, y] = local(b, 57, 9); return [x, y, b.s]; };
+  const gh = propGhosts(5), sparks = [], srnd = seeded(31);
+  const pf = fx(999, () => {
+    if (!st.hold) return; const b = brushAt();
+    if (st.swing) gh.push(bro, b.x, b.y, b.a, 1, 1, 11, K * b.s); gh.draw();
+    drawProp(bro, b.x, b.y, b.a, 1, 1, 11, K * b.s);
+    if (st.scrape) { const [px, py] = local(b, 37 + st.k * 22, -7 + st.k * 5); drawProp(lap, px, py, 1.05, 1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], .95 * b.s); }
+    for (const sp of sparks) { if (sp.t < 0 || sp.t > sp.life) continue; const q = sp.t / sp.life; g.fillStyle = q < .4 ? '#fff3c0' : YE; g.fillRect(Math.round(sp.x + sp.vx * sp.t), Math.round(sp.y + sp.vy * sp.t + .12 * sp.t * sp.t), 1, 1); }
+    if (st.fire > 0) { const [tx, ty, s] = tipAt(); g.globalAlpha = .28 * st.fire * Math.max(.5, Prefs.flash); g.fillStyle = OR; g.beginPath(); g.arc(tx, ty, (8 + st.fire * 16) * s, 0, 6.29); g.fill(); g.globalAlpha = 1; drawFire(tx, ty + 5 * s, (3 + st.fire * 7) * s, (8 + st.fire * 30) * s, pf.t, 1); }
+  });
+  pf.tick = () => { for (const sp of sparks) sp.t++; while (sparks.length && sparks[0].t > sparks[0].life) sparks.shift(); };
+  const spark = n => { if (!Prefs.shake) return; const b = brushAt(), [px, py] = local(b, 37 + st.k * 22, -7 + st.k * 5); for (let j = 0; j < n; j++) sparks.push({ x: px, y: py, vx: (srnd() - .5) * 3, vy: -1 - srnd() * 2.2, t: 0, life: 8 + srnd() * 8 }); };
+  const sparkAt = [red.wx, red.wy, red.def.h * 1.1];
+  for (let r = 0; r < 3; r++) {
+    Audio.sfx('scratch_long', { vol: .8 }); st.scrape = 1;
+    for (let i = 1; i <= 8; i++) { st.k = i / 8; yel.wz = Math.sin(i * .8) * 2; if (Prefs.shake) B.shake = i > 5 ? 1 : 0; spark(2 + r); yield; }
+    if (r < 2) { for (let i = 1; i <= 4; i++) { st.k = 1 - i / 4; yield; } yel.wz = 0; }
+  }
+  st.scrape = 0; yel.wz = 0;
+  // 3) prende: destello en la punta y la llama crece con las cerdas
+  Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .1 }); B.flash = { col: '#fff3c0', a: .35 }; B.slowmo = 8; B.hitstop = 2;
+  { const [tx, ty] = tipAt(); emberStorm(tx, ty, 14, 9); }
+  for (let i = 1; i <= 18; i++) { st.fire = i / 18; users.forEach(u => u.wz = Math.sin(i * .5) * 2); if (i % 3 === 0) spark(1); yield; }
+  users.forEach(u => { u.wz = 0; u.pose = 'attack'; });
+  // 4) el bateo: Carmín echa la brocha atrás y la lanza hacia delante; la bola sale disparada
+  yield* whop(yel, ...side(red, -30), 6, 6); yel.pose = 'idle';
+  Audio.sfx('charge', { semi: 0, vol: .5 }); for (let i = 1; i <= 7; i++) { st.swing = -.55 * i / 7; st.lift = 4 * i / 7; red.gesture = Prefs.shake ? { sx: 1 + .1 * i / 7, sy: 1 - .1 * i / 7 } : null; yield; }
+  Audio.sfx('whip'); Audio.sfx('drop_fall', { when: .1 });
+  for (let i = 1; i <= 5; i++) { st.swing = -.55 + 2.2 * (i / 5) ** 1.6; st.lift = 4 - 6 * i / 5; red.gesture = Prefs.shake ? { sx: 1.12 - .12 * i / 5, sy: .88 + .12 * i / 5 } : null; if (i === 3) { st.fire = 0; red.wz = 6; } yield; }
+  red.gesture = null; red.wz = 0; B.hitstop = 2;
+  // La cámara abre para que quepan la bola en su ápice y la fila de enemigos que la espera.
+  camFocus(ec[0], ec[1], { dist: 112, turn: -.2, h: 58, pitch: .58, ease: .07, subjects: targets, points: [[lerp(red.wx, ec[0], .5), lerp(red.wy, ec[1], .5), 62, 18]] });
+  const ball = { wx: red.wx, wy: red.wy, wz: red.def.h + 8, trail: [] }, sh = shadowFx(ball.wx, ball.wy, 4, 999);
+  const bf = fx(999, () => {
+    // cola de cometa: las posiciones anteriores arden cada vez más pequeñas; delante, la bola con halo
+    ball.trail.forEach((p, i) => { const c = PJ(p), k = (i + 1) / (ball.trail.length + 1); drawFire(c[0], c[1] + 6 * c[2], 7 * k * c[2], 18 * k * c[2], bf.t + i, 3 + i, .35 + .5 * k); });
+    const c = PJ([ball.wx, ball.wy, ball.wz]); g.globalAlpha = .3 * Math.max(.5, Prefs.flash); g.fillStyle = OR; g.beginPath(); g.arc(c[0], c[1], 20 * c[2], 0, 6.29); g.fill(); g.globalAlpha = 1;
+    drawFire(c[0], c[1] + 8 * c[2], 10 * c[2], 30 * c[2], bf.t, 2); g.fillStyle = '#fff3c0'; g.beginPath(); g.arc(c[0], c[1] - 2 * c[2], Math.max(1, 5 * c[2]), 0, 6.29); g.fill();
+  });
+  for (let i = 1; i <= 22; i++) { const k = i / 22; if (i <= 8) { st.swing = lerp(1.65, 0, i / 8); st.lift = lerp(-2, 0, i / 8); } else st.hold = 0; if (i % 2) ball.trail.unshift([ball.wx, ball.wy, ball.wz]); if (ball.trail.length > 7) ball.trail.pop(); ball.wx = lerp(red.wx, ec[0], k); ball.wy = lerp(red.wy, ec[1], k); ball.wz = red.def.h + 8 + Math.sin(k * Math.PI) * 52 - k * 20;
+    sh.draw = () => { const c = project(ball.wx, ball.wy, 0); if (c) shadow(c[0], c[1], Math.round((6 + (1 - Math.sin(k * Math.PI)) * 14) * c[2])); };
+    for (let j = 0; j < 2; j++) B.particles.push({ wx: ball.wx + R(-4, 4), wy: ball.wy + R(-2, 2), wz: ball.wz + R(-4, 4), vx: R(-.4, .4), vy: 0, vz: R(-.4, .8), g: -.01, col: j ? OR : YE, t: 0, life: 16, size: 2 }); yield; }
+  bf.dur = 0; sh.dur = 0; pf.dur = 0; st.hold = 0;
+  // 5) impacto: fotograma de todos, estallido dentado, onda de fuego por el suelo y ascuas hasta la cámara
+  Audio.sfx('fwoom'); Audio.sfx('impact_sub', { vol: .9 }); Audio.sfx('crackle', { when: .2 }); B.flash = { col: '#fff3c0', a: .7 }; B.shake = 9; B.hitstop = 8; B.slowmo = 14;
+  impactFrame(targets, OR, 1.4); { const c = PJ([ec[0], ec[1], 8]); emberStorm(c[0], c[1], 30, 4); }
+  burst(ec[0], ec[1], 6, YE, 24, 3, 30, .1); burst(ec[0], ec[1], 6, OR, 24, 2.2, 36, .06);
+  const blast = fx(22, () => { const c = PJ([ec[0], ec[1], 6]), q = blast.t / 22, e = 1 - (1 - q) ** 3; g.globalAlpha = q > .45 ? (1 - q) / .55 : 1; drawBlast(c[0], c[1], (6 + e * 46) * c[2], q, blast.t); g.globalAlpha = 1; });
+  const ring = fx(34, () => { const c = PJ([ec[0], ec[1], 0]), q = ring.t / 34; g.globalAlpha = 1 - q; g.strokeStyle = C('rojo'); g.lineWidth = 5 * (1 - q * .5); g.beginPath(); g.ellipse(c[0], c[1], (8 + q * 140) * c[2], (3 + q * 54) * c[2], 0, 0, 6.29); g.stroke(); g.strokeStyle = OR; g.lineWidth = 3; g.beginPath(); g.ellipse(c[0], c[1], (6 + q * 128) * c[2], (2 + q * 49) * c[2], 0, 0, 6.29); g.stroke(); g.strokeStyle = YE; g.lineWidth = 1; g.beginPath(); g.ellipse(c[0], c[1], (4 + q * 116) * c[2], (2 + q * 44) * c[2], 0, 0, 6.29); g.stroke(); g.globalAlpha = 1; }, true);
+  const heat = overlay(80, OR, .12, 6, 34); smokeColumn(ec[0], ec[1], 10, 14, 70, 26, 1);
+  mark({ kind: 'pool', p: [ec[0], ec[1] + 2, 0], w: 30, col: '#3a2a22', grow: 8, life: 280, under: true });
+  // 6) la onda enciende a cada enemigo por orden de distancia: fuego detrás (ancho) y delante (fino), humo y chamuscado
+  const order = [...targets].sort((a, b) => Math.hypot(a.wx - ec[0], a.wy - ec[1]) - Math.hypot(b.wx - ec[0], b.wy - ec[1]));
+  const pillars = order.map((t, j) => ({ t, seed: j * 3 + 1, k: 0, at: 4 + j * 5, lit: false }));
+  const fireOf = (p, front) => { const c = PJ([p.t.wx, p.t.wy, 0]), s = c[2] * (p.t.boss ? 1.35 : 1.6), w = p.t.def.w * (front ? .38 : .7) * s * p.k, h = p.t.def.h * (front ? 1.2 : 2.3) * s * p.k; drawFire(c[0] + (front ? 2 : 0), c[1] + (front ? 3 : 1), w, h, pilB.t + p.seed * 5, p.seed + (front ? 20 : 0), front ? .8 : 1); };
+  const pilB = fx(999, () => { for (const p of pillars) if (p.k > 0) fireOf(p, false); }, true), pilF = fx(999, () => { for (const p of pillars) if (p.k > 0) fireOf(p, true); });
+  for (let i = 0; i < 50; i++) {
+    for (const p of pillars) {
+      p.k = clamp((i - p.at) / 8, 0, 1) * (i > 36 ? (50 - i) / 14 : 1);
+      if (!p.lit && i >= p.at) { p.lit = true; p.t.pose = 'hurt'; p.t.poseT = 14; Audio.sfx('fwoom', { vol: .55, pan: -.2 }); burst(p.t.wx, p.t.wy, p.t.def.h * .5, YE, 10, 1.8, 20, .08); smokeColumn(p.t.wx, p.t.wy, p.t.def.h, 6, 40, p.t.def.w * .6, p.seed + 3); mark({ kind: 'blob', p: [p.t.wx, p.t.wy, 0], w: p.t.def.w * .5, col: '#1e1a2c', grow: 6, life: 260, seed: 5 + p.seed, under: true }); mark({ kind: 'pool', p: [p.t.wx, p.t.wy + 2, 0], w: p.t.def.w * .9, col: '#3a2a22', grow: 8, life: 260, under: true }); }
+      if (p.lit && i === p.at + 4) { dmg(p.t); goop(p.t, OR, 90); }
+      if (p.lit && p.k > .3 && i % 2 === 0) flames(p.t.wx, p.t.wy, 1, p.t.def.w * .35);
+    }
+    if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-50, 50), ec[1] + R(-20, 20), 0], w: R(4, 9), col: i % 10 ? '#5a2a2a' : OR, grow: 4, life: 200, under: true });
+    yield;
+  }
+  pilB.dur = 0; pilF.dur = 0;
+  // 7) rescoldos: ascuas que flotan y los dos vuelven a su sitio
+  for (let i = 0; i < 16; i++) { B.particles.push({ wx: ec[0] + R(-60, 60), wy: ec[1] + R(-24, 24), wz: R(0, 10), vx: R(-.2, .2), vy: 0, vz: R(.3, .8), g: -.01, col: i & 1 ? OR : YE, t: 0, life: 40, size: 1 }); yield; }
+  yield* whop(yel, yel.hx, yel.hy, 10, 8); yield* wait(6); users.forEach(u => { u.pose = 'idle'; u.wx = u.hx; u.wy = u.hy; }); camReset();
 }
 function* techBrote(users, targets, tech, col) { // Ámbar alza un sol, Añil vierte agua: nace una semilla, brota un tallo con hojas, los zarcillos trepan y estrujan a los enemigos, florecen y el polen cura al grupo
   const yel = users.find(u => u.id === 'ambar') || users[0], blu = users.find(u => u.id === 'anil') || users[1] || users[0], ec = enemyC(), GR = C('verde');
