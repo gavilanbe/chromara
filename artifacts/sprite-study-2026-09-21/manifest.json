@@ -1,0 +1,115 @@
+{
+  "title": "Chromara — prueba visual de sprites sin equipamiento",
+  "date": "2026-09-21",
+  "generator": "imagegen integrado",
+  "status": "conceptual visual study; not integrated into game",
+  "sheetGrid": {
+    "columns": 4,
+    "rows": 4
+  },
+  "totalPoses": 96,
+  "overworldRows": [
+    [
+      "Reposo",
+      "Frente / sur",
+      "Perfil izquierdo / oeste",
+      "Perfil derecho / este",
+      "Espalda / norte"
+    ],
+    [
+      "Movimiento: contacto",
+      "Frente",
+      "Perfil izquierdo",
+      "Perfil derecho",
+      "Espalda"
+    ],
+    [
+      "Movimiento: salto",
+      "Frente",
+      "Perfil izquierdo",
+      "Perfil derecho",
+      "Espalda"
+    ],
+    [
+      "Reacciones",
+      "Parpadeo",
+      "Sobresalto",
+      "Golpe / aplastamiento",
+      "KO"
+    ]
+  ],
+  "battleRows": [
+    [
+      "Vistas en reposo",
+      "Frente",
+      "Perfil izquierdo",
+      "Perfil derecho",
+      "Espalda a tres cuartos"
+    ],
+    [
+      "Acción",
+      "Parpadeo frontal",
+      "Carga / anticipación",
+      "Ataque sin arma",
+      "Aterrizaje / recuperación"
+    ],
+    [
+      "Movimiento y defensa",
+      "Salto frontal",
+      "Salto de perfil",
+      "Salto de espalda",
+      "Guardia"
+    ],
+    [
+      "Expresiones",
+      "Daño / retroceso",
+      "Cansancio / poca vida",
+      "KO",
+      "Victoria"
+    ]
+  ],
+  "files": [
+    {
+      "character": "carmin",
+      "mode": "overworld",
+      "file": "carmin-overworld.png",
+      "source": "/Users/gavilanbe/.codex/generated_images/01a085b2-b3a9-7412-a4d5-e08a2e492a26/exec-e676a1f2-6b46-4632-be13-6c94ad698066.png",
+      "frames": 16
+    },
+    {
+      "character": "carmin",
+      "mode": "battle",
+      "file": "carmin-battle.png",
+      "source": "/Users/gavilanbe/.codex/generated_images/01a085b2-b3a9-7412-a4d5-e08a2e492a26/exec-1e1db419-01db-4965-8bb8-e537da345a2e.png",
+      "frames": 16
+    },
+    {
+      "character": "ambar",
+      "mode": "overworld",
+      "file": "ambar-overworld.png",
+      "source": "/Users/gavilanbe/.codex/generated_images/01a085b2-b3a9-7412-a4d5-e08a2e492a26/exec-0068a8b3-99d9-47e9-b826-303c967181ac.png",
+      "frames": 16
+    },
+    {
+      "character": "ambar",
+      "mode": "battle",
+      "file": "ambar-battle.png",
+      "source": "/Users/gavilanbe/.codex/generated_images/01a085b2-b3a9-7412-a4d5-e08a2e492a26/exec-77eb827c-4d8a-4765-a87c-c387dd3097b4.png",
+      "frames": 16
+    },
+    {
+      "character": "anil",
+      "mode": "overworld",
+      "file": "anil-overworld.png",
+      "source": "/Users/gavilanbe/.codex/generated_images/01a085b2-b3a9-7412-a4d5-e08a2e492a26/exec-c84bd948-1f88-41e0-8570-e20a528273d4.png",
+      "frames": 16
+    },
+    {
+      "character": "anil",
+      "mode": "battle",
+      "file": "anil-battle.png",
+      "source": "/Users/gavilanbe/.codex/generated_images/01a085b2-b3a9-7412-a4d5-e08a2e492a26/exec-5af5d042-fcb6-4ecf-9d19-0552243a79d8.png",
+      "frames": 16
+    }
+  ]
+}

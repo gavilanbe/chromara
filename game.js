@@ -513,15 +513,19 @@ const DIRVIEW = { up: 'back', down: 'front', left: 'side', right: 'side' };
 function mapDrop(p, x, y, dir, bob, moving, t, idx) {
   const sc = OW.scare, sk = sc ? clamp(sc.k - idx * .12, 0, 1) : 0; // sobresalto durante la transición (el líder primero, los demás en cadena)
   const col = C(p.color), dead = p.cur.hp <= 0, view = dead ? 'front' : sk > 0 ? 'front' : DIRVIEW[dir] || 'back';
-  const blink = !moving && ((t + idx * 53) % 170) < 6, spr = desatSprite(buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : sk > 0 ? 'wide' : blink ? 'blink' : 'normal' }), pigmentFade(p.cur.mp, effStats(p).mp));
+  const blink = !moving && ((t + idx * 53) % 170) < 6;
+  const hopFrame = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0;
+  const atlasState = dead ? 'ko' : sk > 0 ? (sc.stage === 'detect' ? 'wide' : 'hurt') : blink ? 'blink' : moving ? (hopFrame < .2 ? 'contact' : hopFrame > .65 ? 'hop' : 'idle') : 'idle';
+  const atlas = typeof SpriteAtlas !== 'undefined' && SpriteAtlas.mapFrame(p.id, dir, atlasState);
+  const spr = desatSprite(atlas || buildSprite(`${p.id}_${view}_mini`, col, null, { eyes: dead ? 'ko' : sk > 0 ? 'wide' : blink ? 'blink' : 'normal' }), pigmentFade(p.cur.mp, effStats(p).mp));
   const lz = OW.landZ ? OW.landZ[idx] || 0 : 0;
   const hop = moving ? Math.abs(Math.sin(bob * Math.PI)) : 0, wz = hop * 3 + lz; let sq = moving ? (hop < .15 ? [1.1, .9] : hop > .85 ? [.94, 1.06] : [1, 1]) : (((t / 14 | 0) + idx) % 4 === 1 ? [1.03, .97] : [1, 1]);
   // reacción: en 'detect' se giran hacia la sombra con los ojos como platos y tiemblan; en 'fall' se van encogiendo; en el salpicón quedan aplastados
   if (sk > 0 && !dead) { if (sc.stage === 'detect') { if (sk > .4) x += ((Game.t >> 1) & 1) ? 1 : -1; sq = [1 + sk * .08, 1 - sk * .08]; } else if (sc.stage === 'fall') sq = [1.06 + sk * .18, .94 - sk * .18]; else sq = [1.3, .6]; }
   shadow(x, y, Math.max(2, Math.round((p.w * .42) * (1 - hop * .3) * (1 - lz / 160))));
-  if (dead) { drawSprite(spr, x, y, 1, false, .45); return; }
-  drawSprite(spr, x, Math.round(y - wz), lz > 0 ? .9 : sq[0], dir === 'right', lz > 0 ? 1.15 : sq[1]);
-  if (p.id === 'anil') drawSatellites(x, y - wz, t + idx * 10, col, .4);
+  if (dead) { drawSprite(spr, x, y, 1, false, atlas ? 1 : .45); return; }
+  drawSprite(spr, x, Math.round(y - wz), lz > 0 ? .9 : atlas ? 1 : sq[0], !atlas && dir === 'right', lz > 0 ? 1.15 : atlas ? 1 : sq[1]);
+  if (p.id === 'anil' && !atlas) drawSatellites(x, y - wz, t + idx * 10, col, .4);
 }
 function drawOverworld() {
   const nud = OW.camNudge || [0, 0], shk = OW.shake > 0 ? [R(-OW.shake, OW.shake) | 0, R(-OW.shake, OW.shake) / 2 | 0] : [0, 0]; if (OW.shake > 0 && OW.t % 2 === 0) OW.shake--;

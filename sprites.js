@@ -631,6 +631,8 @@ function drawEyesMini(x, def, mode, kind, rp) {
 }
 // Construye un sprite: rampa del color + paleta fija. core = color del núcleo (enemigos), dark = cuerpo de tinta
 function buildSprite(name, color, core, opt = {}) {
+  const atlas = typeof SpriteAtlas !== 'undefined' && SpriteAtlas.staticSprite(name, opt.eyes || 'normal');
+  if (atlas) return atlas;
   const key = `spr|${name}|${color}|${core || ''}|${opt.eyes || 'normal'}`;
   return cached(key, () => {
     const def = SPRITES[name], rp = ramp(color), rows = def.rows, h = rows.length, w = Math.max(...rows.map(r => r.length));
@@ -674,6 +676,8 @@ function unitSpriteInfo(u, frame) {
     const dot=Math.cos(SCENE.cam.yaw)*B.axis.dx+Math.sin(SCENE.cam.yaw)*B.axis.dy;
     view=dot<-.3?'front':Math.abs(dot)<.3?'side':'back';
   }
+  const atlas=typeof SpriteAtlas!=='undefined'&&SpriteAtlas.battle(u,frame,view);
+  if(atlas)return atlas;
   const name=party?`${u.id}_${view}`:u.data.phaseSprites?.[(u.bossPhase||1)-1]||u.id;
   const blink = pose === 'idle' && ((B.t + u.idx * 37) % 160) < 6;
   const spr = buildSprite(name, party ? C(u.color) : C('negro'), party ? null : u.def.core, { eyes: blink ? 'blink' : (party ? EYES[pose] : (pose === 'hurt' ? 'hurt' : pose === 'ko' ? 'ko' : 'normal')) });

@@ -666,7 +666,7 @@ function drawUnit(u) {
     g.save(); g.globalAlpha *= pulse; for (const [ox, oy] of [[-reach, 0], [reach, 0], [0, -reach], [0, reach]]) drawSprite(glow, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore();
   }
   drawSprite(spr, u.x, u.y - bob, SX, flip, SY);
-  if (u.id === 'anil' && u.alive) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
+  if (u.id === 'anil' && u.alive && !info.atlas) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
   g.restore();
   if (clip) g.restore();
