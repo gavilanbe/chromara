@@ -581,7 +581,7 @@ function drawOverworld() {
   }
   ents.sort((a, b) => a.y - b.y).forEach(e => e.draw());
   drawWorldAtmosphere(cx, cy, pal);
-  drawRinseSpray(cx, cy);
+  drawRinseSpray(cx, cy); drawRinseBursts(cx, cy);
   drawFieldEffects(cx, cy);
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }
   if (OW.fx) OW.fx();

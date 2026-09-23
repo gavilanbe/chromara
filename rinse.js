@@ -4,7 +4,7 @@ const RINSE = { w: 52, h: 68, ox: -10, oy: -30, surface: 32, floor: 63 };
 function rinseState() {
   return { phase: 'idle', clock: 0, visits: 0, bubbles: [], tint: [], hidden: [false,false,false],
     inside: [0,0,0], jump: [null,null,null], pos: [], squash: [0,0,0], clean: [false,false,false],
-    wob: 0, glow: 0, charge: 0, clarity: 0, zoom: 1, focus: 0, cd: 0, rings: [], spray: [], drops: [], toast: 0 };
+    wob: 0, glow: 0, charge: 0, clarity: 0, zoom: 1, focus: 0, cd: 0, rings: [], spray: [], drops: [], toast: 0, gain: [null,null,null], bursts: [] };
 }
 function rinseOval(x, col, cx, cy, rx, ry) {
   cx=Math.round(cx);cy=Math.round(cy);rx=Math.max(1,Math.round(rx));ry=Math.max(1,Math.round(ry));
@@ -82,6 +82,7 @@ function rinseTick() {
   for(const d of J.spray){d.x+=d.vx;d.y+=d.vy;d.vy+=.11;d.t++;if(d.y>=floor){if(J.drops.length<36)J.drops.push({x:d.x,y:floor+1,col:d.col,t:0});d.t=d.life;}}
   J.spray=J.spray.filter(d=>d.t<d.life);
   for(const d of J.drops)d.t++;J.drops=J.drops.filter(d=>d.t<180);
+  for(const b of J.bursts||[])b.t++;J.bursts=(J.bursts||[]).filter(b=>b.t<40);
 }
 function rinseSplash(i,power=1) {
   const J=OW.jar,cx=MAP.jar.x*TILE+16,sy=MAP.jar.y*TILE+RINSE.oy+RINSE.surface;
@@ -122,15 +123,46 @@ function drawRinseParty(i,cx,cy) {
 function drawRinseSpray(cx,cy) {
   for(const d of OW.jar.spray){g.fillStyle=d.col;const x=Math.round(d.x-cx),y=Math.round(d.y-cy);g.fillRect(x,y,d.r,d.r+Number(d.vy>1));if(d.r>1){g.fillStyle='#fff9df';g.fillRect(x,y,1,1);}}
 }
+// Al salir del agua, cada gota estalla en su color: un anillo, estrellitas y manchas que quedan en el paño.
+function rinseBurst(i,to){const J=OW.jar,col=C(Party[i].color);J.bursts.push({x:to[0],y:to[1]-8,col,t:0});for(let n=0;n<6;n++){const a=n/6*6.283+i;J.drops.push({x:to[0]+Math.cos(a)*(8+n%3*3),y:to[1]+Math.sin(a)*3,col,t:0});}if(Prefs.flash)J.glow=1;}
+function drawRinseBursts(cx,cy){const J=OW.jar;if(!J)return;for(const b of J.bursts||[]){const q=b.t/40,x=b.x-cx,y=b.y-cy;paintRing(x,y,q,b.col,26);if(Prefs.shake)for(let n=0;n<8;n++){const a=n/8*6.283+b.t*.05,d=6+q*20;g.globalAlpha=1-q;g.fillStyle=n%2?b.col:'#fff8e6';const sx=Math.round(x+Math.cos(a)*d),sy=Math.round(y+Math.sin(a)*d*.7-q*6);g.fillRect(sx-1,sy,3,1);g.fillRect(sx,sy-1,1,3);}g.globalAlpha=1;}}
+// Mientras se aclaran, el mundo se apaga alrededor del vaso y del agua salen rayos de luz tramados.
+function drawRinseSpotlight(){
+  const J=OW.jar;if(!J||!OW.heal||!MAP.jar)return;const k=J.focus||0;if(k<=0)return;
+  const z=J.zoom||1,jx=(MAP.jar.x*TILE+16-OW.cam.x-W/2)*z+W/2,jy=(MAP.jar.y*TILE+10-OW.cam.y-H/2)*z+H/2,r=62*z;
+  const c=cached('rinse-spot',()=>{const c=document.createElement('canvas');c.width=W;c.height=H;return c;}),x=c.getContext('2d');
+  x.clearRect(0,0,W,H);x.fillStyle='rgba(22,16,32,'+(.5*k).toFixed(2)+')';x.fillRect(0,0,W,H);x.globalCompositeOperation='destination-out';
+  for(let i=0;i<4;i++){x.globalAlpha=.35+i*.2;x.beginPath();x.ellipse(jx,jy,r*(1.3-i*.12),r*(1.1-i*.1),0,0,6.283);x.fill();}
+  x.globalCompositeOperation='source-over';x.globalAlpha=1;g.drawImage(c,0,0);
+  if(Prefs.flash&&(J.phase==='clear'||J.phase==='exit')){const a=(J.phase==='clear'?J.clarity:1)*Prefs.flash;g.save();g.globalAlpha=.22*a;
+    for(let i=0;i<7;i++){const ang=-Math.PI/2+(i-3)*.28+Math.sin(J.clock*.02+i)*.04,len=(70+i%3*16)*z;g.fillStyle=i%2?'#fff3c0':'#e8f6f2';g.beginPath();g.moveTo(jx,jy-10*z);g.lineTo(jx+Math.cos(ang-.05)*len,jy+Math.sin(ang-.05)*len);g.lineTo(jx+Math.cos(ang+.05)*len,jy+Math.sin(ang+.05)*len);g.fill();}g.restore();}
+}
+// La ficha de la cura: las tres gotas con su pintura (HP) y su pigmento (MP); al salir del agua, cada una se rellena
+// con un chorro que corre de izquierda a derecha y los números cuentan hasta el máximo.
 function drawRinseUI() {
   const J=OW.jar;if(!J)return;
   if(OW.heal){
+    drawRinseSpotlight();
     const labels={focus:'Un respiro junto al agua',enter:'Al agua, gota a gota',mix:'Tres colores en un remolino',clear:'El agua devuelve el color',exit:'Como recién pintados',settle:'Listos para seguir'};
-    const label=labels[J.phase]||labels.focus,w=textWidth(label)+18,at=artObserve('rinse-phase',J.phase);
-    maskingLabel(Math.round((W-w)/2),H-29,w,15);textCenter(label,W/2,H-25);
-    Party.forEach((p,i)=>{const clean=J.clean[i],col=J.inside[i]||clean?C(p.color):'#a89c88';paintDab(148+i*12,H-7,3,col,clean?artPop(at):0);});
+    const label=labels[J.phase]||labels.focus,at=artObserve('rinse-phase',J.phase),w=rotuloWidth(label.toUpperCase())+26,k=clamp((J.focus||0)*1.4,0,1);
+    g.save();g.translate(0,Math.round((1-k)*-30));brushBand(Math.round((W-w)/2),4,w,17,KIT_INK);bigText(label,Math.round((W-w)/2)+13,8,'#b8e0f0',{outline:'#0b0912',progress:Prefs.shake?(ARTUI.t-at)*1.4:null});g.restore();
+    g.save();g.translate(0,Math.round((1-k)*50));
+    Party.forEach((p,i)=>{
+      const x=8+i*104,y=150,s=effStats(p),gn=J.gain[i],q=gn?clamp((J.clock-gn.at)/34,0,1):0,e=1-(1-q)**3,hp=gn?lerp(gn.hp0,gn.hp,e):p.cur.hp,mp=gn?lerp(gn.mp0,gn.mp,e):p.cur.mp,col=C(p.color),inside=J.inside[i],clean=J.clean[i];
+      maskingLabel(x,y,96,26,clean?'#fff3d2':'#e8dcc4');
+      const bob=inside&&Prefs.shake?Math.round(Math.sin(J.clock*.2+i)*1.5):0;
+      sticker(x+11,y+12+bob,{...p,alive:p.cur.hp>0,hp:p.cur.hp,maxhp:s.hp,mp:p.cur.mp,maxmp:s.mp},8);
+      if(inside){g.fillStyle='#8ec8e8';g.globalAlpha=.5;g.beginPath();g.ellipse(x+11,y+14,10,5,0,0,6.29);g.fill();g.globalAlpha=1;} // en el agua
+      smallText(p.name,x+23,y+2,UI_INK);
+      g.fillStyle='#cfc1a9';g.fillRect(x+23,y+12,62,3);g.fillStyle=col;g.fillRect(x+23,y+12,Math.round(62*hp/s.hp),3);g.fillStyle=ramp(col).hi;g.fillRect(x+23,y+12,Math.round(62*hp/s.hp),1);
+      g.fillStyle='#cfc1a9';g.fillRect(x+23,y+18,62,2);g.fillStyle='#6fa6d8';g.fillRect(x+23,y+18,Math.round(62*mp/s.mp),2);
+      if(gn&&q<1&&Prefs.shake){const fx=x+23+Math.round(62*hp/s.hp);g.fillStyle='#fff8e6';g.fillRect(fx-1,y+11,2,5);} // la punta del chorro
+      textRight(Math.round(hp),x+93,y+2,clean?'#34733e':UI_MUTED);
+      if(gn&&J.clock-gn.at<70&&(gn.dh||gn.dm)){const r=(J.clock-gn.at)/70;g.save();g.globalAlpha=1-r*r;const t2='+'+gn.dh;smallText(t2,x+60-textWidth(t2),y-9-Math.round(r*6),'#34733e');g.restore();}
+    });
+    g.restore();
   }else if(J.toast>0&&!OW.msg&&!OW.menu&&!OW.ring){
-    const label='HP y MP al máximo',w=textWidth(label)+34,age=150-J.toast;
+    const label='Como recién pintados: HP y MP al máximo',w=textWidth(label)+34,age=150-J.toast;
     g.save();g.globalAlpha=Math.min(1,J.toast/20);g.translate(0,Math.round((1-(Prefs.shake?easeBack(clamp(age/14,0,1)):1))*26));maskingLabel((W-w)/2,H-24,w,17);
     g.drawImage(iconSprite('item',C('azul')),(W-w)/2+5,H-22);smallText(label,(W-w)/2+24,H-19,UI_INK,{progress:Prefs.shake?age*1.4:Infinity,wet:C('azul')});g.restore();
   }
@@ -139,14 +171,14 @@ function rinseFocus(k,start) {
   const J=OW.jar;J.focus=k;
   if(Prefs.camera==='fija'){J.zoom=1;return;}
   const eased=k*k*(3-2*k),jx=MAP.jar.x*TILE+16,jy=MAP.jar.y*TILE+5;
-  J.zoom=1+eased*(Prefs.camera==='cinema'?.4:.24);
+  J.zoom=1+eased*(Prefs.camera==='cinema'?.7:.5);
   OW.cam.x=lerp(start.x,clamp(jx-W/2,0,MAP.w*TILE-W),eased);
-  OW.cam.y=lerp(start.y,clamp(jy-H*.43,0,MAP.h*TILE-H),eased);
+  OW.cam.y=lerp(start.y,clamp(jy-H*.38,0,MAP.h*TILE-H),eased);
 }
 function* rinseSequence() {
   const J=OW.jar,cam={...OW.cam},hist=OW.hist.map(h=>[...h]),cx=MAP.jar.x*TILE+16,sy=MAP.jar.y*TILE+RINSE.oy+RINSE.surface;
   const repeat=J.visits>0,focusFrames=repeat?12:24,entryFrames=repeat?23:30,mixFrames=repeat?40:78;
-  J.phase='focus';J.tint=[];J.inside=[0,0,0];J.hidden=[false,false,false];J.clean=[false,false,false];J.charge=0;J.clarity=0;J.toast=0;
+  J.phase='focus';J.gain=[null,null,null];J.bursts=[];J.tint=[];J.inside=[0,0,0];J.hidden=[false,false,false];J.clean=[false,false,false];J.charge=0;J.clarity=0;J.toast=0;
   Audio.sfx('glass',{vol:.4});
   try {
     for(let n=1;n<=focusFrames;n++){rinseFocus(n/focusFrames,cam);yield;}
@@ -174,13 +206,12 @@ function* rinseSequence() {
         const q=n/24;J.jump[i]=[lerp(cx+(i-1)*4,to[0],q),lerp(sy+6,to[1],q),Math.sin(q*Math.PI)*(30+i*3),Math.sin(q*Math.PI*2)*(1-i)*.12,.93,1.08];yield;
       }
       J.jump[i]=null;Audio.sfx('plop',{semi:[0,4,7][i],vol:.28});Audio.sfx('tinkle',{semi:[0,4,7][i],vol:.35});
-      if(dh>0)OW.floats.push({x:to[0],y:to[1]-20,s:'+'+dh+' HP',col:'#3f845d',t:0});
-      if(dm>0)OW.floats.push({x:to[0],y:to[1]-10,s:'+'+dm+' MP',col:C('azul'),t:-10});
+      J.gain[i]={hp0:s.hp-dh,mp0:s.mp-dm,hp:s.hp,mp:s.mp,dh,dm,at:J.clock};rinseBurst(i,to);
       for(let n=0;n<8;n++){J.squash[i]=Math.sin((n+1)/8*Math.PI)*.65;yield;}J.squash[i]=0;
     }
     J.phase='settle';
     for(let n=0;n<24;n++){rinseFocus(1-(n+1)/24,cam);J.clarity=1;yield;}
-    J.visits++;J.toast=150;
+    J.visits++;J.toast=150;J.gain=[null,null,null];
   } finally {
     J.phase='idle';J.zoom=1;J.focus=0;J.glow=0;J.charge=0;J.clarity=0;J.inside=[0,0,0];J.hidden=[false,false,false];J.jump=[null,null,null];J.squash=[0,0,0];J.tint=[];J.cd=1;
     OW.hist=hist;OW.cam.x=cam.x;OW.cam.y=cam.y;OW.vx=OW.vy=0;OW.moving=false;
