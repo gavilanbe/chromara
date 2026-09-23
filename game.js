@@ -32,7 +32,7 @@ const keys = {}, pressed = {};
 const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right', z: 'ok', Enter: 'ok', ' ': 'ok', x: 'back', Escape: 'back', Tab: 'swap', c: 'ring', F1: 'debug' };
 addEventListener('keydown', e => {
   if (typeof chapterTitleButton !== 'undefined' && e.target === chapterTitleButton && ['Enter',' '].includes(e.key)) return;
-  if (e.key === 'Tab' && (Game.state === 'cover' || Game.state === 'title')) return;
+  if (e.key === 'Tab' && (Game.state === 'cover' || Game.state === 'prologue' || Game.state === 'title')) return;
   if (captureBinding(e)) return;
   const k = actionForKey(e.key);
   if (!k) return;
@@ -383,7 +383,7 @@ const Party = DATA.party.map(p => { const s = effStats(p); return { ...p, cur: {
 function setState(s) {
   Game.state = s; Game.t = 0;
   if (typeof chapterTitleButton !== 'undefined' && chapterTitleButton && s !== 'title') chapterTitleButton.style.display = 'none';
-  document.getElementById('hint').hidden = s === 'cover' || s === 'title';
+  document.getElementById('hint').hidden = s === 'cover' || s === 'prologue' || s === 'title';
   if (s !== 'title') titleStartButton.style.display = 'none';
 }
 
@@ -811,7 +811,7 @@ function drawLogo(t, x0, y0) {
 const COVER = { t: 0, open: 0 };
 function updateCover() {
   COVER.t++; COVER.dust = COVER.dust || []; for (const d of COVER.dust) { d.x += d.vx; d.y += d.vy; d.vy += .1; d.t++; } COVER.dust = COVER.dust.filter(d => d.t < d.life);
-  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { setState('title'); TITLE.t = 0; TITLE.exit = 0; TITLE.snap = null; COVER.snap = null; Audio.play('title'); } ANYKEY = false; return; }
+  if (COVER.open) { if (COVER.t - COVER.open === 1) Audio.sfx('book_open'); if (COVER.t - COVER.open >= 40) { COVER.snap = null; Audio.play('title'); startPrologue(); } ANYKEY = false; return; }
   const t = Math.floor(COVER.t * 1.35), prev = Math.floor((COVER.t - 1) * 1.35), done = t >= 175;
   if (t > 20 && t <= 110 && (t - 20) % 10 === 1) Audio.sfx('scratch', { vol: .35, semi: RI(-2, 4) }); // el lápiz escribe
   if (t >= 112 && prev < 112) Audio.sfx('scratch_long', { vol: .5 }); if (t >= 126 && prev < 126) Audio.sfx('fwip', { vol: .6 }); // subrayado y floritura
@@ -957,7 +957,7 @@ function drawCover() {
   const t = COVER.t;
   if (!COVER.open) { drawCoverArt(t * 1.35); return; }
   if (!COVER.snap) { COVER.snap = document.createElement('canvas'); COVER.snap.width = W; COVER.snap.height = H; COVER.snap.getContext('2d').drawImage(buf, 0, 0); }
-  TITLE.t = 0; drawTitle(); TITLE.t = 0; // debajo, la primera página del título
+  const pt = PRO.t; PRO.t = 0; drawPrologue(); PRO.t = pt; // debajo, el primer plano de la cinemática
   const k = clamp((t - COVER.open) / 38, 0, 1); pageCurl(COVER.snap, k * k * (3 - 2 * k), '#b8905e', '#a57f50');
 }
 // Pencil outlines and translucent washes share the same silhouette: colour really
@@ -1334,6 +1334,7 @@ function update() {
   Game.t++;
   switch (Game.state) {
     case 'cover': updateCover(); break;
+    case 'prologue': updatePrologue(); break;
     case 'title': updateTitle(); break;
     case 'overworld': updateOverworld(); break;
     case 'pageTurn': chapterTick(); break;
@@ -1353,6 +1354,7 @@ function render() {
   if (Game.overlay?.snap) g.drawImage(Game.overlay.snap, 0, 0);
   else switch (Game.state) {
     case 'cover': drawCover(); break;
+    case 'prologue': drawPrologue(); break;
     case 'title': drawTitle(); break;
     case 'overworld': drawOverworld(); break;
     case 'pageTurn': chapterDrawTurn(); break;
@@ -1375,7 +1377,7 @@ window.__chromara = {
   atb() { if (B.party) B.party.forEach(u => u.atb = 100); },
   kill() { if (B.enemies) B.enemies.forEach(u => u.alive && (u.hp = 1)); },
   win() { if (B.enemies) B.enemies.forEach(u => u.alive && kill(u)); checkEnd(); },
-  start() { if (Game.state === 'title' || Game.state === 'cover') { initOverworld(); setState('overworld'); Audio.play(worldCue()); } },
+  start() { if (Game.state === 'title' || Game.state === 'cover' || Game.state === 'prologue') { initOverworld(); setState('overworld'); Audio.play(worldCue()); } },
   title(t) { setState('title'); TITLE.t = t; },
   pause(v = !Game.paused) { Game.paused = v; },
   colorize() { Game.palette = Game.palette === 'gris' ? 'vivo' : 'gris'; },

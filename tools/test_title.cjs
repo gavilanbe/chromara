@@ -20,8 +20,18 @@ const base = process.argv[2] || 'http://127.0.0.1:8765';
       Audio.play = () => {}; Audio.prepare = () => {};
       for (let i = 0; i < 180 && Game.state === 'cover'; i++) { updateCover(); drawCover(); }
     });
-    assert.equal(await page.evaluate(() => Game.state), 'title');
-    console.log('PASS the cover opens automatically into the painted title');
+    assert.equal(await page.evaluate(() => Game.state), 'prologue');
+    const prologue = await page.evaluate(() => {
+      // The cinematic plays to the end on its own, renders deterministically and never touches gameplay RNG.
+      const random = Math.random; Math.random = () => { throw new Error('Prologue rendering consumed gameplay RNG'); };
+      try { for (let i = 0; i < 700 && Game.state === 'prologue'; i++) { drawPrologue(); updatePrologue(); } } finally { Math.random = random; }
+      const played = Game.state;
+      // Any key skips it once the first beat has been seen.
+      startPrologue(); for (let i = 0; i < 20; i++) updatePrologue(); ANYKEY = true; updatePrologue();
+      return { played, skipped: Game.state, t: TITLE.t };
+    });
+    assert.deepEqual(prologue, { played: 'title', skipped: 'title', t: 8 });
+    console.log('PASS the cover opens into the prologue, which plays or skips into the painted title');
 
     const render = await page.evaluate(() => {
       titleSounds.length = 0;
