@@ -763,9 +763,14 @@ function drawLogo(t, x0, y0) {
     // The stroke lands with a quick compression, then one damped elastic recoil.
     const recoil = age >= 0 ? Math.sin(age * .43) * Math.exp(-age / 8) * motion : 0;
     const sy = 1 - recoil * .2, wob = recoil * 1.5;
-    const spr = logoPaint(ch,col,k);
-    g.save(); g.globalAlpha = .14; g.drawImage(spr,x+1,y0+2); g.restore();
+    const spr = logoPaint(ch,col,k), raid = titleRaid(t), drain = raid && raid.L === i ? raid.drain : 0;
+    if (drain > 0) { g.save(); g.globalAlpha = .7 * drain; g.drawImage(logoGraphite(ch),x,y0); g.restore(); }
+    g.save(); g.globalAlpha *= 1 - drain;
+    g.save(); g.globalAlpha *= .14; g.drawImage(spr,x+1,y0+2); g.restore();
     drawGooey(spr,x,y0,wob,sy,age * .18);
+    g.restore();
+    // Las secundarias nacen de una mezcla: al terminar, dos gotas de los pigmentos se juntan en la letra y florecen en su color.
+    const mixOf = TITLE_PAINTERS[TITLE.cols[i]]; if (mixOf.length > 1 && age >= 0 && age < 22) { const q = clamp(age / 10, 0, 1); if (age < 10) mixOf.forEach((id, n) => paintDab(Math.round(x + 11 + (n ? 1 : -1) * 10 * (1 - q)), Math.round(y0 + 12 - Math.sin(q * Math.PI) * 6), 3, C(TITLE_HOME[id].col))); else paintRing(x + 11, y0 + 12, (age - 10) / 12, col, 16); }
     if (age >= 0) {
       // Tiny dry flecks stay on the page; airborne droplets have a bounded life.
       const rnd = seeded(270 + i * 97);
@@ -806,6 +811,8 @@ function drawLogo(t, x0, y0) {
     const brush = propSprite('brocha',C(TITLE.cols[index]));
     drawProp(brush,bx,by-lift,angle,1,58,10,.57+(lift<.5?.03:0),clamp((finished+16-t)/7,0,1));
   }
+  // Las pintoras: agarradas al pincel mientras pintan, sentadas en su última letra mientras esperan.
+  for (const id of ['carmin','ambar','anil']) { const p = titlePainterAt(id,t); if (!p || p.mode === 'leave') continue; titleDrop(id,x0+p.x,y0+p.y,t,p.flip,1.6,p.mode === 'paint' ? 'angry' : undefined); }
 }
 // ---- Portada breve y automática. Cualquier tecla adelanta su apertura y desbloquea el audio.
 const COVER = { t: 0, open: 0 };
@@ -1002,7 +1009,7 @@ function titlePaper() {
   });
 }
 const TITLE_DROPS = [
-  { at: 99, from: [67, 64], to: [87, 113], col: 'rojo', sound: 0 },
+  { at: 137, from: [67, 64], to: [87, 113], col: 'rojo', sound: 0 },
   { at: 132, from: [177, 64], to: [176, 151], col: 'azul', sound: 7 },
   { at: 165, from: [120, 64], to: [229, 145], col: 'amarillo', sound: 4 },
   { at: 183, from: [177, 64], to: [229, 145], col: 'azul', sound: 7 },
@@ -1092,7 +1099,7 @@ function titleInkPool(x, y, w, t, eyes = false) {
   if (eyes && t % 270 > 9) { g.fillStyle = '#efe4bf'; g.fillRect(x + 1, y - 3, 2, 2); g.fillRect(x + 6, y - 3, 2, 2); }
 }
 function titleLandscape(t) {
-  const red = titleProgress(t, 127), blue = titleProgress(t, 160), gold = titleProgress(t, 193), green = titleProgress(t, 211, 56);
+  const red = titleProgress(t, 165), blue = titleProgress(t, 160), gold = titleProgress(t, 193), green = titleProgress(t, 211, 56);
   // Light abandoned construction lines make the unfinished parts legible.
   titleLine([[30, 143], [44, 124], [58, 129], [73, 113], [103, 117], [130, 130]], '#d3c4a7');
   titleLine([[226, 126], [240, 100], [273, 109], [293, 131]], '#d3c4a7');
@@ -1112,7 +1119,7 @@ function titleLandscape(t) {
   titleInkPool(142,153,17,t);
   for (let i = 0; i < 6; i++) { g.fillStyle = '#b6a789'; g.fillRect(127 + i * 5, 155 + (i % 3), 2, 1); }
   if (red > 0) {
-    const repair = titleProgress(t,153,60), pts = [[114,151],[130,151],[140,148],[153,150],[163,147]];
+    const repair = titleProgress(t,185,60), pts = [[114,151],[130,151],[140,148],[153,150],[163,147]];
     g.save(); g.beginPath(); g.rect(112,141,55 * repair,18); g.clip();
     titleLine(pts,'#994653',7); titleLine(pts,'#df6b62',5); titleLine(pts,'#f39a77',2); g.restore();
   }
@@ -1201,6 +1208,63 @@ function titleDroplets(t) {
     }
   });
 }
+// ---- Las gotas pintan su propio título. Cada letra la pinta la gota de su color; las secundarias, las dos gotas cuyos pigmentos
+// la mezclan. Mientras otra pinta, cada gota espera sentada sobre su última letra; al terminar las suyas baja de un salto al paisaje.
+const TITLE_PAINTERS = { rojo: ['carmin'], amarillo: ['ambar'], azul: ['anil'], naranja: ['carmin', 'ambar'], verde: ['ambar', 'anil'], violeta: ['carmin', 'anil'] };
+const TITLE_HOME = { carmin: { col: 'rojo', home: [120, 158], land: 165 }, ambar: { col: 'amarillo', home: [147, 137], land: 193 }, anil: { col: 'azul', home: [207, 165], land: 160 } };
+const LOGO_X = 46, LOGO_Y = 25, LOGO_S = 1.25, logoToScreen = (x, y) => [LOGO_X + x * LOGO_S, LOGO_Y + y * LOGO_S];
+function titleLetterSpan(i) { const s = LOGO_BEATS.start + i * LOGO_BEATS.step; return [s, s + LOGO_BEATS.stroke]; }
+function titleLettersOf(id) { return TITLE.letters.split('').map((_, i) => i).filter(i => TITLE_PAINTERS[TITLE.cols[i]].includes(id)); }
+function titleBrushTip(i, k) { const tip = logoTip(TITLE.letters[i], k); return [i * 23 + tip.x, tip.y - tip.lift]; }
+// Dónde está una gota en el instante t, en coordenadas del logo; o 'leave' con su progreso hacia el paisaje.
+function titlePainterAt(id, t) {
+  const mine = titleLettersOf(id), side = i => TITLE_PAINTERS[TITLE.cols[i]].indexOf(id) ? -1 : 1, bob = Math.sin(t * .2 + id.length) * 1.2;
+  const atBrush = (i, k) => { const [x, y] = titleBrushTip(i, k); return [x + 11 * side(i), y - 8 + bob]; }, seat = i => [i * 23 + 11 + 3 * side(i), 5];
+  const [s0] = titleLetterSpan(mine[0]); if (t < s0 - 10) return null;
+  const last = mine[mine.length - 1], [, lastEnd] = titleLetterSpan(last), land = TITLE_HOME[id].land;
+  if (t > lastEnd + 8) return t >= land ? null : { mode: 'leave', k: clamp((t - lastEnd - 8) / (land - lastEnd - 8), 0, 1), from: logoToScreen(...seat(last)) };
+  for (let n = 0; n < mine.length; n++) {
+    const i = mine[n], [s, e] = titleLetterSpan(i);
+    if (t >= s - 10 && t < s) { // salta hasta el pincel: desde arriba la primera vez, desde su asiento después
+      const q = (t - (s - 10)) / 10, from = n ? seat(mine[n - 1]) : [atBrush(i, 0)[0], -40], to = atBrush(i, 0);
+      return { mode: 'hop', x: lerp(from[0], to[0], q), y: lerp(from[1], to[1], q) - Math.sin(q * Math.PI) * 10, flip: side(i) > 0, i };
+    }
+    if (t >= s && t <= e) { const p = atBrush(i, (t - s) / LOGO_BEATS.stroke); return { mode: 'paint', x: p[0], y: p[1], flip: side(i) > 0, i }; }
+    if (t > e && t <= e + 8) { const q = (t - e) / 8, from = atBrush(i, 1), to = seat(i); return { mode: 'hop', x: lerp(from[0], to[0], q), y: lerp(from[1], to[1], q) - Math.sin(q * Math.PI) * 8, flip: false, i }; }
+  }
+  const done = mine.filter(i => titleLetterSpan(i)[1] + 8 < t).pop(); if (done === undefined) return null;
+  const [x, y] = seat(done); return { mode: 'sit', x, y: y + (Math.sin(t * .09 + id.length) > .8 ? -1 : 0), flip: false, i: done };
+}
+function titleDrop(id, x, y, t, flip, s = 1, eyes) { drawSprite(buildSprite(id + '_side_mini', C(TITLE_HOME[id].col), null, { eyes: eyes || (((t + id.length * 40) % 220) < 6 ? 'blink' : 'normal') }), Math.round(x), Math.round(y), s, flip); }
+// La Tinta vuelve cada cierto tiempo: repta por la página hasta una letra y se bebe su color; su pintora sube del paisaje,
+// la repinta de un brochazo y la espanta. Es función de t: seguir mirando la portada no cambia nada del juego.
+const TITLE_RAID = { from: 480, every: 900, order: [5, 2, 7, 0, 4, 1, 6, 3] };
+function titleRaid(t) {
+  if (t < TITLE_RAID.from) return null; const n = Math.floor((t - TITLE_RAID.from) / TITLE_RAID.every), p = (t - TITLE_RAID.from) % TITLE_RAID.every; if (p >= 240) return null;
+  const L = TITLE_RAID.order[n % TITLE_RAID.order.length], painter = TITLE_PAINTERS[TITLE.cols[L]][0];
+  const drain = p < 70 ? 0 : p < 110 ? (p - 70) / 40 : p < 150 ? 1 : p < 186 ? 1 - (p - 150) / 36 : 0;
+  return { L, p, painter, drain, away: p >= 110 && p < 232 };
+}
+function titleRaidAway(id, t) { const r = titleRaid(t); return !!r && r.painter === id && r.away; }
+function drawTitleRaid(t) {
+  const r = titleRaid(t); if (!r) return;
+  const { L, p, painter } = r, [lx, ly] = logoToScreen(L * 23 + 11, 2), start = [W + 14, 18];
+  // la tinta: avanza por el borde superior dejando un rastro, se posa sobre la letra y huye cuando llega la brocha
+  const come = clamp(p / 70, 0, 1), flee = clamp((p - 160) / 30, 0, 1), k = come * (1 - flee), hx = lerp(start[0], lx, ease(k)), hy = lerp(start[1], ly - 4, ease(k)) - Math.sin(k * Math.PI) * 6;
+  if (k > 0 && (p < 190)) {
+    const N = 14; for (let i = 1; i <= N; i++) { const a = (i - 1) / N, b = i / N, ax = lerp(start[0], hx, a), ay = lerp(start[1], hy, a) + Math.sin(a * 9 + t * .1) * 2, bx = lerp(start[0], hx, b), by = lerp(start[1], hy, b) + Math.sin(b * 9 + t * .1) * 2; pstroke(ax, ay, bx, by, 1 + b * 2.5, '#0b0912', 1, 0, false); }
+    inkSplat(hx, hy, 5 + (p > 60 && p < 150 ? 3 + Math.sin(t * .2) : 0), 1, t, 13, p > 70);
+    if ((t % 120) > 5) { g.fillStyle = '#efe4bf'; g.fillRect(Math.round(hx - 3), Math.round(hy - 2), 2, 2); g.fillRect(Math.round(hx + 1), Math.round(hy - 2), 2, 2); }
+    // mientras bebe, hilos de color suben de la letra a la tinta
+    if (p > 70 && p < 150) { const col = C(TITLE.cols[L]); for (let j = 0; j < 3; j++) { const q = ((t + j * 7) % 20) / 20; g.fillStyle = col; g.fillRect(Math.round(lerp(lx + (j - 1) * 5, hx, q)), Math.round(lerp(ly + 14, hy, q)), 2, 2); } }
+  }
+  // la pintora sube del paisaje, repinta la letra con su brocha y vuelve
+  const home = TITLE_HOME[painter].home, col = C(TITLE.cols[L]);
+  if (p >= 110 && p < 150) { const q = (p - 110) / 40, x = lerp(home[0], lx + 6, ease(q)), y = lerp(home[1], ly - 4, q) - Math.sin(q * Math.PI) * 34; titleDrop(painter, x, y, t, x > home[0], 1 + q, 'normal'); }
+  else if (p >= 150 && p < 190) { const k2 = (p - 150) / 36, [tx, ty] = titleBrushTip(L, Math.min(1, k2)), [sx, sy] = logoToScreen(tx, ty), P = PROP.brocha;
+    drawProp(propSprite('brocha', col), sx, sy, -2.3, 1, 58, 10, .6); titleDrop(painter, sx + 13, sy - 10 + Math.sin(t * .4), t, false, 2, 'angry'); if (k2 < 1 && Prefs.shake) { g.fillStyle = ramp(col).hi; g.fillRect(Math.round(sx) - 2, Math.round(sy) - 1, 3, 2); } }
+  else if (p >= 190 && p < 232) { const q = (p - 190) / 42, x = lerp(lx + 6, home[0], ease(q)), y = lerp(ly - 4, home[1], q) - Math.sin(q * Math.PI) * 26; titleDrop(painter, x, y, t, x > home[0], 2 - q, 'happy'); }
+}
 function titleResidents(t) {
   // Each protagonist uses their own tool on the world, then settles into a quiet
   // working pose. Their gestures are staggered so they do not compete with the logo.
@@ -1210,9 +1274,9 @@ function titleResidents(t) {
     drawSprite(buildSprite(id + '_side_mini', C(col), null, { eyes: t % 240 < 7 ? 'blink' : 'normal' }), x, y, 1, flip);
     g.restore();
   };
-  const red = titleProgress(t,127,25), blue = titleProgress(t,160,25), gold = titleProgress(t,193,25);
+  const red = titleRaidAway('carmin',t) ? 0 : titleProgress(t,165,3), blue = titleRaidAway('anil',t) ? 0 : titleProgress(t,160,3), gold = titleRaidAway('ambar',t) ? 0 : titleProgress(t,193,3);
   if (red > 0) {
-    const painting = titleProgress(t,153,60), idle = t % 600, working = t < 230 || idle > 480;
+    const painting = titleProgress(t,185,60), idle = t % 600, working = t < 260 || idle > 480;
     const x = 108 + painting * 12, tip = [x + 15, 151 + (working ? Math.sin(t * .1) : 0)];
     actor('carmin','rojo',Math.round(x),158,red);
     g.save(); g.globalAlpha = red;
@@ -1275,6 +1339,9 @@ function updateTitle() {
   }
   for (const d of TITLE_DROPS) if (TITLE.t === d.at + 28) Audio.sfx('plop', { semi: d.sound, vol: .4 });
   if (TITLE.t === 213) Audio.sfx('grow', { vol: .25, semi: 4 });
+  for (const id of ['carmin','ambar','anil']) if (TITLE.t === TITLE_HOME[id].land) Audio.sfx('plop', { semi: SEMI[id], vol: .35 }); // aterrizan en el paisaje
+  const raid = titleRaid(TITLE.t);
+  if (raid) { const p = raid.p; if (p === 0) Audio.sfx('ink_tide', { vol: .35 }); if (p === 80) Audio.sfx('slow_drip', { vol: .35 }); if (p === 110) Audio.sfx('fwip', { semi: SEMI[raid.painter], vol: .4 }); if (p === 150) Audio.sfx('brush_sweep', { vol: .4, semi: SEMI[raid.painter] }); if (p === 166) Audio.sfx('ink_hit', { vol: .3 }); if (p === 186) Audio.sfx('plop', { semi: SEMI[raid.painter] + 5, vol: .35 }); }
   if (hit('ok')) beginTitleGame();
 }
 function drawTitle() {
@@ -1285,15 +1352,21 @@ function drawTitle() {
   // Wet strokes settle into the original letterforms; the page stays still.
   g.save(); g.translate(46, 25); g.scale(1.25, 1.25); drawLogo(t, 0, 0); g.restore();
   titleDroplets(t);
+  // bajan de un salto al paisaje al terminar sus letras
+  for (const id of ['carmin','ambar','anil']) { const p = titlePainterAt(id,t); if (!p || p.mode !== 'leave') continue; const h = TITLE_HOME[id].home, x = lerp(p.from[0],h[0],p.k), y = lerp(p.from[1],h[1],p.k) - Math.sin(p.k * Math.PI) * 30; if (p.k > .1) shadow(Math.round(x),Math.round(lerp(p.from[1],h[1],p.k)) + 1,5); titleDrop(id,x,y,t,h[0] > p.from[0],1 + (1 - p.k),'happy'); }
+  drawTitleRaid(t);
+  // el lema, escrito a plumilla bajo el logo
+  if (t >= 190) { const line = 'El color que la Tinta robó', w = textWidth(line); writtenLines([line], Math.round((W - w) / 2), 64, '#8a7e68', Prefs.shake ? (t - 190) * .6 : Infinity, { nib: !!Prefs.shake }); }
   if (t >= LOGO_BEATS.ready) {
     const k = titleProgress(t, LOGO_BEATS.ready, 30), pressed = TITLE.exit > 0, focused = titleStartButton.matches(':hover, :focus-visible');
     const label = handStrokes('comenzar', 117, 79, 1.25, 12);
     // The wash beneath the handwriting becomes a full brushstroke on confirmation.
-    if (pressed || focused) { g.save(); g.globalAlpha = pressed ? .3 : .14; titleLine([[117, 94], [148, 93], [211, 94]], '#d5a13a', 5); g.restore(); }
+    // una pincelada de los tres pigmentos bajo «comenzar», más viva al apuntarla; tres gotas de pintura hacen de cursor
+    { const band = titleProgress(t, LOGO_BEATS.ready + 10, 24); if (band > 0) { g.save(); g.globalAlpha = (pressed ? .45 : focused ? .3 : .16) * band; titleLine([[117, 91], [117 + 94 * band, 90]], '#e76b55', 4); titleLine([[117, 94], [117 + 94 * band, 94]], '#edc65c', 3); titleLine([[117, 97], [117 + 94 * band, 97]], '#638dcd', 2); g.restore(); } }
     drawHand(label, label.total * k, '#645c51', 2);
     const underline = titleProgress(t, LOGO_BEATS.ready + 28, 18);
     titleLine([[118, 96], [118 + 92 * underline, 96]], pressed ? '#b37c27' : '#aaa08a', pressed ? 2 : 1);
-    if (k >= 1) { g.fillStyle = pressed ? '#ba8735' : '#8e826c'; g.fillRect(106, 87, 2, 5); g.fillRect(108, 88, 2, 3); }
+    if (k >= 1) { const b = Prefs.shake ? Math.round(Math.sin(t * .12) * 1.5) : 0; paintDab(101, 86 + b, 3, C('rojo')); paintDab(107, 90 - b, 3, C('amarillo')); paintDab(101, 94 + b, 3, C('azul')); }
   }
 }
 function drawDebug() {
