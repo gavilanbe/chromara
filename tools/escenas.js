@@ -33,7 +33,7 @@ const ESCENAS = {
   objetos() { escenaBattle('5'); B.menu.level = 'item'; B.menu.idx = 0; },
   objetivo() { escenaBattle('5'); beginTarget(B.menu, { type: 'attack' }); },
   objetivo_tech() { escenaBattle('5'); beginTarget(B.menu, { type: 'tech', techId: 'brochazo' }); },
-  cura() { escenaBattle('5'); B.party[2].hp = 30; beginTarget(B.menu, { type: 'item' }); B.menu.pending = { type: 'item', item: 'gota_agua' }; B.menu.targets = validTargets(B.menu.pending, B.menu.unit); B.menu.tidx = 2; },
+  cura() { escenaBattle('5'); B.party[2].hp = 30; beginTarget(B.menu, { type: 'item', item: 'gota_agua' }); B.menu.tidx = 2; },
   accion() { escenaBattle('5'); executeCommand(B.party[0], { type: 'tech', techId: 'brochazo' }, [B.enemies[0]]); },
   golpe() { escenaBattle('5'); executeCommand(B.party[0], { type: 'attack' }, [B.enemies[0]]); },
   // ?escena=tecnica&id=<techId>: la técnica arranca con todos listos; ?escena=enemigo&forma=<shape> lanza el ataque de un enemigo.
@@ -45,7 +45,7 @@ const ESCENAS = {
   carga() { escenaBattle('5', false); B.party.forEach(p => p.atb = 50); B.enemies[0].atb = 80; planEnemy(B.enemies[0]); B.enemies[1].atb = 62; planEnemy(B.enemies[1]); B.party[0].guard = { target: B.party[2], charges: 1 }; B.enemies[2].coat = { col: 'azul', turns: 2, max: 2, birth: 0 }; B.enemies[1].status.lento = 3; B.enemies[0].status.firmado = 2; B.party[1].status.tiznado = 2; B.party[2].status.contorno = 3; },
   jefa() { escenaBattle('B'); B.enemies[0].atb = 80; planEnemy(B.enemies[0]); },
   estados() { escenaBattle('5'); B.party.forEach(u => { u.status = { lento: 3, tiznado: 2 }; }); B.party[1].hp = 20; B.party[2].mp = 0; B.party[2].hp = 0; B.party[2].alive = false; B.party[2].pose = 'ko'; },
-  victoria() { escenaBattle('5', false); B.enemies.forEach(u => { u.alive = false; u.dead = 3; }); B.phase = 'victory'; B.showResult = true; B.result = 48; B.stats = { actions: 12, mixes: 3, interrupts: 1, damageTaken: 60 }; },
+  victoria() { escenaBattle('5', false); B.enemies.forEach(u => { u.alive = false; u.dead = 3; }); B.phase = 'victory'; B.stats = { actions: 12, mixes: 3, interrupts: 1, damageTaken: 60 }; B.gen = victoryGen(); }, // la celebración real: la carta llega cuando el grupo ya ha saltado
   derrota() { escenaBattle('5', false); B.party.forEach(u => { u.alive = false; u.hp = 0; u.pose = 'ko'; }); B.phase = 'defeat'; B.t = 90; },
   dialogo() {
     ESCENAS.mapa(); const foe = OW.foes.find(f => f.boss); OW.x = foe.x - 40; OW.y = foe.y + 20; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
@@ -112,5 +112,5 @@ const ESCENAS = {
     }
     ESCENA.frozen = true;
   };
-  bootAt();
+  try { bootAt(); } catch (err) { document.title = 'ERROR ' + (err.stack || err); throw err; } // setup errors are readable from a headless --dump-dom too
 })();

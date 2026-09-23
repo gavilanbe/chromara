@@ -338,10 +338,10 @@ function drawCommandPalette(m, ghost = false) {
   g.fillStyle=KIT_INK;g.fillRect(-3,-2,17,4);g.fillStyle='#efd4a0';g.fillRect(-3,-1,10,2);g.fillStyle='#e4dcd0';g.fillRect(7,-2,3,4);g.fillStyle=col;g.fillRect(10,-2,4+Math.round(dip*.4),4);g.restore();
   // Names are pencilled on the wood under each well; the chosen one gets a paper tag.
   for(const t of tags){
-    const label=paletteToolLabel(t.row,m.unit),lw=textWidth(label)+8,lx=Math.max(8,Math.round(x+t.px-lw/2)),ly=y+t.py+12,cx=lx+lw/2;
+    const label=paletteToolLabel(t.row,m.unit),lw=textWidth(label)+8,lean=[0,0,-7,0,8][t.i],lx=Math.max(8,Math.round(x+t.px+lean-lw/2)),ly=y+t.py+(t.i===3?10:12),cx=lx+lw/2;
     g.save();g.globalAlpha*=clamp(t.grow,0,1);
     if(t.selected){maskingLabel(lx,ly-1,lw,10,'#fff1ca');textCenter(label,cx,ly,UI_INK);g.fillStyle=col;g.fillRect(lx+3,ly+7,lw-6,1);g.fillStyle='#fff1ca';g.fillRect(x+t.px-1,ly-2,3,1);g.fillRect(x+t.px,ly-3,1,1);}
-    else{textCenter(label,cx+1,ly+1,'#e9cfa2');UI_TEXT.pop();textCenter(label,cx,ly,'#4b3320');} // the pencil's light edge is decoration, not a second label
+    else{for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1],[1,1]]){textCenter(label,cx+ox,ly+oy,'#edc78c');UI_TEXT.pop();}textCenter(label,cx,ly,'#4b3320');} // a pale wood halo keeps the pencil legible where the name leans past the rim // the pencil's light edge is decoration, not a second label
     g.restore();
     labelHits.push([lx-1,ly-1,lw+2,11,()=>activatePaletteTool(m,t.i),()=>focusPaletteTool(m,t.i)]);
   }
@@ -438,7 +438,7 @@ function drawReservation() {
 function drawActionStamp(action) {
   if(!action.stamp)return;
   const age=B.t-BUI.actionAt,life=70;if(age>life+12)return;
-  const col=C(action.command?.techId?DATA.techs[action.command.techId].color||action.users[0].color:action.users[0].color),w=rotuloWidth(action.title)+34,x=Math.round((W-w)/2),pop=uiPop(BUI.actionAt,12),out=clamp((age-life)/12,0,1);
+  const raw=C(action.command?.techId?DATA.techs[action.command.techId].color||action.users[0].color:action.users[0].color),col=action.users[0].boss||raw===C('negro')?'#dbbae8':raw,w=rotuloWidth(action.title)+34,x=Math.round((W-w)/2),pop=uiPop(BUI.actionAt,12),out=clamp((age-life)/12,0,1);
   g.save();g.globalAlpha*=1-out;g.translate(0,Prefs.shake?Math.round(out*-12):0);
   brushBand(x,3,w,17+Math.round(pop*2),KIT_INK);paintDab(x+10,11,4,col,pop);bigText(action.title,x+19,7,col,{progress:Prefs.shake?age*7:null,outline:'#0b0912'});
   g.fillStyle=col;g.fillRect(x+4,19,Math.round((w-8)*Math.min(1,(age+3)/10)),2);
@@ -536,13 +536,16 @@ function drawTacticalMarkers() {
   const m = B.currentAction ? null : B.menu, targeting = m?.level === 'target', selected = targeting ? selectedTargets(m) : [];
   for (const u of B.enemies) {
     if (!u.alive||!cameraShowsUnit(u)) continue;
-    const hx = Math.round(u.x - (targeting ? 12 : 10)), hy = Math.round(u.y + 5);
+    // A stroke that would cross a nearer enemy's body hangs above its own head instead.
+    const box = q => { const s = q.sc * B.unitScale; return [q.x - q.def.w * .5 * s, q.y - q.def.h * s, q.x + q.def.w * .5 * s, q.y]; };
+    const hidden = B.enemies.some(q => q !== u && q.alive && q.y > u.y && (([l, t, r, b]) => u.x + 12 > l && u.x - 12 < r && u.y + 9 > t && u.y + 3 < b)(box(q)));
+    const hx = Math.round(u.x - (targeting ? 12 : 10)), hy = Math.round(hidden ? box(u)[1] - 6 : u.y + 5);
     if(hy<31||hy>145||u.x<15||u.x>305)continue;
     // Only a short ink stroke of health sits below the feet; letters, coats and warnings live on the drop and the ground.
     const bx = hx, px = bx + 1, py = hy + 1, width = targeting ? 22 : 18;
     g.fillStyle = KIT_INK; g.fillRect(px - 1, py - 1, width + 2, 4);
     g.fillStyle = '#574360'; g.fillRect(px, py, width, 2);
-    g.fillStyle = selected.includes(u) ? '#ffe2a0' : '#c3a0cb'; g.fillRect(px, py, Math.round(width * u.hp / u.maxhp), 2);
+    g.fillStyle = selected.includes(u) ? '#ffe2a0' : u.def.core ? mixHex(u.def.core, '#f4f0ea', .35) : '#c3a0cb'; g.fillRect(px, py, Math.round(width * u.hp / u.maxhp), 2); // each drop's stroke carries the colour it stole
     if (selected.includes(u)) {
       const estimate = previewAction(m.unit, m.pending, u), after = Math.max(0, u.hp - (estimate.lo || 0));
       g.fillStyle = (B.t >> 3) & 1 ? '#e77f8b' : '#d16b79';
@@ -579,7 +582,10 @@ function drawBattleResults() {
   g.save();g.translate(0,drop);
   artSheet(61,40,198,88,C('verde'));
   brushBand(72,31,176,17,'#387850');bigCenter('¡Color recuperado!',160,35,KIT_LIGHT,{outline:'#1d3d2a'});
-  ['rojo','amarillo','azul'].forEach((c,i)=>paintDab(135+i*25,62,7*Math.min(1,artIn(at,12,10+i*4)),C(c),artPop(at+10+i*4)));
+  // The three drops themselves stand on the card and keep hopping, each a beat after the other; a wash of their colour marks where they land.
+  B.party.forEach((u,i)=>{const k=Math.min(1,artIn(at,12,10+i*4)),px=135+i*25;if(k<=0)return;g.fillStyle=mixHex(C(u.color),'#f1e6cc',.45);g.beginPath();g.ellipse(px,70,9*k,2.5*k,0,0,6.29);g.fill();
+    const hop=Prefs.shake?Math.round(Math.abs(Math.sin((ARTUI.t-at-i*7)*.09))*5):0,info=unitSpriteInfo({...u,pose:'happy'},(ARTUI.t/9+i*2|0)%4);
+    drawSprite(info.spr,px,70-hop,.8*k);});
   g.save();g.globalAlpha*=fade;
   const count='+'+B.result,cw=rotuloWidth(count)+4+textWidth('pigmentos'),cx=Math.round(160-cw/2);
   bigText(count,cx,76,'#f2c93a',{outline:'#4a3a12'});smallText('pigmentos',cx+rotuloWidth(count)+4,78,'#5b4623');
