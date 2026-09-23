@@ -110,8 +110,8 @@ function materialImpact(t, col, weight = 1, opt = {}) {
 function recoilPose(u) {
   const r = u.recoil, still = {x:0,y:0,sx:1,sy:1}; if (!r || !Prefs.shake) return still;
   const q = clamp(r.t / r.dur, 0, 1), spring = Math.cos(q * Math.PI * 2.5) * (1 - q) ** 2;
-  const k = spring * r.power * Math.min(1, Prefs.shake * 1.5), a = PJ([u.wx, u.wy, 0]), b = PJ([u.wx + r.dx * 5, u.wy + r.dy * 5, 0]);
-  return {x:clamp((b[0] - a[0]) * k, -6, 6), y:clamp((b[1] - a[1]) * k, -3, 3), sx:1 + k * .12, sy:1 - k * .2};
+  const k = spring * r.power * Math.min(1, Prefs.shake * 1.5), a = PJ([u.wx, u.wy, 0]), b = PJ([u.wx + r.dx * 9, u.wy + r.dy * 9, 0]);
+  return {x:clamp((b[0] - a[0]) * k, -9, 9), y:clamp((b[1] - a[1]) * k, -4, 4), sx:1 + k * .18, sy:1 - k * .26};
 }
 function drawToolMark(m, k) {
   const pts = m.pts.map(PJ), total = pts.length - 1, end = Math.min(total, Math.ceil(k * total)), rp = ramp(m.col), alpha = g.globalAlpha;
@@ -834,23 +834,72 @@ function* actItem(u, itemId, target) {
 function* enemyAttack(u, t) {
   const shape = u.data.shape, quick = !u.boss;
   setActionShot('source',[u],{dist:83,turn:-.18,headroom:14});
-  if (shape === 'round') { // salta alto y se estampa contra el objetivo (planchazo)
-    yield* anticipate(u, quick ? 12 : 14); setActionShot('target',[t],{dist:84,turn:.2,headroom:26}); u.pose = 'attack'; const sh = shadowFx(t.wx, t.wy, 4, 999), flight = quick ? 16 : 20;
-    for (let i = 1; i <= flight; i++) { const k = i / flight; u.wx = lerp(u.hx, t.wx, k); u.wy = lerp(u.hy, t.wy - 2, k); u.wz = Math.sin(k * Math.PI) * 60; sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((4 + k * 16) * c[2])); }; yield; }
-    sh.dur = 0; u.wz = 0; B.shake = quick ? 3 : 6; Audio.sfx('ink_tide', { vol: .7 }); hitBasic(u, t); goop(t, C('negro'), 60); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: 12, col: C('negro'), seed: 7, life: 90, under: true });
-    yield* wait(quick ? 6 : 16); yield* whop(u, u.hx, u.hy, quick ? 10 : 12, 22);
-  } else if (shape === 'splash') { // escupe tres pegotes en arco
-    yield* anticipate(u, 10); setActionShot('target',[t],{dist:80,turn:-.12,headroom:24}); u.pose = 'attack'; for (let k = 0; k < 3; k++) { Audio.sfx('ink_jet', { pan: -.3 }); const p = { wx: u.wx, wy: u.wy, wz: u.def.h * .5, tx: t.wx + R(-4, 4), ty: t.wy + R(-3, 3), tz: t.def.h * .5, col: C('negro'), t: 0, life: 12, dur: 12, arc: 26, stream: true, size: 3 }; B.particles.push(p); u.wz = 4; yield* wait(5); u.wz = 0; yield* wait(9); burst(t.wx, t.wy, t.def.h * .5, C('negro'), 5, 1.2, 14, .1); if (k === 2) { hitBasic(u, t); goop(t, C('negro'), 60); lensSplatter('#1e1a2c', 5, 7); } else { t.pose = 'hurt'; t.poseT = 6; } }
-    yield* wait(quick ? 4 : 8);
-  } else if (shape === 'tall') { // embiste atravesando al objetivo y deja un tachón en el suelo
-    yield* anticipate(u, 12); setActionShot('target',[t],{dist:78,turn:.24,headroom:10}); u.pose = 'attack'; Audio.sfx('dash'); const gh = ghostsOf(u); const to = fwdOf(t, -22);
+  if (shape === 'round') { // Planchazo: se encoge, salta estirándose, cae sobre la cabeza del objetivo, que se aplasta, rebota hacia atrás y deja una estrella de tinta
+    yield* anticipate(u, quick ? 12 : 14);
+    const apex = quick ? 46 : 54, top = t.def.h * .85, [lx, ly] = towards(t, { wx: u.hx, wy: u.hy }, .08), [bx, by] = towards(t, { wx: u.hx, wy: u.hy }, .45);
+    // Un solo plano cerrado sobre el objetivo: la Gota sale por arriba del cuadro, su sombra crece y cae en picado.
+    setActionShot('target', [t], { dist: 84, turn: .2, headroom: 34, solo: true }); u.pose = 'attack';
+    const sh = shadowFx(t.wx, t.wy, 4, 999), flight = quick ? 16 : 20; Audio.sfx('fwip', { semi: -5 });
+    for (let i = 1; i <= flight; i++) { const k = i / flight; u.wx = lerp(u.hx, lx, k); u.wy = lerp(u.hy, ly, k); u.wz = top * k * k + Math.sin(k * Math.PI) * apex;
+      // se estira al subir y al caer, y es una bola en lo alto
+      const v = Math.cos(k * Math.PI), st = Prefs.shake ? Math.min(.26, Math.abs(v) * .3) : 0; u.gesture = { sx: 1 - st * .7, sy: 1 + st };
+      sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((4 + k * 16) * c[2])); }; yield; }
+    sh.dur = 0; u.wz = top; B.shake = quick ? 4 : 7; Audio.sfx('ink_tide', { vol: .7 }); Audio.sfx('plop', { semi: -7, when: .02 });
+    hitBasic(u, t); goop(t, C('negro'), 60);
+    const squash = { k: 1 }, sq = () => { const e = Prefs.shake ? squash.k : 0; t.gesture = { sx: 1 + e * .45, sy: 1 - e * .45 }; u.gesture = { sx: 1 + e * .4, sy: 1 - e * .38 }; }; sq();
+    // estrella de tinta: el golpe salpica el suelo en rayos alrededor del aplastado
+    for (let j = 0; j < 7; j++) { const a = j / 7 * 6.28 + .3, L = t.def.w * (.45 + (j % 3) * .12), ex = t.wx + Math.cos(a) * L, ey = t.wy + Math.sin(a) * L * .45; mark({ kind: 'path', pts: [[t.wx + Math.cos(a) * 5, t.wy + Math.sin(a) * 2.5, 0], [ex, ey, 0]], w: 2, col: C('negro'), grow: 4, life: 90, under: true }); mark({ kind: 'blob', p: [ex + Math.cos(a) * 3, ey + Math.sin(a) * 1.5, 0], w: 2 + (j % 2), col: C('negro'), seed: j, life: 90, grow: 3, under: true }); }
+    mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: 12, col: C('negro'), seed: 7, life: 90, under: true }); burst(t.wx, t.wy, 2, C('negro'), 10, 2, 18, .12);
+    yield* wait(quick ? 3 : 6);
+    // rebote: sale despedido hacia atrás en voltereta corta; el aplastado recupera su forma con un muelle
+    Audio.sfx('fwip', { semi: 2, vol: .6 });
+    for (let i = 1; i <= 10; i++) { const k = i / 10; u.wx = lerp(lx, bx, k); u.wy = lerp(ly, by, k); u.wz = lerp(top, 0, k) + Math.sin(k * Math.PI) * 20;
+      squash.k = Math.cos(k * Math.PI * 1.5) * (1 - k); sq(); u.gesture = Prefs.shake ? { sx: 1 - .15 * Math.sin(k * Math.PI), sy: 1 + .15 * Math.sin(k * Math.PI) } : null; yield; }
+    t.gesture = null; u.gesture = null; u.wz = 0;
+    yield* wait(quick ? 4 : 10); yield* whop(u, u.hx, u.hy, quick ? 10 : 12, 14);
+  } else if (shape === 'splash') { // escupe tres pegotes de tinta en arco, por encima de su hombro: cada uno revienta en el objetivo y el tercero lo tumba
+    yield* anticipate(u, 10); setActionShot('target', [t, u], { dist: 88, turn: -.12, headroom: 24 }); u.pose = 'attack';
+    const blobs = [], INK = '#1e1a2c', HI = '#6a6480';
+    const bf = fx(999, () => { for (const p of blobs) { if (p.k <= 0 || p.k >= 1) continue; const at = k => [lerp(p.from[0], p.to[0], k), lerp(p.from[1], p.to[1], k), lerp(p.from[2], p.to[2], k) + Math.sin(k * Math.PI) * p.arc];
+      for (let j = 3; j >= 1; j--) { const c = PJ(at(Math.max(0, p.k - j * .07))); g.fillStyle = INK; const r = Math.max(1, (3 - j * .6) * c[2]); g.fillRect(Math.round(c[0] - r / 2), Math.round(c[1] - r / 2), Math.ceil(r), Math.ceil(r)); }
+      const c = PJ(at(p.k)), n = PJ(at(Math.min(1, p.k + .05))), a = Math.atan2(n[1] - c[1], n[0] - c[0]), r = 4.5 * c[2];
+      g.save(); g.translate(Math.round(c[0]), Math.round(c[1])); g.rotate(a); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(0, 0, r * 1.5 + 1, r + 1, 0, 0, 6.29); g.fill(); g.fillStyle = INK; g.beginPath(); g.ellipse(0, 0, r * 1.5, r, 0, 0, 6.29); g.fill(); g.fillStyle = HI; g.fillRect(Math.round(-r * .2), Math.round(-r * .6), Math.max(2, Math.round(r * .6)), 1); g.restore(); } });
+    for (let k = 0; k < 3; k++) {
+      // se hincha, escupe con un respingo y el pegote vuela
+      for (let i = 1; i <= 3; i++) { u.gesture = Prefs.shake ? { sx: 1 + i * .05, sy: 1 - i * .06 } : null; yield; }
+      Audio.sfx('ink_jet', { pan: -.3 }); u.gesture = Prefs.shake ? { sx: .86, sy: 1.18 } : null; u.wz = 4;
+      const p = { k: 0, from: [u.wx, u.wy, u.def.h * .55], to: [t.wx + (k - 1) * 3, t.wy + (k - 1) * 2, t.def.h * (.35 + k * .12)], arc: 18 + k * 4 }; blobs.push(p);
+      for (let i = 1; i <= 10; i++) { p.k = i / 10; if (i === 3) { u.wz = 0; u.gesture = null; } yield; }
+      p.k = 1; const q = p.to; burst(q[0], q[1], q[2], INK, 7, 1.4, 16, .1); mark({ kind: 'blob', p: q, w: 4 + k, col: '#1e1a2c', seed: 3 + k, life: 70, grow: 3 }); drips(q[0], q[1], q[2], INK, 2);
+      if (k === 2) { hitBasic(u, t); goop(t, C('negro'), 60); lensSplatter('#1e1a2c', 5, 7); } else { t.pose = 'hurt'; t.poseT = 6; t.recoil = { t: 0, dur: 12, dx: t.wx - u.wx, dy: t.wy - u.wy, power: .5, col: '#8c8ab0', material: 'ink' }; { const L = Math.hypot(t.recoil.dx, t.recoil.dy) || 1; t.recoil.dx /= L; t.recoil.dy /= L; } Audio.sfx('plop', { semi: -4 + k * 3, vol: .6 }); B.shake = 2; }
+      yield* wait(2);
+    }
+    bf.dur = 0; yield* wait(quick ? 2 : 8);
+  } else if (shape === 'tall') { // embiste como una pincelada: se estira en horizontal, atraviesa al objetivo y deja un tachón en el suelo
+    yield* anticipate(u, 12); setActionShot('target', [t], { dist: 78, turn: .24, headroom: 10 }); u.pose = 'attack'; Audio.sfx('dash'); const gh = ghostsOf(u); const to = fwdOf(t, -22);
     mark({ kind: 'path', pts: [[u.wx, u.wy, 0], [t.wx - 6, t.wy + 4, 0], [t.wx + 6, t.wy - 4, 0], [to[0], to[1], 0]], w: 4, col: C('negro'), grow: 8, life: 100, jit: 2, under: true });
-    for (let i = 1; i <= 11; i++) { const k = i / 11; u.wx = lerp(u.hx, to[0], k); u.wy = lerp(u.hy, to[1], k); gh.add(); if (i === 6) { hitBasic(u, t); goop(t, C('negro'), 60); } yield; }
-    gh.end(); yield* wait(quick ? 6 : 14); yield* whop(u, u.hx, u.hy, quick ? 10 : 12, 12);
-  } else { // charco: se aplasta y manda una ola de tinta por el suelo
-    yield* anticipate(u, 12); setActionShot('target',[t],{dist:82,turn:.18,headroom:12}); u.pose = 'hurt'; u.poseT = 24; Audio.sfx('ink_jet'); const wv = fx(999, () => { const k = clamp(wv.t / 22, 0, 1), c = PJ([lerp(u.wx, t.wx, k), lerp(u.wy, t.wy, k), 0]); g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(c[0], c[1], (14 + k * 8) * c[2], 6 * c[2], 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4460'; g.fillRect(Math.round(c[0] - 8 * c[2]), Math.round(c[1] - 8 * c[2]), Math.round(16 * c[2]), 2); }, true);
-    for (let i = 0; i < 22; i++) { B.particles.push({ wx: lerp(u.wx, t.wx, i / 22), wy: lerp(u.wy, t.wy, i / 22), wz: 2, vx: 0, vy: 0, vz: R(.5, 1.5), g: .08, col: C('negro'), t: 0, life: 16 }); yield; }
-    wv.dur = 0; hitBasic(u, t); goop(t, C('negro'), 70); mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: 14, col: '#1e1a2c', grow: 4, life: 100, under: true }); yield* wait(quick ? 6 : 12);
+    for (let i = 1; i <= 11; i++) { const k = i / 11; u.wx = lerp(u.hx, to[0], k); u.wy = lerp(u.hy, to[1], k); gh.add(); u.gesture = Prefs.shake ? { sx: 1.35, sy: .78 } : null;
+      if (i === 6) { hitBasic(u, t); goop(t, C('negro'), 60); t.wz = 0; for (let j = 0; j < 6; j++) B.particles.push({ wx: t.wx, wy: t.wy, wz: t.def.h * .5, vx: (to[0] - u.hx) * .02 + R(-.4, .4), vy: (to[1] - u.hy) * .02, vz: R(.4, 1.4), g: .1, col: '#1e1a2c', t: 0, life: 18, size: 2 }); }
+      yield; }
+    // frena en seco: se aplasta contra el aire, el golpeado gira sobre sí y vuelve a su forma
+    Audio.sfx('scratch', { vol: .5 }); for (let i = 1; i <= 6; i++) { const e = Math.sin(i / 6 * Math.PI); u.gesture = Prefs.shake ? { sx: .8 + .2 * (i / 6), sy: 1.2 - .2 * (i / 6) } : null; burst(u.wx, u.wy, 1, '#8c8ab0', 1, .8, 10, .05); t.gesture = Prefs.shake ? { sx: 1 - .5 * e, sy: 1 + .08 * e } : null; yield; }
+    u.gesture = null; t.gesture = null; gh.end(); yield* wait(quick ? 4 : 12); yield* whop(u, u.hx, u.hy, quick ? 10 : 12, 12);
+  } else { // charco: se aplasta, levanta una ola de tinta con cresta y espuma que rompe sobre el objetivo y lo lanza
+    yield* anticipate(u, 12); setActionShot('target', [t], { dist: 82, turn: .18, headroom: 22 }); u.pose = 'hurt'; u.poseT = 30; Audio.sfx('ink_jet');
+    const wave = { k: 0, h: 0, crash: 0 }, INK = '#1e1a2c';
+    const wv = fx(999, () => { const c = PJ([lerp(u.wx, t.wx, wave.k), lerp(u.wy, t.wy, wave.k), 0]), s = c[2], dir = PJ([t.wx, t.wy, 0])[0] >= PJ([u.wx, u.wy, 0])[0] ? 1 : -1, w = (24 + wave.k * 8) * s, h = wave.h * s * (1 - wave.crash * .6), lean = (4 + wave.crash * 10) * s;
+      g.save(); g.translate(c[0], 0); g.scale(dir, 1); g.translate(-c[0], 0); // the crest always curls the way the wave travels
+      // cuerpo de la ola: sube desde el suelo, se curva hacia delante en la cresta
+      g.fillStyle = '#0b0912'; g.beginPath(); g.moveTo(c[0] - w - 1, c[1] + 1); g.quadraticCurveTo(c[0] - w * .3, c[1] - h * 1.1 - 1, c[0] + lean + w * .35, c[1] - h - 1); g.quadraticCurveTo(c[0] + lean + w * .8, c[1] - h * .6, c[0] + w + 1, c[1] + 1); g.closePath(); g.fill();
+      g.fillStyle = INK; g.beginPath(); g.moveTo(c[0] - w, c[1]); g.quadraticCurveTo(c[0] - w * .3, c[1] - h * 1.1, c[0] + lean + w * .35, c[1] - h); g.quadraticCurveTo(c[0] + lean + w * .8, c[1] - h * .6, c[0] + w, c[1]); g.closePath(); g.fill();
+      // espuma: una línea clara bajo la cresta y gotas que salta
+      if (h > 3) { pstroke(c[0] - w * .45, c[1] - h * .8, c[0] + lean + w * .3, c[1] - h + 1, 1, '#8c8ab0', 1, 0, false); g.fillStyle = '#b4acc8'; for (let j = 0; j < 3; j++) g.fillRect(Math.round(c[0] + lean + w * .35 + j * 3 * s), Math.round(c[1] - h - 2 - ((wv.t + j * 3) % 6)), 1, 1); } g.restore(); }, true);
+    for (let i = 1; i <= 22; i++) { wave.k = (i / 22) ** 1.3; wave.h = Math.min(1, i / 8) * 16 + Math.sin(i * .9) * 1.5; if (i % 2) B.particles.push({ wx: lerp(u.wx, t.wx, wave.k) + R(-6, 6), wy: lerp(u.wy, t.wy, wave.k) + R(-3, 3), wz: 2, vx: 0, vy: 0, vz: R(.5, 1.5), g: .08, col: '#1e1a2c', t: 0, life: 14, size: 2 }); yield; }
+    // rompe: la ola se derrumba sobre el objetivo, que sale despedido hacia arriba y cae
+    Audio.sfx('splash', { vol: .8 }); hitBasic(u, t); goop(t, C('negro'), 70); burst(t.wx, t.wy, t.def.h * .6, INK, 14, 2, 22, .1); burst(t.wx, t.wy, t.def.h, '#8c8ab0', 5, 1.5, 16, .08);
+    mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: 14, col: INK, grow: 4, life: 100, under: true });
+    for (let i = 1; i <= 12; i++) { const k = i / 12; wave.crash = Math.min(1, k * 2); wave.h = 14 * (1 - k); t.wz = Math.sin(k * Math.PI) * 10; t.gesture = Prefs.shake ? { sx: 1 - .15 * Math.sin(k * Math.PI), sy: 1 + .15 * Math.sin(k * Math.PI) } : null; yield; }
+    wv.dur = 0; t.wz = 0; t.gesture = Prefs.shake ? { sx: 1.25, sy: .8 } : null; yield* wait(3); t.gesture = null; yield* wait(quick ? 4 : 10);
   }
   u.pose = 'idle'; u.wz = 0; yield* wait(quick ? 6 : 14); camReset();
 }

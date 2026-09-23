@@ -530,7 +530,8 @@ function drawProp(img, x, y, a, fac, px = 1, py = 5, scale = 1, alpha = 1) { g.s
 // La herramienta protagonista: aparece con destello, recorre un camino de mundo con la punta dejando su trazo y se retira.
 function* toolStroke(o) {
   const img = propSprite(o.kind, o.color), P = PROP[o.kind], sc = o.scale || 1, p0 = o.pts[0], fac = o.fac || 1;
-  const st = {k:0,lift:0,lead:o.from ? 0 : 1}, ghosts = propGhosts();
+  const st = {k:0,lift:0,lead:o.from ? 0 : 1}, ghosts = propGhosts(3), smear = [], rp = ramp(o.col);
+  const by = o.by !== undefined ? o.by : B.currentAction?.users?.[0], body = k => { if (by && Prefs.shake && !by.dead) by.gesture = k ? {sx:1 + k * .16,sy:1 - k * .2} : null; };
   const f = fx(999, () => {
     let wp = pointAt(o.pts, st.k);
     if (st.lead < 1) wp = [lerp(o.from[0], p0[0], st.lead),lerp(o.from[1], p0[1], st.lead),lerp(o.from[2] || 0, p0[2] || 0, st.lead) + Math.sin(st.lead * Math.PI) * 12];
@@ -539,10 +540,13 @@ function* toolStroke(o) {
     const l = st.lift, pressure = Math.sin(st.k * Math.PI) * (o.kind === 'brocha' ? .12 : .045), a = P.a + (o.a || 0) + tilt - l * .05, scale = sc * s * (1 + pressure);
     // La herramienta deja estela cuando corre: se lee el gesto completo, no sólo su punta.
     if (!l) ghosts.push(img, x, y, a, fac, P.tip[0], P.tip[1], scale); ghosts.draw();
+    // Smear: a solid tapered band of the tool's paint along the last tip positions, like a drawn motion frame.
+    if (Prefs.shake && st.lead >= 1) { const last = smear[smear.length - 1]; if (!l && (!last || Math.hypot(last[0] - x, last[1] - y) > 1.5)) { smear.push([x, y]); if (smear.length > 6) smear.shift(); } else if (l && smear.length) smear.shift();
+      for (let i = 1; i < smear.length; i++) { const q = i / smear.length, w = Math.max(1, (o.kind === 'brocha' ? 6 : o.kind === 'pincel' ? 4 : 2) * s * q); pstroke(smear[i - 1][0], smear[i - 1][1], smear[i][0], smear[i][1], w + 2, q > .5 ? rp.hi : o.col, 1, 0, false); } }
     drawProp(img, x - fac * l * 1.5, y - l * 2.5, a, fac, P.tip[0], P.tip[1], scale, l ? Math.max(0, 1 - l / 10) : o.from ? Math.min(1, st.lead * 3) : 1);
   });
   f.tool = o.kind; f.stroke = st;
-  if (o.from) for (let i = 1; i <= 10; i++) { const k = i / 10; st.lead = k * k * (3 - 2 * k); yield; }
+  if (o.from) for (let i = 1; i <= 10; i++) { const k = i / 10; st.lead = k * k * (3 - 2 * k); body(-.35 * Math.sin(k * Math.PI)); yield; } // the wielder stretches up as the tool leaves them
   const marks = [];
   if (o.under) marks.push(mark({kind:'path',pts:o.pts.map(p => [p[0] + 1,p[1] + 1,p[2] || 0]),w:o.w,col:o.under,life:o.life || 50,jit:o.jit,progress:0}));
   marks.push(mark({kind:'path',pts:o.pts,w:o.w,col:o.col,life:o.life || 50,jit:o.jit,material:o.kind,progress:0}));
@@ -551,9 +555,11 @@ function* toolStroke(o) {
   for (let i = 1; i <= o.frames; i++) {
     const k = i / o.frames; st.k = k * k * (3 - 2 * k); marks.forEach(m => m.progress = st.k);
     const wp = pointAt(o.pts, st.k); if (o.onTip) o.onTip(st.k, wp);
-    if (!touched && o.contact && st.k >= (o.hitAt ?? .5)) { touched = true; o.contact(wp); }
+    if (!touched && o.contact && st.k >= (o.hitAt ?? .5)) { touched = true; o.contact(wp); st.hitAt = i; }
+    body(st.hitAt ? .5 * Math.max(0, 1 - (i - st.hitAt) / 6) : .12 * Math.sin(k * Math.PI)); // and squashes as it lands
     yield;
   }
+  body(0);
   for (let i = 1; i <= (o.liftFrames ?? 8); i++) { st.lift = i * 8 / (o.liftFrames ?? 8); yield; }
   f.dur = 0;
 }
@@ -679,9 +685,9 @@ function drawUnit(u) {
   // emergiendo del charco: se recorta por debajo del suelo
   let clip = false; if (u.wz < 0 && gp) { g.save(); g.beginPath(); g.rect(0, 0, W, gp[1] + 1); g.clip(); clip = true; }
   const G = u.goop, ga = G ? (G.t > G.life - 20 ? (G.life - G.t) / 20 : 1) : 0;
-  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (u.kind === 'party') spr = desatSprite(spr, pigmentFade(u.mp, u.maxmp)); if (G) spr = tintSprite(spr, G.col, .55 * ga); if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
+  const info = unitSpriteInfo(u, frame); let spr = info.spr; if (u.kind === 'party') spr = desatSprite(spr, pigmentFade(u.mp, u.maxmp)); if (G) spr = tintSprite(spr, G.col, .3 * ga * Math.min(1, G.t / 10)); // the paint settles in over the first frames and never hides the face if (u.sketch) spr = tintSprite(spr, '#8a86a0', .8);
   if (warn && Prefs.flash > 0 && wq < .18) spr = tintSprite(spr, '#f4f0ea', .4 * Prefs.flash); // destello al compás del aro
-  const recoil = recoilPose(u); if (u.recoil && u.recoil.t < 3 && Prefs.flash) spr = tintSprite(spr, u.recoil.col, .45 * Prefs.flash);
+  const recoil = recoilPose(u); if (u.recoil && u.recoil.t < 4 && Prefs.flash) spr = u.recoil.t < 2 ? tintSprite(spr, '#fff8e6', 1) : tintSprite(spr, u.recoil.col, .5 * Prefs.flash); // contact reads as a paper-white frame (held by the hit-stop), then the blow's colour
   g.save(); g.translate(recoil.x, recoil.y);
   const flip = u.kind === 'party' ? (u.pose === 'attack' || u.pose === 'charge' ? false : false) : u.facingLeft;
   const recovery = Prefs.shake && u === B.recoveringEnemy && !u.acting ? .1 * (B.enemyRecovery / COMBAT_PACE.recovery) ** 2 : 0;
@@ -694,7 +700,8 @@ function drawUnit(u) {
   }
   if (u.boss && u.alive) drawBossTendrils(u, SX, SY, bob, false);
   // Las Gotas Negras llevan un filo de papel húmedo: sin él se pierden sobre su propio charco de tinta.
-  if (u.kind === 'enemy' && u.alive && u.pose !== 'charge') { const rim = tintSprite(spr, '#ece3cf', 1); g.save(); g.globalAlpha *= .8; for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1]]) drawSprite(rim, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore(); }
+  const struck = u.recoil && u.recoil.t < 2 && Prefs.flash; // on the struck frame the rim turns to ink so the white body stands off the paper
+  if (u.alive && (struck || u.kind === 'enemy' && u.pose !== 'charge')) { const rim = tintSprite(spr, struck ? '#14121c' : '#ece3cf', 1); g.save(); g.globalAlpha *= .8; for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1]]) drawSprite(rim, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore(); }
   drawSprite(spr, u.x, u.y - bob, SX, flip, SY);
   if (u.boss && u.alive) drawBossTendrils(u, SX, SY, bob, true);
   if (u.id === 'anil' && u.alive && !info.atlas) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);

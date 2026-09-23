@@ -229,7 +229,7 @@ function cameraShowsUnit(u) {
   const b=cameraBounds(u,SCENE.cam);
   if(!b)return false;
   const m=B.menu,subjects=B.currentAction?SCENE.shot?.subjects:B.tr?.stage==='intro'?B.enemies:menuCameraSubjects(m)||(m?.level==='target'?validTargets(m.pending,m.unit):null);
-  if(!subjects||subjects.includes(u))return true;
+  if(!subjects||subjects.includes(u)||B.currentAction?.users.includes(u))return true; // the body doing the action is never hidden
   return b[0]>=2&&b[1]>=30&&b[2]<=318&&b[3]<=144;
 }
 function beginActionCamera(action) {
@@ -252,7 +252,7 @@ function setActionShot(phase,subjects,o={}) {
 function updateActionCamera() {
   const a=B.currentAction,shot=SCENE.shot;if(!shot||shot.action!==a||Prefs.camera==='fija')return;
   let subjects=shot.subjects;
-  if(shot.phase==='target'&&!a.support){
+  if(shot.phase==='target'&&!a.support&&!shot.options.solo){ // solo: a body that leaves the frame on purpose (a leap) does not widen the shot
     // Only a nearby attacking body shares the receiving shot. The distant side
     // does not force a wide shot while a projectile or a tool crosses the frame.
     const nearby=a.users.filter(u=>subjects.some(t=>Math.hypot(u.wx-t.wx,u.wy-t.wy)<52));
