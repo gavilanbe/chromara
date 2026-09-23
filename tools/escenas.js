@@ -35,7 +35,8 @@ const ESCENAS = {
   objetivo_tech() { escenaBattle('5'); beginTarget(B.menu, { type: 'tech', techId: 'brochazo' }); },
   cura() { escenaBattle('5'); B.party[2].hp = 30; beginTarget(B.menu, { type: 'item', item: 'gota_agua' }); B.menu.tidx = 2; },
   accion() { escenaBattle('5'); executeCommand(B.party[0], { type: 'tech', techId: 'brochazo' }, [B.enemies[0]]); },
-  golpe() { escenaBattle('5'); executeCommand(B.party[0], { type: 'attack' }, [B.enemies[0]]); },
+  // ?escena=golpe[&quien=0..2][&arma=brocha|lapiz|pincel|pluma]: el golpe básico de cualquier gota con cualquier herramienta.
+  golpe() { const q = new URLSearchParams(location.search); escenaBattle('5'); const p = B.party[+(q.get('quien') || 0)] || B.party[0]; if (q.get('arma')) p.data.weapon = q.get('arma'); p.atb = 100; executeCommand(p, { type: 'attack' }, [B.enemies[0]]); },
   // ?escena=tecnica&id=<techId>: la técnica arranca con todos listos; ?escena=enemigo&forma=<shape> lanza el ataque de un enemigo.
   tecnica() { escenaBattle('5', false); const id = new URLSearchParams(location.search).get('id') || 'brochazo', t = DATA.techs[id], u = B.party.find(p => p.id === (t.user || t.users[0])); if (t.weapon) u.data.weapon = t.weapon; B.party.forEach(p => { p.atb = 100; p.mp = 30; }); if (t.target === 'ally') B.party[0].hp = 40; executeCommand(u, { type: 'tech', techId: id }, validTargets({ type: 'tech', techId: id }, u)); },
   enemigo() { escenaBattle('5', false); const forma = new URLSearchParams(location.search).get('forma'); if (forma) B.enemies[0].data = { ...B.enemies[0].data, shape: forma }; B.enemies[0].intent = { kind: 'attack', name: 'Planchazo', target: B.party[0] }; B.actQueue.push(tracked(B.enemies[0], actEnemy(B.enemies[0]), [B.enemies[0]], { type: 'enemy' })); },
