@@ -72,7 +72,7 @@ test('Y is available only for another ready painter and arrows still choose tool
  run('B.party[2].atb=100;updateTouchControls()');assert.equal(swap.disabled,false);
  swap.handlers.pointerdown(pointer(9,swap));run('updateBattleMenu()');assert.equal(run('B.menu.unit.id'),'anil');
  events.pointerup.forEach(fn=>fn(pointer(9)));run('pressed.right=true;updateBattleMenu()');
- assert.equal(run('B.menu.unit.id'),'anil');assert.equal(run('B.menu.idx'),1);
+ assert.equal(run('B.menu.unit.id'),'anil');assert.equal(run('B.menu.idx'),2); // the cross: right leaves Attack for Objects
  for(const level of ['tech','item','target']){
   run(`openCmd(B.party[0]);B.menu.level='${level}';B.menu.pending={type:'attack'};updateTouchControls()`);assert.equal(swap.disabled,false,level);
   swap.handlers.pointerdown(pointer(10,swap));run('updateBattleMenu()');assert.equal(run('B.menu.unit.id'),'anil');events.pointerup.forEach(fn=>fn(pointer(10)));

@@ -158,7 +158,8 @@ function previewAction(u, p, t) {
     effect: reaction ? 'Reacción ' + DATA.colors[reaction].name + ': ' + ({ naranja: 'salpica al vecino', verde: 'raíces + cura al grupo', violeta: 'interrumpe y debilita' }[reaction]) : p.type === 'role' ? ROLE_ACTIONS[u.id].desc : tech ? TECH_RULES[p.techId] : DATA.weapons[u.data.weapon].desc };
 }
 function openCmd(u) { B.menu = { unit: u, level: 'cmd', idx: u.lastCmd || 0, opened: B.t }; }
-const PALETTE_TOOLS = [[25,17],[70,10],[96,40],[62,59],[23,51]];
+// A cross: attack in the middle, then techniques up, objects right, the role down and reloading left.
+const PALETTE_TOOLS = [[57,38],[57,13],[92,38],[57,63],[22,38]];
 function focusPaletteTool(m,idx) {
   if(B.menu!==m||m.level!=='cmd'||idx===m.idx)return false;
   m.idx=idx;m.unit.lastCmd=idx;Audio.sfx('cursor',semiOf(m.unit));return true;

@@ -6,9 +6,9 @@ function test(name,fn){scenario();run("releaseInputs();Prefs.camera='suave';Pref
 function press(action){run(`pressed.${action}=true;updateBattleMenu()`);}
 function draw(){run('UI_HITS.length=0;UI_TEXT.length=0;drawBattleUI()');}
 function tapTool(i){run(`{const [x,y]=PALETTE_TOOLS[${i}],px=PALETTE_ORIGIN.x+x,py=PALETTE_ORIGIN.y+y;UI_HITS.slice().reverse().find(h=>px>=h.x&&px<=h.x+h.w&&py>=h.y&&py<=h.y+h.h).run();updateBattleMenu();}`);}
-test('four directions follow the wells without switching painters or moving the camera',()=>{
+test('the cross: each direction leaves the middle for its arm and the opposite one returns, without switching painters or moving the camera',()=>{
  run('updateMenuCamera();for(let i=0;i<46;i++)camTick();var palettePose=JSON.stringify(SCENE.cam),paletteResources=JSON.stringify(B.party.map(u=>[u.mp,u.atb]));');
- for(const [key,expected] of [['right',1],['down',3],['right',2],['up',1],['left',0],['down',4],['right',3]]){
+ for(const [key,expected] of [['right',2],['up',1],['down',0],['down',3],['left',4],['right',0],['up',1]]){
   press(key);assert.equal(run('B.menu.idx'),expected,key);assert.equal(run('B.menu.unit.id'),'carmin');
   run('updateMenuCamera();camTick()');assert.equal(run('JSON.stringify(SCENE.cam)===palettePose'),true);
  }
@@ -27,9 +27,9 @@ test('a touch selects another well before opening, with no premature resource sp
  draw();tapTool(4);assert.equal(run('B.menu.level'),'target');assert.equal(run('B.menu.pending.type'),'reload');
  assert.equal(run('B.party[0].atb'),100);assert.equal(run('B.actQueue.length'),0);
 });
-test('painted names are touch targets and hover keeps all hit areas stationary',()=>{
+test('hovering a well focuses it and hover keeps all hit areas stationary',()=>{
  draw();run('var paletteHits=JSON.stringify(UI_HITS.filter(h=>h.hover).map(h=>[h.x,h.y,h.w,h.h]));');
- run("{const label=UI_TEXT.find(t=>t.text==='Objetos');UI_HITS.slice().reverse().find(h=>h.hover&&label.x>=h.x&&label.x<=h.x+h.w&&label.y>=h.y&&label.y<=h.y+h.h).run();}");
+ run("{const [x,y]=PALETTE_TOOLS[2],px=PALETTE_ORIGIN.x+x,py=PALETTE_ORIGIN.y+y;UI_HITS.slice().reverse().find(h=>h.hover&&px>=h.x&&px<=h.x+h.w&&py>=h.y&&py<=h.y+h.h).hover();}");
  assert.equal(run('B.menu.idx'),2);assert.equal(run('B.menu.level'),'cmd');
  run('B.t+=4');draw();assert.equal(run('JSON.stringify(UI_HITS.filter(h=>h.hover).map(h=>[h.x,h.y,h.w,h.h]))===paletteHits'),true);
 });

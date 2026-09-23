@@ -90,7 +90,7 @@ function observeBattleFeedback() {
       else { c.heal = B.t; paintMotes(x + 15, 161, '#8fba70'); }
       c.hp = u.hp;
     }
-    if (u.mp !== c.mp) { c.squeeze = B.t; paintMotes(x + 88, 171, u.mp < c.mp ? C(u.color) : '#9abadd'); c.mp = u.mp; }
+    if (u.mp !== c.mp) { c.squeeze = B.t; c.mpFrom = c.mp; paintMotes(x + 100, 169, u.mp < c.mp ? C(u.color) : '#9abadd'); c.mp = u.mp; }
     const ready = u.alive && u.atb >= 100 && !u.acting;
     if (ready && !c.ready) { c.readyAt = B.t; paintMotes(x + 17, 153, C(u.color), 7); }
     c.ready = ready;
@@ -143,24 +143,34 @@ function selectedPaintCost(u) {
   if (p?.type === 'tech' && p.techId) { const t = DATA.techs[p.techId]; return (t.users || [t.user]).includes(u.id) ? techCost(u,t) : 0; }
   return p?.type === 'role' && u === m.unit ? ROLE_ACTIONS[u.id].mp : 0;
 }
+// An oil tube lying along the card. What is left sits against the cap; what was spent
+// is flattened and rolled up from the crimped tail, as a painter would. The label near
+// the cap carries the number; a preview shows the stretch about to be squeezed.
 function paintTube(x, y, u, c, cost) {
-  const col=C(u.color),squeeze=Math.round(uiPop(c.squeeze,22)*4),left=x+squeeze,right=x+23-squeeze;
-  // Rolled aluminium tail, creased sides, paper wrapper, tapered shoulder and
-  // a ribbed cap: the pigment sits in a tube, rather than a rectangular meter.
-  g.fillStyle=KIT_INK;g.beginPath();g.moveTo(left,y+1);g.lineTo(right,y+1);g.lineTo(right-1,y+17);g.lineTo(x+16,y+21);g.lineTo(x+7,y+21);g.lineTo(left+1,y+17);g.closePath();g.fill();
-  g.fillStyle='#d4c8b7';g.beginPath();g.moveTo(left+1,y+3);g.lineTo(right-1,y+3);g.lineTo(right-2,y+16);g.lineTo(x+15,y+19);g.lineTo(x+8,y+19);g.lineTo(left+2,y+16);g.closePath();g.fill();
-  g.fillStyle='#fff5df';g.fillRect(left+2,y+4,2,11);g.fillRect(x+7,y+18,5,1);
-  g.fillStyle='#8b8290';g.fillRect(left+1,y+1,right-left-1,2);g.fillRect(left+3,y+3,3,1);g.fillRect(right-5,y+4,3,1);g.fillRect(right-4,y+14,2,3);
-  g.fillStyle='#e5ded0';g.fillRect(left,y, right-left,1);
-  for(let k=left+2;k<right;k+=3){g.fillStyle='#eee5d4';g.fillRect(k,y+1,1,1);}
-  const fill=Math.round(12*clamp(u.mp/u.maxmp,0,1)),top=y+17-fill;
-  g.fillStyle='#86776f';g.fillRect(left+4,y+5,right-left-8,12);
-  g.fillStyle=col;g.fillRect(left+4,top,right-left-8,fill);
-  g.fillStyle=ramp(col).hi;if(fill)g.fillRect(left+4,top,right-left-8,1);
-  if(cost){const h=Math.round(12*Math.min(cost,u.mp)/u.maxmp);g.fillStyle=cost>u.mp?'#ec8993':'#fff3d4';for(let k=0;k<h;k+=2)g.fillRect(left+4,top+k,right-left-8,1);}
-  g.fillStyle='#fff2cf';g.fillRect(x+6,y+7,12,9);textCenter(u.mp,x+12,y+8,u.mp?UI_INK:'#a73445');
-  g.fillStyle=KIT_INK;g.fillRect(x+7,y+20,10,4);g.fillStyle='#756e78';g.fillRect(x+8,y+20,8,3);
-  g.fillStyle='#ded3bf';for(let k=0;k<3;k++)g.fillRect(x+8+k*3,y+20,1,2);
+  const col=u.alive?C(u.color):'#8d8390',rp=ramp(col),tail=x,cap=x+64,H=9,L=cap-(tail+5);
+  if(c.mpStep!==B.t){c.mpShow=c.mpShow==null||!Prefs.shake?u.mp:lerp(c.mpShow,u.mp,.18);if(Math.abs(c.mpShow-u.mp)<.05)c.mpShow=u.mp;c.mpStep=B.t;}
+  const f=clamp(c.mpShow/u.maxmp,0,1),body=Math.round(L*f),start=cap-body,squeeze=Prefs.shake?Math.round(uiPop(c.squeeze,22)):0;
+  // Crimped tail: a flat, ridged end that never goes away.
+  g.fillStyle=KIT_INK;g.fillRect(tail,y,5,H);g.fillStyle='#bdb5aa';g.fillRect(tail+1,y+1,3,H-2);g.fillStyle='#8f8779';for(let k=0;k<3;k++)g.fillRect(tail+1,y+1+k*2,3,1);
+  // The spent part: flattened aluminium with creases, and a curl where it is rolled.
+  if(start>tail+5){const w=start-tail-5;g.fillStyle=KIT_INK;g.fillRect(tail+5,y+2,w,4);g.fillStyle='#b7afa4';g.fillRect(tail+5,y+3,w,2);g.fillStyle='#8f8779';for(let k=tail+7;k<start-2;k+=4)g.fillRect(k,y+3,1,2);
+    g.fillStyle=KIT_INK;g.beginPath();g.arc(start,y+4,4,0,6.29);g.fill();g.fillStyle='#d6cfc3';g.beginPath();g.arc(start,y+4,2.8,0,6.29);g.fill();g.fillStyle='#8f8779';g.fillRect(start-1,y+4,3,1);g.fillRect(start,y+3,1,1);}
+  // The full part: coloured body with a light top and a darker belly; it bulges when squeezed.
+  if(body>0){const top=y-squeeze,h=H+squeeze*2;
+    g.fillStyle=KIT_INK;g.fillRect(start,top,body+1,h);g.fillStyle=col;g.fillRect(start+1,top+1,body,h-2);
+    g.fillStyle=rp.hi;g.fillRect(start+1,top+1,body,1);g.fillStyle=mixHex(col,rp.sh,.5);g.fillRect(start+1,top+h-3,body,1);g.fillStyle=rp.sh;g.fillRect(start+1,top+h-2,body,1);
+    g.fillStyle='#fff6e2';g.fillRect(start+2,top+2,Math.min(4,body-1),1);
+    // The stretch a command would spend: pale and breathing, from the rolled end inward.
+    if(cost){const n=Math.min(body,Math.max(2,Math.round(L*Math.min(cost,u.mp)/u.maxmp))),over=cost>u.mp,pulse=Prefs.shake?.4+.2*Math.sin(B.t*.2):.55;
+      g.fillStyle=over?'#ec8993':mixHex(col,'#fff6e2',pulse);g.fillRect(start+1,top+1,n,h-2);g.fillStyle=over?'#a12f42':mixHex(col,'#fff6e2',pulse*.5);g.fillRect(start+n,top+1,1,h-2);}}
+  // Tapered shoulder and ribbed cap.
+  g.fillStyle=KIT_INK;g.fillRect(cap,y,3,H);g.fillRect(cap+3,y+1,7,H-2);g.fillStyle='#cfc7bb';g.fillRect(cap+1,y+1,2,H-2);g.fillStyle='#3b3346';g.fillRect(cap+4,y+2,5,H-4);g.fillStyle='#6a6076';g.fillRect(cap+5,y+2,1,H-4);g.fillRect(cap+7,y+2,1,H-4);
+  // The label carries what is left; a small tag in front of it says what would be spent.
+  const n=String(u.mp),nw=textWidth(n)+5,lx=cap-nw-1;
+  g.fillStyle=KIT_INK;g.fillRect(lx-1,y,nw+2,H);g.fillStyle=u.mp?'#fff2cf':'#f3d9d9';g.fillRect(lx,y+1,nw,H-2);textCenter(n,lx+nw/2,y+1,u.mp?UI_INK:'#a73445');
+  if(cost){const tag='-'+cost,tw=textWidth(tag)+5,tx=lx-tw-2,over=cost>u.mp;g.fillStyle=KIT_INK;g.fillRect(tx-1,y,tw+2,H);g.fillStyle=over?'#f3c7cb':'#f7dfad';g.fillRect(tx,y+1,tw,H-2);textCenter(tag,tx+tw/2,y+1,over?'#a12f42':'#6b4a1c');}
+  // A bead of paint leaves the nozzle when the tube is squeezed.
+  const age=B.t-c.squeeze;if(Prefs.shake&&age>=0&&age<16&&u.mp<(c.mpFrom??u.mp+1)){g.fillStyle=col;g.fillRect(cap+10,y+3+Math.round(age*.4),2,2);}
 }
 function drawATBBrush(x,y,u,c,reserved) {
   const ready=u.alive&&u.atb>=100&&!u.acting,col=reserved?'#ad8dcc':u.alive?C(u.color):'#877b87',rp=ramp(col);
@@ -173,7 +183,7 @@ function drawATBBrush(x,y,u,c,reserved) {
   if(end>0){
     g.fillStyle=col;g.fillRect(x+1,y,end,5);
     // Bristle streaks: the wet edge is ragged, a little longer on the middle hairs.
-    g.fillStyle=rp.sh;for(let i=3;i<end-2;i+=7)g.fillRect(x+1+i,y+3,4,1);
+    g.fillStyle=mixHex(col,rp.sh,.45);for(let i=3,k=0;i<end-2;i+=5+(k*7)%6,k++)g.fillRect(x+1+i,y+3+(k&1),2+(k*3)%4,1);
     g.fillStyle=rp.hi;g.fillRect(x+1,y,end,1);
     if(!ready){g.fillStyle=col;g.fillRect(x+1+end,y+1,1,3);g.fillRect(x+2+end,y+2,1,1);}
   }
@@ -217,25 +227,24 @@ function drawPartyCards() {
     const rise = Math.round((1 - uiIn(B.fightStart, 15, i * 6)) * 40) + Math.round(uiFade(BUI.resultAt, 18, i * 4) * 44 * (B.showResult ? 1 : 0));
     g.save(); g.translate(0, rise);
     // Three individual stickers and tubes; the continuous HUD slab is gone.
-    maskingLabel(x + 24, y, 53, 22, !u.alive ? '#d8d0c4' : UI_PAPER);
+    maskingLabel(x + 24, y, 78, 15, !u.alive ? '#d8d0c4' : UI_PAPER);
     const bounce = Math.round(uiPop(c.readyAt) * 3), jolt = Prefs.shake && uiAge(c.hit, 12) < 1 ? Math.round(Math.sin((B.t-c.hit)*1.8)*2*(1-uiAge(c.hit,12))) : 0;
     if (active || reserved) { g.fillStyle = reserved ? '#b796d0' : col; g.beginPath(); g.arc(x+13,y+10,12,0,6.29); g.fill(); if (active && Prefs.shake) { g.fillStyle = ramp(reserved ? '#b796d0' : col).hi; g.fillRect(x+6, y+3, 2, 1); g.fillRect(x+4, y+5, 1, 2); } }
     paintRing(x+13, y+10, uiAge(c.readyAt, 18), col, 16);
     g.save(); g.translate(x+13+jolt,y+10-bounce); g.rotate(uiPop(c.hit,12)*.12); sticker(0,0,u,10); g.restore();
     smallText(u.name, x + 29, y + 2, u.alive ? UI_INK : UI_MUTED);
-    smallText(u.hp + '/' + u.maxhp, x + 29, y + 11, low ? '#a12f42' : u.alive ? UI_INK : UI_MUTED);
+    const hpText = String(u.hp), hx = x + 97 - textWidth(hpText); // the stroke below already shows the maximum
+    textRight(hpText, x + 97, y + 2, low ? '#a12f42' : u.alive ? UI_INK : UI_MUTED);
     // The heart beats faster when the paint is running out.
-    const beat = low && Prefs.shake ? ((B.t >> 3) & 1 ? 1 : 0) : 0;
-    g.fillStyle = low ? (beat ? '#d24d5e' : '#a04750') : '#a04750'; g.fillRect(x+22,y+11-beat,2,2);g.fillRect(x+25,y+11-beat,2,2);g.fillRect(x+22,y+13-beat,5,1);g.fillRect(x+23,y+14-beat,3,1);g.fillRect(x+24,y+15-beat,1,1);
-    // HP is a thick, wet stroke. Lost paint lingers before drying away.
-    g.fillStyle = '#a89a88'; g.fillRect(x + 29, y + 19, 43, 3);
-    g.fillStyle = '#dfa495'; g.fillRect(x + 29, y + 19, Math.round(43*c.trail/u.maxhp), 3);
-    g.fillStyle = low ? '#b23749' : col; g.fillRect(x + 29, y + 19, Math.round(43*u.hp/u.maxhp), 2);
-    if (low) { g.fillStyle = '#c4384a'; g.globalAlpha = .35; g.beginPath(); g.ellipse(x+70, y+5, 6, 4, .4, 0, 6.29); g.fill(); g.globalAlpha = 1; }
+    const beat = low && Prefs.shake ? ((B.t >> 3) & 1 ? 1 : 0) : 0, hy = y + 3 - beat, ht = hx - 7;
+    g.fillStyle = low ? (beat ? '#d24d5e' : '#a04750') : '#a04750'; g.fillRect(ht,hy,2,2);g.fillRect(ht+3,hy,2,2);g.fillRect(ht,hy+2,5,1);g.fillRect(ht+1,hy+3,3,1);g.fillRect(ht+2,hy+4,1,1);
+    // HP is a thick, wet stroke along the bottom of the tape. Lost paint lingers before drying away.
+    g.fillStyle = '#a89a88'; g.fillRect(x + 28, y + 11, 70, 2);
+    g.fillStyle = '#dfa495'; g.fillRect(x + 28, y + 11, Math.round(70*c.trail/u.maxhp), 2);
+    g.fillStyle = low ? '#b23749' : col; g.fillRect(x + 28, y + 11, Math.round(70*u.hp/u.maxhp), 2);
+    if (low) { g.fillStyle = '#c4384a'; g.globalAlpha = .35; g.beginPath(); g.ellipse(x+62, y+6, 6, 4, .4, 0, 6.29); g.fill(); g.globalAlpha = 1; }
     if (Prefs.shake && uiAge(c.hit, 20) < 1) { g.fillStyle = '#c4384a'; g.globalAlpha = 1 - uiAge(c.hit, 20); for (let k = 0; k < 4; k++) g.fillRect(x + 48 + ((k * 13) % 26), y + 1 + ((k * 7) % 5), 1 + (k & 1), 1); g.globalAlpha = 1; }
-    paintTube(x+79,y+5,u,c,cost);
-    // The tube speaks only when it has news: the spend being previewed, or a reserved mix.
-    if(cost||reserved){maskingLabel(x+79,y-4,24,9,cost?'#f7dfad':'#e4d5ee');textCenter(cost?'-'+cost:'MIX',x+91,y-3,cost>u.mp?'#a12f42':cost?UI_INK:'#674875');}
+    paintTube(x+27,y+15,u,c,cost);
     drawStatusIcons(u,x+1,y+14);
     // An enemy's ink thread reaches the portrait too: a drop hangs from the sticker while the attack is announced.
     if (u.alive && B.enemies.some(e => e.alive && e.intent && !e.acting && (e.intent.all || e.intent.target === u))) { const wob = Prefs.shake ? Math.round(Math.sin(B.t * .3)) : 0; g.fillStyle = '#2a2438'; g.fillRect(x+3, y-4+wob, 1, 2); g.fillRect(x+2, y-2+wob, 3, 3); g.fillRect(x+3, y+1+wob, 1, 1); g.fillStyle = '#8c8ab0'; g.fillRect(x+2, y-1+wob, 1, 1); }
@@ -282,9 +291,6 @@ function commandTool(row, u, x, y) {
   }
   g.drawImage(iconSprite(row[2],C(u.color)),x-2,y-2,16,16);
 }
-function paletteToolLabel(row,u) {
-  return row[0]==='reload'?'+6 MP':row[0]==='role'?{carmin:'Proteger',ambar:'Corte',anil:'Capa'}[u.id]:row[1];
-}
 function paletteToolHint(row,u) {
   return row[0]==='attack'?DATA.weapons[u.data.weapon].desc:row[0]==='tech'?'Técnicas propias y mezclas con las otras gotas.':row[0]==='item'?'Estuche: agua, tubos, goma y savia.':row[0]==='role'?ROLE_ACTIONS[u.id].desc:'Exprime el tubo: +6 MP. Gasta la brocha.';
 }
@@ -302,68 +308,64 @@ function drawPaletteOwner(m) {
   g.restore();
   if(canChange)uiHit(4,33,113,16,cycleBattlePainter);
 }
+// The painter's palette: a kidney of walnut with a real thumb hole. Attacking is the big
+// well in the middle; the other four sit in a cross, one per direction, so the hand
+// learns them. Only the chosen well is named, on the tape below.
+const PALETTE_WELL_COLORS = ['#b46756','#748c59','#688daa','#98749e','#c49a52'];
+function palettePath(x, y, grow = 0) {
+  const cx = x + 57, cy = y + 38;
+  g.beginPath();
+  for (let i = 0; i <= 72; i++) {
+    const a = i / 72 * 6.283, bite = 1 - .15 * Math.exp(-((a - 2.25) ** 2) / .07), wob = 1 + .018 * Math.sin(a * 5 + 1.3);
+    const px = cx + Math.cos(a) * (58 + grow) * bite * wob, py = cy + Math.sin(a) * (40 + grow) * bite * wob;
+    if (i) g.lineTo(px, py); else g.moveTo(px, py);
+  }
+  g.closePath();
+  g.moveTo(x + 45, y + 54); g.ellipse(x + 39, y + 54, 6 - grow * .3, 4.5 - grow * .3, -.4, 0, 6.283); // thumb hole (evenodd cuts it)
+}
 function drawCommandPalette(m, ghost = false) {
   const {x,y}=PALETTE_ORIGIN,col=C(m.unit.color),rows=commandRows(m.unit),intro=ghost?1:uiIn(BUI.openedAt,14),wobble=ghost?0:uiPop(BUI.deniedAt,18)*3;
   if(!ghost)drawPaletteOwner(m);
   g.save();
-  // The wooden palette swings in from the painter's side and settles with a small overshoot.
+  // The palette swings in from the painter's side and settles with a small overshoot.
   g.translate(Math.round(wobble-(1-intro)*70),Math.round((1-intro)*34));g.translate(x+57,y+38);g.rotate((1-intro)*-.35);g.translate(-(x+57),-(y+38));
-  // Carved walnut, a worn bevel and dried pigment caught in the wood grain.
-  g.fillStyle='#201926';g.beginPath();g.ellipse(x+57,y+40,58,41,-.12,0,6.29);g.fill();
-  g.fillStyle='#77492f';g.beginPath();g.ellipse(x+57,y+38,57,40,-.12,0,6.29);g.fill();
-  g.fillStyle='#edc78c';g.beginPath();g.ellipse(x+56,y+36,55,38,-.12,0,6.29);g.fill();
-  g.fillStyle='#c39660';g.beginPath();g.ellipse(x+57,y+37,53,35,-.12,0,6.29);g.fill();
-  for(let i=0;i<5;i++){g.strokeStyle=i%2?'#e0b57b':'#a7764a';g.lineWidth=1;g.beginPath();g.ellipse(x+55,y+38,31+i*4,14+i*4,-.1,.12,3.04);g.stroke();}
-  g.fillStyle=KIT_INK;g.beginPath();g.ellipse(x+13,y+36,5,7,-.4,0,6.29);g.fill();g.fillStyle='#f0cc91';g.fillRect(x+8,y+31,2,5);g.fillStyle='#885834';g.fillRect(x+17,y+35,2,5);
-  [['#ac554b',37,37],['#6a8d85',88,60],['#967287',47,61],['#e8cc94',78,26]].forEach(([c,px,py])=>{g.fillStyle=c;g.fillRect(x+px,y+py,3,2);g.fillRect(x+px+3,y+py+1,1,1);});
+  // Shadow, dark rim, a light bevel on the upper edge and the oiled face; the hole goes all the way through.
+  g.save();g.translate(1,3);palettePath(x,y,1);g.fillStyle='rgba(20,16,28,.45)';g.fill('evenodd');g.restore();
+  palettePath(x,y,1);g.fillStyle='#201926';g.fill('evenodd');
+  palettePath(x,y);g.fillStyle='#77492f';g.fill('evenodd');
+  g.save();g.translate(-1,-1);palettePath(x,y,-1.5);g.fillStyle='#e6be83';g.fill('evenodd');g.restore();
+  palettePath(x,y,-2.5);g.fillStyle='#c39660';g.fill('evenodd');
+  // Grain follows the wood around the hole, and old pigment is caught in it.
+  g.save();palettePath(x,y,-2.5);g.clip('evenodd');
+  for(let i=0;i<6;i++){g.strokeStyle=i%2?'#d4a86e':'#ad7c4d';g.lineWidth=1;g.beginPath();g.ellipse(x+40,y+52,20+i*9,12+i*6,-.25,3.5,6.1);g.stroke();}
+  [['#ac554b',38,24],['#6a8d85',80,58],['#967287',74,18],['#e8cc94',96,54],['#5c7fa6',40,48]].forEach(([c,px,py])=>{g.fillStyle=c;g.fillRect(x+px,y+py,3,2);g.fillRect(x+px+3,y+py+1,1,1);g.fillRect(x+px+1,y+py-1,1,1);});
+  g.restore();
+  g.strokeStyle='#4a2e20';g.lineWidth=1;g.beginPath();g.ellipse(x+39.5,y+54.5,6.5,5,-.4,3.4,6.2);g.stroke();g.strokeStyle='#e6be83';g.beginPath();g.ellipse(x+39,y+54,7.5,5.5,-.4,.3,2.6);g.stroke(); // lip and worn edge of the hole
+  // A carved cross joins the middle well to its four arms; the groove to the chosen arm holds wet paint.
+  const C0=PALETTE_TOOLS[0];
+  for(let i=1;i<5;i++){const [px,py]=PALETTE_TOOLS[i],on=i===m.idx,x0=Math.min(C0[0],px),y0=Math.min(C0[1],py),w=Math.abs(px-C0[0]),h=Math.abs(py-C0[1]);
+    if(w){g.fillStyle='#8a5a38';g.fillRect(x+x0,y+C0[1]-1,w,3);g.fillStyle='#e0b57b';g.fillRect(x+x0,y+C0[1]+2,w,1);if(on){g.fillStyle=col;g.fillRect(x+x0,y+C0[1],w,1);}}
+    else{g.fillStyle='#8a5a38';g.fillRect(x+C0[0]-1,y+y0,3,h);g.fillStyle='#e0b57b';g.fillRect(x+C0[0]+2,y+y0,1,h);if(on){g.fillStyle=col;g.fillRect(x+C0[0],y+y0,1,h);}}}
   const [sx,sy]=PALETTE_TOOLS[m.idx];
-  // The selection ring glides between wells; the brush follows it a beat later and dips into the paint.
-  const cur=ghost?{x:sx,y:sy}:glide(BUI.cursor||(BUI.cursor={x:sx,y:sy}),sx,sy);
-  const targetAngle=Math.atan2(cur.y-37,cur.x-55);
-  if(!ghost){if(BUI.brushAngle==null||!Prefs.shake)BUI.brushAngle=targetAngle;else{let d=Math.atan2(Math.sin(targetAngle-BUI.brushAngle),Math.cos(targetAngle-BUI.brushAngle));BUI.brushAngle+=d*.3;}}
-  const sway=ghost||!Prefs.shake?0:Math.sin(B.t*.05)*.02,angle=(ghost?targetAngle:BUI.brushAngle)+sway,dip=ghost?0:uiPop(BUI.selectedAt,14)*5;
-  const labelHits=[],tags=[];
-  rows.forEach((row,i)=>{const [px,py]=PALETTE_TOOLS[i],selected=i===m.idx,pop=selected&&!ghost?uiPop(BUI.selectedAt,20)*2:0,grow=ghost?1:Math.min(1.08,uiIn(BUI.openedAt,9,5+i*3)),lift=selected?2:0;
-    if(selected){
-      g.fillStyle=KIT_INK;g.beginPath();g.ellipse(x+cur.x,y+cur.y+2,15+pop,12+pop,0,0,6.29);g.fill();
-      g.fillStyle='#fff1cf';g.beginPath();g.ellipse(x+cur.x,y+cur.y,14+pop,11.5+pop,0,0,6.29);g.fill();
-    }
-    // The chosen well sits proud of the wood; the others rest a little deeper in shadow.
+  // The selection ring glides between wells.
+  const cur=ghost?{x:sx,y:sy}:glide(BUI.cursor||(BUI.cursor={x:sx,y:sy}),sx,sy),big=m.idx===0?3:0;
+  if(!ghost){g.fillStyle=KIT_INK;g.beginPath();g.ellipse(x+cur.x,y+cur.y+2,15+big,12.5+big,0,0,6.29);g.fill();g.fillStyle='#fff1cf';g.beginPath();g.ellipse(x+cur.x,y+cur.y,14+big,11.5+big,0,0,6.29);g.fill();}
+  rows.forEach((row,i)=>{const [px,py]=PALETTE_TOOLS[i],selected=i===m.idx,pop=selected&&!ghost?uiPop(BUI.selectedAt,20)*2:0,grow=ghost?1:Math.min(1.08,uiIn(BUI.openedAt,9,5+i*3)),lift=selected?2:0,r=(i===0?13:10)+(selected?1:0);
+    // The chosen well sits proud of the wood; the others rest deeper, in their own shadow.
+    if(!selected&&!ghost){g.fillStyle=KIT_INK;g.globalAlpha*=.18;g.beginPath();g.ellipse(x+px+1,y+py+2,r*grow,r*.8*grow,-.12,0,6.29);g.fill();g.globalAlpha/=.18;}
     if(selected)g.save(),g.translate(0,-lift);
-    paintDab(x+px,y+py,(selected?11:10)*grow,selected?col:['#b46756','#748c59','#688daa','#98749e','#78966d'][i],pop);
-    if(grow>.55)commandTool(row,m.unit,x+px-6,y+py-6-Math.round(pop));
-    if(selected&&Prefs.shake&&grow>.55){
-      // Wet paint catches a moving glint.
-      const a=B.t*.09,gx=Math.round(x+px+Math.cos(a)*6),gy=Math.round(y+py-1+Math.sin(a)*3);
-      g.fillStyle='#fff8e6';g.fillRect(gx,gy,2,1);g.fillStyle=ramp(col).hi;g.fillRect(gx-1,gy+1,1,1);
-    }
+    paintDab(x+px,y+py,r*grow,selected?col:PALETTE_WELL_COLORS[i],pop);
+    if(grow>.55){if(i===0){g.save();g.translate(x+px,y+py);g.scale(1.3,1.3);commandTool(row,m.unit,-6,-6-Math.round(pop));g.restore();}else commandTool(row,m.unit,x+px-6,y+py-6-Math.round(pop));}
+    if(selected&&Prefs.shake&&grow>.55){const a=B.t*.09,gx=Math.round(x+px+Math.cos(a)*(r-4)),gy=Math.round(y+py-1+Math.sin(a)*(r*.4));g.fillStyle='#fff8e6';g.fillRect(gx,gy,2,1);g.fillStyle=ramp(col).hi;g.fillRect(gx-1,gy+1,1,1);}
     if(selected)g.restore();
-    else if(!ghost){g.fillStyle=KIT_INK;g.globalAlpha*=.14;g.beginPath();g.ellipse(x+px,y+py,11*grow,8.5*grow,-.12,0,6.29);g.fill();g.globalAlpha/=.14;}
-    if(!ghost){
-      uiHit(x+px-14,y+py-13,28,25,()=>activatePaletteTool(m,i),()=>focusPaletteTool(m,i));
-      tags.push({row,i,px,py,selected,grow});
-    }
+    const hr=i===0?13:10;if(!ghost)uiHit(x+px-hr-3,y+py-hr-2,hr*2+6,hr*2+4,()=>activatePaletteTool(m,i),()=>focusPaletteTool(m,i)); // fixed boxes: hovering never moves them
   });
-  // The painter's brush points from the mixing area to the chosen well.
-  g.save();g.translate(x+55+Math.cos(angle)*dip,y+37+Math.sin(angle)*dip);g.rotate(angle);
-  g.fillStyle=KIT_INK;g.fillRect(-3,-2,17,4);g.fillStyle='#efd4a0';g.fillRect(-3,-1,10,2);g.fillStyle='#e4dcd0';g.fillRect(7,-2,3,4);g.fillStyle=col;g.fillRect(10,-2,4+Math.round(dip*.4),4);g.restore();
-  // Names are pencilled on the wood under each well; the chosen one gets a paper tag.
-  for(const t of tags){
-    const label=paletteToolLabel(t.row,m.unit),lw=textWidth(label)+8,lean=[0,0,-7,0,8][t.i],lx=Math.max(8,Math.round(x+t.px+lean-lw/2)),ly=y+t.py+(t.i===3?10:12),cx=lx+lw/2;
-    g.save();g.globalAlpha*=clamp(t.grow,0,1);
-    if(t.selected){maskingLabel(lx,ly-1,lw,10,'#fff1ca');textCenter(label,cx,ly,UI_INK);g.fillStyle=col;g.fillRect(lx+3,ly+7,lw-6,1);g.fillStyle='#fff1ca';g.fillRect(x+t.px-1,ly-2,3,1);g.fillRect(x+t.px,ly-3,1,1);}
-    else{for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1],[1,1]]){textCenter(label,cx+ox,ly+oy,'#edc78c');UI_TEXT.pop();}textCenter(label,cx,ly,'#4b3320');} // a pale wood halo keeps the pencil legible where the name leans past the rim // the pencil's light edge is decoration, not a second label
-    g.restore();
-    labelHits.push([lx-1,ly-1,lw+2,11,()=>activatePaletteTool(m,t.i),()=>focusPaletteTool(m,t.i)]);
-  }
-  // The name is the most precise hit area where a well's generous touch box
-  // reaches its neighbour; register all names above those boxes.
-  labelHits.forEach(args=>uiHit(...args));
   g.restore();
   if(!ghost){
-    const name=rows[m.idx][1],key=battleKey('ok'),kw=Math.max(13,textWidth(key)+6),w=113,drop=Math.round((1-uiIn(BUI.openedAt,11,4))*18);
+    // The tape names the chosen well with its key; a dab of the well's own colour ties them.
+    const name=rows[m.idx][1],key=battleKey('ok'),kw=Math.max(13,textWidth(key)+6),w=Math.max(70,kw+textWidth(name)+22),drop=Math.round((1-uiIn(BUI.openedAt,11,4))*18),at=BUI.selectedAt,slide=Prefs.shake?Math.round((1-clamp((B.t-at)/6,0,1))*3):0;
     g.save();g.translate(0,drop);
-    maskingLabel(3,135,w,12);brushBand(4,135,kw,12,col);textCenter(key,4+kw/2,138,accentInk(col));smallText(name,kw+9,138);
+    maskingLabel(3,135,w,12);brushBand(4,135,kw,12,col);textCenter(key,4+kw/2,138,accentInk(col));smallText(name,kw+9+slide,138);
     g.restore();
     uiHit(3,135,w,13,()=>pressed.ok=true);
   }
@@ -616,7 +618,7 @@ function drawBattleResults() {
 }
 const GUIDE_PAGES = [
   { title:'Pintar y reaccionar',lines:['Núcleo: afinidad del enemigo.','Complementario x2. Mismo color x0.5.','Capa: el aro guarda una gota por acción.','Pincel y Preparar: dura 3 acciones.','Rojo + amarillo: daño y salpicadura.','Amarillo + azul: raíces y cura grupal.','Rojo + azul: interrumpe y firma.','Hilo de tinta: a quién va a atacar.'] },
-  { title:'Tiempo y herramientas',lines:['Brocha llena: turno. Tubo: MP.','-N en el tubo: coste. MIX: reservada.','Liberar conserva el ATB de cada gota.','Paleta: cuatro direcciones o rueda.','Toca para elegir; otra vez para abrir.','Otra gota: su retrato o {swap}.','Volver conserva tu última selección.','Objetivo: flechas o toca su nombre.'] },
+  { title:'Tiempo y herramientas',lines:['Brocha llena: turno. Tubo: MP.','Tramo claro del tubo: coste. Lila: reservada.','Liberar conserva el ATB de cada gota.','Paleta: cuatro direcciones o rueda.','Toca para elegir; otra vez para abrir.','Otra gota: su retrato o {swap}.','Volver conserva tu última selección.','Objetivo: flechas o toca su nombre.'] },
   { title:'Leer a La Tinta',lines:['I: roba MP. Su núcleo cambia de color.','Reacción o 3 primarios: rompe coraza.','Abrirla: +2 MP para cada gota viva.','II: núcleo abierto. Vigila la marea.','III: vuelve la coraza y borra capas.','Arcoíris brilla con la coraza abierta.','Gotea: lento. Tizne: pega menos.','Perfil: recibe -40%. Rúbrica: +30%.'] },
 ];
 const BINDING_NAMES = { ok:'Confirmar', back:'Volver', swap:'Cambiar gota', release:'Liberar mezcla', options:'Opciones', journal:'Estudios', help:'Guía', up:'Arriba', down:'Abajo', left:'Izquierda', right:'Derecha', ring:'Herramientas' };
