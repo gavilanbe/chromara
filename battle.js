@@ -167,7 +167,33 @@ function* transitionGen(foe) {
     yield;
   }
   B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); B.enemies.forEach(u => { u.wz = 0; });
+  // 6) presentación: la cámara se vuelve hacia los rivales; cada uno da un respingo por turnos
+  // y su nombre se escribe a plumilla sobre él. Con un grupo ya conocido, más breve. Sin RNG.
+  T.stage = 'intro'; T.names = B.enemies.map((u, j) => ({ u, at: (short ? 2 : 6) + j * (short ? 4 : 9) })); T.i = 0;
+  const introN = short ? 30 : 62; T.introN = introN;
+  if (Prefs.camera !== 'fija') camGo(fitCameraSubjects(B.enemies, { home: true, yaw: SCENE.rest.yaw + .22, dist: 80, zoom: 1.3, headroom: 16, box: [24, 44, 296, 142] }), .1);
+  for (let i = 0; i < introN; i++) {
+    T.i = i;
+    for (const n of T.names) { const q = i - n.at; if (q === 0) { Audio.sfx('plop', { semi: -7 - n.u.idx * 2, vol: .6 }); mark({ kind: 'pool', p: [n.u.wx, n.u.wy, 0], col: '#0b0912', w: n.u.def.w * .9, life: 26, grow: 4 }); } n.u.wz = q >= 0 && q < 12 ? Math.sin(q / 12 * Math.PI) * 7 : 0; n.u.pose = q >= 0 && q < 12 ? 'hurt' : 'idle'; }
+    yield;
+  }
+  B.enemies.forEach(u => { u.wz = 0; u.pose = 'idle'; });
   B.tr = null; OW.hideFoe = null; OW.scare = null; B.phase = 'fight'; B.fightStart = B.t; Audio.sfx('banner'); setState('battle');
+}
+// Nombres de la presentación: cinta de carrocero sobre cada rival, escrita a plumilla con tinta aún húmeda.
+function drawIntroNames(T) {
+  for (const n of T.names) {
+    const q = T.i - n.at; if (q < 0 || !n.u.alive) continue;
+    const u = n.u, s = u.sc * B.unitScale * 1.6, name = u.name, w = textWidth(name) + 12, x = clamp(Math.round(u.x - w / 2), 3, W - w - 3);
+    // Under the feet, unless that would cover a nearer rival; then above the head.
+    const covers = B.enemies.some(o => o !== u && o.alive && o.y > u.y && Math.abs(o.x - u.x) < (o.def.w * o.sc * B.unitScale * .8 + w / 2) && o.y - o.def.h * o.sc * B.unitScale * 1.6 < u.y + 14);
+    const y = clamp(Math.round(covers ? u.y - u.def.h * s - 14 : u.y + 4), 24, 150);
+    const drop = Prefs.shake ? Math.round((1 - clamp(q / 8, 0, 1)) ** 2 * -6) : 0, out = clamp((T.i - T.introN + 10) / 10, 0, 1);
+    g.save(); g.globalAlpha *= 1 - out; g.translate(0, drop);
+    maskingLabel(x, y, w, 11); paintDab(x + 5, y + 5, 2.5, u.def.core || '#2a2438', 0);
+    smallText(name, x + 9, y + 2, UI_INK, { progress: Prefs.shake ? q * .9 : null, wet: '#2a2438', nib: !!Prefs.shake });
+    g.restore();
+  }
 }
 // Copia del mapa congelado para la fase 'blot': se muestra fuera de la ventana de tinta, con el borde blando y desaturado
 let MAPC = null, MAPG = null; // se crea al primer uso (W y H viven en game.js, que carga después)
@@ -258,7 +284,8 @@ function drawTransitionFx() {
     MAPG.globalCompositeOperation = 'destination-out'; MAPG.fillStyle = gr; MAPG.fillRect(-W * 3, -H * 4, W * 6, H * 8); MAPG.restore();
     g.drawImage(MAPC, 0, 0);
     inkSplat(sx, sy, R0 * .75, k, B.t, 7, true);
-  } else if (T.stage === 'drain') { // la mancha se escurre hacia el charco de los enemigos y encoge
+  } else if (T.stage === 'intro') drawIntroNames(T);
+  else if (T.stage === 'drain') { // la mancha se escurre hacia el charco de los enemigos y encoge
     const k = T.k, e = k * k, cx = lerp(p[0], q[0], e), cy = lerp(p[1], q[1], e), R0 = lerp(118, B.puddle.rx, e);
     g.save(); g.translate(cx, cy); g.scale(1, .75); inkSplat(0, 0, R0 * .75, 1 - e * .8, B.t, 7, false); g.restore();
   }
@@ -665,15 +692,44 @@ function drawUnit(u) {
     const glow = tintSprite(spr, u.kind === 'party' ? C(u.color) : '#8c8ab0', 1), pulse = .3 + (Prefs.shake ? .25 * Math.sin(B.t * .45) : .1), reach = Prefs.shake ? 2 : 1;
     g.save(); g.globalAlpha *= pulse; for (const [ox, oy] of [[-reach, 0], [reach, 0], [0, -reach], [0, reach]]) drawSprite(glow, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore();
   }
+  if (u.boss && u.alive) drawBossTendrils(u, SX, SY, bob, false);
   // Las Gotas Negras llevan un filo de papel húmedo: sin él se pierden sobre su propio charco de tinta.
   if (u.kind === 'enemy' && u.alive && u.pose !== 'charge') { const rim = tintSprite(spr, '#ece3cf', 1); g.save(); g.globalAlpha *= .8; for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1]]) drawSprite(rim, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore(); }
   drawSprite(spr, u.x, u.y - bob, SX, flip, SY);
+  if (u.boss && u.alive) drawBossTendrils(u, SX, SY, bob, true);
   if (u.id === 'anil' && u.alive && !info.atlas) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
   g.restore();
   if (clip) g.restore();
   g.globalAlpha = 1;
   drawStatusMarks(u, s);
+}
+// La Tinta no es sólo una gota grande: tentáculos de tinta se mecen desde su charco por
+// detrás y goterones le resbalan por delante y caen. Todo depende de B.t (sin RNG) y se
+// aquieta con «Sin sacudidas». En la fase III se agitan más.
+function drawBossTendrils(u, SX, SY, bob, front) {
+  const w = u.def.w * SX, H0 = u.def.h * SX * SY, x0 = u.x, y0 = u.y - bob, t = Prefs.shake ? B.t : 0, fury = u.bossPhase >= 3 ? 1.6 : u.bossPhase === 2 ? 1.25 : 1;
+  if (!front) {
+    // Four thick ink tongues rise from the puddle beside her and lean outward, each a chain
+    // of wet beads thinning to a point; the highlight runs down their inner edge.
+    const arms = [[-1, .62, 0, .44], [1, .7, 1.9, .46], [-1, .42, 3.4, .56], [1, .46, 4.6, .58]];
+    for (const [side, reach, ph, root] of arms) {
+      const bx = x0 + side * w * root, by = y0 + 1, len = H0 * reach * (.88 + .12 * Math.sin(t * .035 * fury + ph)), r0 = Math.max(2.5, w * .1);
+      const pts = [];
+      for (let n = 0; n <= 10; n++) { const q = n / 10, lean = side * (q * q * w * .3 + Math.sin(q * 2.6 + t * .055 * fury + ph) * w * .06 * q); pts.push([bx + lean, by - len * q, r0 * (1 - q * .82)]); }
+      g.fillStyle = '#0b0912'; for (const [px, py, r] of pts) { g.beginPath(); g.arc(Math.round(px), Math.round(py), r, 0, 6.29); g.fill(); }
+      g.fillStyle = '#3a3652'; for (let n = 2; n < 9; n++) { const [px, py, r] = pts[n]; g.fillRect(Math.round(px - side * r * .45), Math.round(py), 1, 2); }
+      const tip = pts[10]; g.fillStyle = '#4a4664'; g.fillRect(Math.round(tip[0]), Math.round(tip[1]) - 1, 1, 1);
+    }
+    return;
+  }
+  // Goterones: nacen en el vientre, se estiran y caen al charco.
+  for (let i = 0; i < 4; i++) {
+    const cyc = 70 + i * 13, q = ((t + i * 29) % cyc) / cyc, dx = (i / 3 - .5) * w * .7, top = y0 - H0 * (.35 + (i % 2) * .1);
+    const stretch = q < .6 ? q / .6 : 1, fall = q < .6 ? 0 : (q - .6) / .4, len = 2 + stretch * 5, dy = top + stretch * 4 + fall * fall * (y0 - top);
+    g.fillStyle = '#0b0912'; g.fillRect(Math.round(x0 + dx), Math.round(dy - len), 2, Math.round(len)); g.beginPath(); g.arc(x0 + dx + 1, dy, 1.6 + stretch * .6, 0, 6.29); g.fill();
+    if (fall > .9) { g.fillStyle = '#2a2438'; g.fillRect(Math.round(x0 + dx - 2), Math.round(y0), 6, 1); }
+  }
 }
 function drawGroundLayer() {
   // charco de tinta de los enemigos (aparece al drenar la mancha)

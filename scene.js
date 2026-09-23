@@ -228,7 +228,7 @@ function cameraShowsUnit(u) {
   // depth; only unrelated foreground units are kept out of the HUD.
   const b=cameraBounds(u,SCENE.cam);
   if(!b)return false;
-  const m=B.menu,subjects=B.currentAction?SCENE.shot?.subjects:menuCameraSubjects(m)||(m?.level==='target'?validTargets(m.pending,m.unit):null);
+  const m=B.menu,subjects=B.currentAction?SCENE.shot?.subjects:B.tr?.stage==='intro'?B.enemies:menuCameraSubjects(m)||(m?.level==='target'?validTargets(m.pending,m.unit):null);
   if(!subjects||subjects.includes(u))return true;
   return b[0]>=2&&b[1]>=30&&b[2]<=318&&b[3]<=144;
 }
