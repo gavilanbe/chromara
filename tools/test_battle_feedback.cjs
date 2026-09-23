@@ -43,4 +43,17 @@ test('reduced motion removes decoration, and feedback never consumes combat RNG'
  run(`Prefs.shake=.5;B.t++;B.party[0].mp--;observeBattleFeedback();drawPartyCards();drawPaintMotes()`);
  ctx.Math.random=originalRandom;assert.equal(randomCalls,0);
 });
+test('the ink encounter plays every beat to the battle, drawn each frame, with and without motion',()=>{
+ for(const shake of [1,0]){
+  run(`resetGame();Game.intro=false;OW.msg=null;Prefs.shake=${shake};Prefs.flash=${shake};Game.met=new Set();`);
+  const stages=run(`(()=>{const foe=OW.foes.find(f=>f.key==='5');OW.x=foe.x-40;OW.y=foe.y+14;startTransition(foe);const seen=[];let n=0;
+   while(Game.state==='transition'){if(++n>600)throw Error('transition never ends');updateTransition();drawTransition();const s=B.tr&&B.tr.stage;if(s&&seen[seen.length-1]!==s)seen.push(s);}
+   return seen;})()`);
+  assert.deepEqual(Array.from(stages),['detect','fall','splash','blot','drain','intro']);
+  assert.equal(run(`Game.state`),'battle');assert.equal(run(`B.tr`),null);
+  assert(run(`B.unitScale===1&&B.propScale===1`),'the scene did not settle to full size');
+ }
+ // the ink field covers the whole screen at the radius the flood grows to
+ run(`inkFields()`);const cover=run(`inkCoverRadius(100,90)`);assert(cover>150&&cover<700,String(cover));
+});
 console.log(`${checks} visual feedback checks passed.`);

@@ -137,35 +137,41 @@ function* transitionGen(foe) {
   Audio.bend(.5, short ? .4 : .7); Audio.sfx('hum_down', { vol: .5 }); Audio.sfx(foe.seen ? 'lunge' : 'detect');
   // 1) anticipación: el mapa se congela, el enemigo se agazapa y tiembla, el grupo se sobresalta, la sombra crece sobre ellos
   T.stage = 'detect'; OW.scare = { stage: 'detect', k: 0 }; const nd = short ? 8 : 18;
-  for (let i = 0; i < nd; i++) { T.k = i / nd; OW.scare.k = T.k; yield; }
+  for (let i = 0; i < nd; i++) { T.k = i / nd; T.q = i; OW.scare.k = T.k; if (i === 1) Audio.sfx('plop', { semi: -12, vol: .6 }); yield; }
   // 2) el propio enemigo salta en arco hacia el grupo y se hincha al acercarse a la cámara; el grupo se encoge
   T.stage = 'fall'; OW.scare = { stage: 'fall', k: 0 }; Audio.sfx('fall'); const nf = short ? 16 : 22;
   for (let i = 0; i < nf; i++) { T.k = i / nf; OW.scare.k = T.k; yield; }
   // 3) salpicón: hit-stop, flash de tinta, sacudida vertical y golpe de zoom, gotas hacia la cámara, ondas
   T.stage = 'splash'; T.k = 0; T.punch = 1; OW.scare = { stage: 'splash', k: 0 }; OW.flash = { col: '#0b0912', a: .5 };
   Audio.stop(.05); Audio.sfx('splash'); Audio.sfx('encounter'); B.shake = 7; Audio.play(foe.boss ? 'boss' : 'battle');
-  T.drops = []; for (let i = 0; i < 14; i++) T.drops.push({ a: R(0, 6.28), s: R(1.2, 3.2), r: R(3, 9), rot: R(-.05, .05) });
-  for (let i = 0; i < 5; i++) yield; // hit-stop
-  for (let i = 0; i < 16; i++) { T.k = i / 16; T.punch = 1 - T.k; yield; }
+  // gotas grandes que salen hacia la cámara y se quedan pegadas a la pantalla, escurriendo
+  T.lens = [[.16, 48, 40, 11], [.3, 262, 58, 14], [.42, 118, 138, 9], [.55, 214, 150, 12], [.66, 30, 124, 8], [.78, 296, 22, 7]].map(([at, x, y, r], i) => ({ at, x, y, r, seed: 30 + i * 7, hit: false }));
+  for (let i = 0; i < 5; i++) { T.hs = i; yield; } // hit-stop: fogonazo de papel y negativo
+  T.hs = null;
+  for (let i = 0; i < 18; i++) { T.k = i / 18; T.punch = 1 - T.k;
+    for (const d of T.lens) if (!d.hit && T.k >= d.at) { d.hit = true; Audio.sfx('plop', { semi: -9 + d.r, vol: .45, pan: (d.x - W / 2) / W }); if (d.r > 10) B.shake = Math.max(B.shake, 2); }
+    yield; }
   T.punch = 0;
   // 4) la tinta abre una ventana en el mapa congelado: fuera sigue el mapa (desaturado por la onda); dentro, la escena inclinándose a la vista de batalla
   T.stage = 'blot'; T.overworld = false; T.k = 0;
-  T.balls = []; for (let i = 0; i < 9; i++) T.balls.push({ a: i / 9 * 6.28 + R(-.3, .3), d: R(.3, 1), r: R(.5, 1), ph: R(0, 6.28) });
-  T.tendrils = []; for (let i = 0; i < 7; i++) T.tendrils.push({ a: R(0, 6.28), len: R(1.2, 2.2), w: R(.12, .3), sp: R(.6, 1.4) });
   const top = { x: Math.round(OW.cam.x) + W / 2, y: Math.round(OW.cam.y) + H / 2, yaw: -Math.PI / 2, pitch: 1.5, h: 110, f: 110, hy: 90 };
   camSet(top);
-  for (let i = 0; i < 40; i++) { T.k = i / 40; const k = clamp((i - 8) / 30, 0, 1), e = k * k * (3 - 2 * k); B.propScale = lerp(.5, 1, e); B.unitScale = lerp(.5, 1, e);
-    const c = SCENE.cam, r = SCENE.rest; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(top[key], r[key], e); c.yaw = lerp(top.yaw, r.yaw, e); yield; }
-  camSet(SCENE.rest); B.propScale = 1; B.unitScale = 1; OW.scare = null;
+  // la tinta se traga el mapa (0..72%) y, ya todo negro, la cámara se inclina por debajo sin que se vea el truco
+  const tilt = e => { B.propScale = lerp(.5, 1, e); B.unitScale = lerp(.5, 1, e); const c = SCENE.cam, r = SCENE.rest; for (const key of ['x', 'y', 'pitch', 'h', 'f', 'hy']) c[key] = lerp(top[key], r[key], e); c.yaw = lerp(top.yaw, r.yaw, e); };
+  Audio.sfx('ink_jet', { vol: .8 }); Audio.sfx('hum_down', { vol: .5, when: .15 });
+  for (let i = 0; i < 32; i++) { T.k = i / 32; if (i === 10) B.shake = Math.max(B.shake, 3); if (i === 19) Audio.sfx('slow_drip', { vol: .7 }); if (i === 20) Audio.sfx('detect', { vol: .35, semi: -12 });
+    const k = clamp((T.k - .56) / .44, 0, 1); tilt(k * k * (3 - 2 * k) * .62); yield; }
+  OW.scare = null;
   // 5) la tinta se escurre hacia los enemigos y se vuelve su charco; los enemigos emergen, el grupo rebota a su formación
-  T.stage = 'drain'; T.k = 0; Audio.sfx('slow_drip'); Audio.sfx('ink_jet', { when: .2 });
+  T.stage = 'drain'; T.k = 0; Audio.sfx('ink_jet', { when: .05 }); Audio.sfx('splash', { vol: .35, when: .5 });
   const from = B.party.map(u => [u.wx, u.wy]);
   for (let i = 0; i < 34; i++) {
-    const k = i / 34; T.k = k; B.puddle.k = clamp((i - 6) / 16, 0, 1);
+    const k = i / 34; T.k = k; B.puddle.k = clamp((i - 6) / 16, 0, 1); { const c = clamp(i / 22, 0, 1); tilt(.62 + .38 * (1 - (1 - c) * (1 - c))); }
     B.enemies.forEach((u, j) => { const kk = clamp((i - 8 - j * 4) / 18, 0, 1); u.wz = lerp(-u.def.h - 4, 0, kk * kk); if (kk > 0 && kk < 1 && i % 2 === 0) B.particles.push({ wx: u.wx + R(-u.def.w * .4, u.def.w * .4), wy: u.wy + R(-4, 4), wz: u.wz + u.def.h * R(.3, .9), vx: 0, vy: 0, vz: -R(.2, .6), g: -.08, col: C('negro'), t: 0, life: 18, size: 2 }); });
     B.party.forEach((u, j) => { if (!u.alive) { u.wx = u.hx; u.wy = u.hy; return; } const kk = clamp((i - 4 - j * 3) / 20, 0, 1); u.wx = lerp(from[j][0], u.hx, kk); u.wy = lerp(from[j][1], u.hy, kk); u.wz = Math.abs(Math.sin(kk * Math.PI * 2)) * (kk < .5 ? 28 : 8) * (kk < 1 ? 1 : 0); u.pose = kk < 1 ? 'hop' : 'idle'; if (kk === 1 && !u.landed) { u.landed = true; burst(u.wx, u.wy, 0, C(u.color), 6, 1.2, 14, .1); Audio.sfx('plop', { pan: .3 }); } });
     yield;
   }
+  camSet(SCENE.rest); B.propScale = 1; B.unitScale = 1;
   B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); B.enemies.forEach(u => { u.wz = 0; });
   // 6) presentación: la cámara se vuelve hacia los rivales; cada uno da un respingo por turnos
   // y su nombre se escribe a plumilla sobre él. Con un grupo ya conocido, más breve. Sin RNG.
@@ -287,37 +293,13 @@ function drawTransitionFx() {
   if (T.overworld) {
     const sx = lead.wx - OW.cam.x, sy = lead.wy - OW.cam.y, foe = T.foe, fx0 = foe.x - OW.cam.x, fy0 = foe.y - OW.cam.y;
     const e0 = DATA.enemies[foe.enemies[0]], fspr = buildSprite(foe.enemies[0] + '_mini', C('negro'), e0.color === 'negro' ? null : C(e0.color), { eyes: 'happy' });
-    if (T.stage === 'detect') { // el enemigo del mapa se agazapa (anticipación del salto) y tiembla; la sombra crece bajo el grupo
-      const k = T.k, sq = 1 + k * .45, tr = k > .5 ? (((Game.t >> 1) & 1) ? 1 : -1) : 0;
-      shadow(fx0, fy0, foe.boss ? 18 : 10); drawSprite(fspr, fx0 + tr, fy0, sq, foe.dirLeft, 1 / sq);
-      g.fillStyle = 'rgba(11,9,18,' + (.15 + k * .35) + ')'; g.beginPath(); g.ellipse(sx, sy, 4 + k * 10, 2 + k * 4, 0, 0, 6.29); g.fill();
-    } else if (T.stage === 'fall') { // el mismo enemigo salta en arco: se estira al despegar, se hincha hacia la cámara en el ápice y cae aplastándose sobre el grupo
-      const k = T.k, arc = Math.sin(k * Math.PI), x = lerp(fx0, sx, k), yb = lerp(fy0, sy, k), sc = 1 + arc * 1.9, st = k < .3 ? [.8, 1.35] : k > .82 ? [1.3, .75] : [1, 1];
-      g.fillStyle = 'rgba(11,9,18,' + (.5 + k * .3) + ')'; g.beginPath(); g.ellipse(sx, sy, 14 - k * 6, 6 - k * 3, 0, 0, 6.29); g.fill();
-      drawSprite(fspr, x, yb - 2 - arc * 38, sc * st[0], foe.dirLeft, st[1]); // arco bajo: la altura la vende la escala (viene hacia la cámara), no que se salga por arriba
-    } else if (T.stage === 'splash') { // impacto: mancha en el suelo, ondas, gotas grandes hacia la cámara
-      const k = T.k; g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(sx, sy, 10 + k * 26, 5 + k * 12, 0, 0, 6.29); g.fill();
-      for (let r = 0; r < 3; r++) { const kk = clamp(k * 1.4 - r * .25, 0, 1); if (kk <= 0) continue; g.strokeStyle = 'rgba(244,240,234,' + (.7 * (1 - kk)) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(sx, sy, 8 + kk * 60, 4 + kk * 26, 0, 0, 6.29); g.stroke(); }
-      g.fillStyle = '#0b0912'; for (const d of T.drops) { const dist = k * k * 260 * d.s * .5 + k * 20, x = sx + Math.cos(d.a) * dist, y = sy + Math.sin(d.a) * dist * .8 - k * 10, r = d.r * (1 + k * d.s * 1.6); g.beginPath(); g.ellipse(x, y, r, r * .8, d.a, 0, 6.29); g.fill(); g.fillRect(x - r * .3 | 0, y - r * .5 | 0, 2, 1); }
-    }
+    drawEncounterOverworld(T, sx, sy, fx0, fy0, foe, fspr);
     return;
   }
   const p = project(lead.hx, lead.hy, 0) || [W / 2, H / 2, 1], q = project(B.puddle.wx, B.puddle.wy, 0) || [W / 2, H / 2, 1];
-  if (T.stage === 'blot') { // ventana de tinta: fuera queda el mapa congelado (desaturado por la onda), dentro la escena inclinándose; en medio la mancha orgánica
-    const k = T.k, grow = Math.sin(Math.min(1, k * 1.15) * Math.PI / 2), R0 = 22 + grow * 96;
-    const [sx, sy] = [lerp(lead.wx - OW.cam.x, p[0], clamp((k - .2) / .75, 0, 1)), lerp(lead.wy - OW.cam.y, p[1], clamp((k - .2) / .75, 0, 1))];
-    const rw = R0 * 2.1 + clamp((k - .65) / .35, 0, 1) * 110, inner = Math.max(0, rw - 28); // al final la ventana desborda la pantalla: no hay corte con el drenaje
-    MAPG.save(); MAPG.translate(sx, sy); MAPG.scale(1, .72);
-    MAPG.globalCompositeOperation = 'saturation'; MAPG.fillStyle = '#7a7a7a'; MAPG.beginPath(); MAPG.arc(0, 0, rw * 1.35, 0, 6.29); MAPG.fill();
-    const gr = MAPG.createRadialGradient(0, 0, inner, 0, 0, rw); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-    MAPG.globalCompositeOperation = 'destination-out'; MAPG.fillStyle = gr; MAPG.fillRect(-W * 3, -H * 4, W * 6, H * 8); MAPG.restore();
-    g.drawImage(MAPC, 0, 0);
-    inkSplat(sx, sy, R0 * .75, k, B.t, 7, true);
-  } else if (T.stage === 'intro') drawIntroNames(T);
-  else if (T.stage === 'drain') { // la mancha se escurre hacia el charco de los enemigos y encoge
-    const k = T.k, e = k * k, cx = lerp(p[0], q[0], e), cy = lerp(p[1], q[1], e), R0 = lerp(118, B.puddle.rx, e);
-    g.save(); g.translate(cx, cy); g.scale(1, .75); inkSplat(0, 0, R0 * .75, 1 - e * .8, B.t, 7, false); g.restore();
-  }
+  if (T.stage === 'blot') drawEncounterBlot(T, lead.wx - OW.cam.x, lead.wy - OW.cam.y, q); // la tinta nace donde cayó
+  else if (T.stage === 'intro') drawIntroNames(T);
+  else if (T.stage === 'drain') { g.save(); drawEncounterDrain(T, q); g.restore(); }
 }
 
 // =====================================================================
@@ -777,8 +759,8 @@ function drawGroundLayer() {
 function drawBattle() {
   const T = B.tr;
   if (T && T.overworld) { // fases 1-3 sobre el mapa: sacudida con más peso vertical (el impacto viene de arriba) y golpe de zoom sobre el grupo
-    const sh = Math.round(B.shake * Prefs.shake), punch = (T.punch || 0) * Prefs.shake, lead = B.party[0], px = lead.wx - OW.cam.x, py = lead.wy - OW.cam.y;
-    g.save(); if (sh) g.translate(RI(-sh, sh) / 2 | 0, RI(-sh, sh)); if (punch > 0) { const z = 1 + punch * .07; g.translate(px, py); g.scale(z, z); g.translate(-px, -py); }
+    const sh = Math.round(B.shake * Prefs.shake), lead = B.party[0], px = lead.wx - OW.cam.x, py = lead.wy - OW.cam.y, foe = T.foe, zm = foe && encounterZoom(T, foe.x - OW.cam.x, foe.y - OW.cam.y, px, py);
+    g.save(); if (sh) g.translate(RI(-sh, sh) / 2 | 0, RI(-sh, sh)); if (zm) { g.translate(zm.x, zm.y); g.scale(zm.z, zm.z); g.translate(-zm.x, -zm.y); }
     drawOverworld(); drawTransitionFx(); g.restore(); drawFastHint(); return;
   }
   if (T && T.stage === 'blot') { drawOverworld(); mapSnap().drawImage(buf, 0, 0); } // el mapa congelado se guarda: se verá fuera de la ventana de tinta
