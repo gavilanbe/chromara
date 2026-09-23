@@ -545,10 +545,11 @@ function drawOverworld() {
   const zoom = OW.jar.zoom || 1; g.translate(W / 2, H / 2); g.scale(zoom, zoom); g.translate(-W / 2, -H / 2);
   const ents = [];
   for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
-    const ch = tileAt(tx, ty); g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
+    const ch = tileAt(tx, ty); if (pageEdgeAt(tx, ty)) { g.drawImage(pageEdgeTile(tx, ty), tx * TILE - cx, ty * TILE - cy); continue; } // el borde de la hoja
+    g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
     if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => g.drawImage(treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7, Game.page === 1 ? null : worldRegion(tx, ty)), tx * TILE - cx, ty * TILE - 8 - cy) });
   }
-  drawWorldGround(g, cx, cy, pal);
+  drawRegionDetails(cx, cy); drawWorldGround(g, cx, cy, pal);
   drawRinseGround(cx, cy, pal);
   drawWorldObjects(ents, cx, cy, pal);
   if (typeof drawChapterLandmarks === 'function') drawChapterLandmarks(ents,cx,cy);

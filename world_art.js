@@ -364,3 +364,39 @@ function drawMerchant(ents, cx, cy) {
     if (!near) { const t = Game.t * .06; ['rojo', 'amarillo', 'azul'].forEach((k, i) => { const a = t + i * 2.09; paintDab(Math.round(x + 1 + Math.cos(a) * 5), Math.round(y - 36 + Math.sin(a) * 2 - bob), 2, C(k)); }); }
   } });
 }
+// ---- El borde del mundo es el borde de la hoja: papel rasgado sobre la mesa de nogal, sin setos que encierren.
+function pageEdgeTile(tx, ty) {
+  const L = tx === 0, Rt = tx === MAP.w - 1, T = ty === 0, B = ty === MAP.h - 1, v = hash2(tx, ty) & 3;
+  return cached(`page-edge|${L ? 1 : 0}${Rt ? 1 : 0}${T ? 1 : 0}${B ? 1 : 0}|${v}`, () => {
+    const c = document.createElement('canvas'); c.width = c.height = TILE; const x = c.getContext('2d'), rnd = seeded(v * 17 + (L ? 1 : 0) + (Rt ? 2 : 0) + (T ? 4 : 0) + (B ? 8 : 0));
+    x.fillStyle = '#4a3122'; x.fillRect(0, 0, 16, 16); x.fillStyle = '#5a3d2a'; for (let i = 0; i < 6; i++) x.fillRect(rnd() * 16 | 0, rnd() * 16 | 0, 3, 1); // la mesa
+    // cuánto papel queda en cada columna/fila: un filo irregular a unos 6 px del borde exterior
+    const edge = i => 6 + Math.round(Math.sin(i * 1.7 + v * 2) * 1.5 + (rnd() - .5) * 1.4);
+    for (let yy = 0; yy < 16; yy++) for (let xx = 0; xx < 16; xx++) {
+      const inside = (!L || xx >= edge(yy)) && (!Rt || xx < 16 - edge(yy)) && (!T || yy >= edge(xx)) && (!B || yy < 16 - edge(xx)); if (!inside) continue;
+      const near = (L && xx === edge(yy)) || (Rt && xx === 15 - edge(yy)) || (T && yy === edge(xx)) || (B && yy === 15 - edge(xx));
+      x.fillStyle = near ? '#fff6e2' : '#e6dcc5'; x.fillRect(xx, yy, 1, 1);
+    }
+    // sombra del papel sobre la mesa, del lado de fuera
+    x.fillStyle = 'rgba(20,10,4,.35)'; if (L) for (let yy = 0; yy < 16; yy++) x.fillRect(edge(yy) - 2, yy, 2, 1); if (T) for (let xx = 0; xx < 16; xx++) x.fillRect(xx, edge(xx) - 2, 1, 2);
+    return c;
+  });
+}
+function pageEdgeAt(tx, ty) { return Game.page !== 1 && (tx === 0 || ty === 0 || tx === MAP.w - 1 || ty === MAP.h - 1); }
+// ---- Detalles de región sobre el suelo: la Tinta ha manchado el Tiznal y el Atelier está sobre una hoja pautada.
+function drawRegionDetails(cx, cy) {
+  if (Game.page === 1) return;
+  const x0 = cx / TILE | 0, y0 = cy / TILE | 0, ink = MAP.pz ? fieldGroups().inkSet : new Set();
+  for (let ty = y0; ty <= y0 + 12; ty++) for (let tx = x0; tx <= x0 + 20; tx++) {
+    if (pageEdgeAt(tx, ty) || tx < 0 || ty < 0 || tx >= MAP.w || ty >= MAP.h) continue;
+    const r = worldRegion(tx, ty), x = tx * TILE - cx, y = ty * TILE - cy, h = hash2(tx * 3, ty * 5), ch = tileAt(tx, ty);
+    if (r.name.startsWith('Atelier') && tx >= 30 && !ink.has(tx + ',' + ty) && ch !== 'T') { // hoja pautada: renglones azules y margen rojo
+      g.fillStyle = '#f1eadb'; g.fillRect(x, y, 16, 16); g.fillStyle = '#c3d3e4'; g.fillRect(x, y + 5, 16, 1); g.fillRect(x, y + 13, 16, 1);
+      if (tx === 30) { g.fillStyle = '#e3a0a0'; g.fillRect(x + 11, y, 1, 16); }
+    }
+    if (r.drained && ch !== 'T' && !ink.has(tx + ',' + ty)) { // vetas de tinta que la Jefa ha dejado al beberse el color
+      if ((h & 7) < 3) { const a = (h >> 3) % 6, len = 5 + (h >> 6) % 7; g.fillStyle = '#2a2438'; for (let i = 0; i < len; i++) g.fillRect(x + 2 + Math.round(i * Math.cos(a)) + (i % 3 === 0 ? 1 : 0), y + 8 + Math.round(i * Math.sin(a) * .6), 1, 1); }
+      if ((h & 15) === 5) { g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(x + 8, y + 10, 3, 2, 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4664'; g.fillRect(x + 7, y + 9, 1, 1); }
+    }
+  }
+}
