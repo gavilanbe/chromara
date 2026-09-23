@@ -196,3 +196,45 @@ body.touch-mode.is-portrait { --pad:min(44vw,190px,30vh); }
   body.touch-mode { --pad:130px; }
   .touch-mode #touch-actions #touch-confirm { width:92px;height:92px; }
 }
+
+/* ---- PWA: notas de papel pegadas con cinta (instalar, sin conexión, página nueva) y la hoja que se pasa al actualizar ---- */
+#pwa-note {
+  position:fixed;z-index:30;left:50%;top:max(10px,env(safe-area-inset-top));width:min(360px,calc(100vw - 28px));box-sizing:border-box;
+  padding:14px 16px 12px 44px;border-radius:3px 6px 4px 5px;color:#392c3f;font:16px/1.25 'Chromara Cuaderno',system-ui,sans-serif;-webkit-font-smoothing:none;
+  background:repeating-linear-gradient(180deg,transparent 0 19px,rgba(104,139,194,.22) 19px 20px) 0 34px/100% 20px,linear-gradient(174deg,#f7ecd0,#e8d6ae);
+  box-shadow:0 2px 0 #07060c,0 12px 26px rgba(0,0,0,.5);transform:translate(-50%,-140%) rotate(-2deg);opacity:0;pointer-events:none;
+  transition:transform 380ms cubic-bezier(.3,1.5,.5,1),opacity 200ms ease;
+}
+#pwa-note.is-shown { transform:translate(-50%,0) rotate(-1deg);opacity:1;pointer-events:auto; }
+#pwa-note.is-gone { transform:translate(-50%,-30px) rotate(2deg);opacity:0;transition:transform 260ms ease-in,opacity 260ms ease-in; }
+#pwa-note::before { content:'';position:absolute;left:50%;top:-8px;width:64px;height:16px;transform:translateX(-50%) rotate(3deg);background:rgba(236,222,178,.85);box-shadow:0 1px 0 rgba(0,0,0,.2); }
+#pwa-note::after { content:'';position:absolute;left:30px;top:0;bottom:0;width:1px;background:rgba(216,80,90,.45); }
+#pwa-note strong { display:block;font:16px/1.1 'Chromara Rotulo','Chromara Cuaderno',system-ui,sans-serif;margin-bottom:5px;color:#2a1f30; }
+#pwa-note p { margin:0;line-height:20px; }
+.touch-mode.is-portrait #pwa-note { top:auto;bottom:calc(var(--pad) + 64px + 26px + max(12px,env(safe-area-inset-bottom)));transform:translate(-50%,40px) rotate(-2deg); }
+.touch-mode.is-portrait #pwa-note.is-shown { transform:translate(-50%,0) rotate(-1deg); }
+.touch-mode.is-portrait #pwa-note.is-gone { transform:translate(-50%,24px) rotate(2deg); }
+#pwa-note .pwa-drop { position:absolute;left:10px;top:15px;width:13px;height:16px;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;background:radial-gradient(circle at 35% 35%,#fff4c8 0 14%,transparent 16%),#e8b04a;box-shadow:0 1px 0 #7a5420; }
+#pwa-note[data-type=update] .pwa-drop { background:radial-gradient(circle at 35% 35%,#dbe7fb 0 14%,transparent 16%),#5d86cc;box-shadow:0 1px 0 #27427a; }
+#pwa-note[data-type=offline] .pwa-drop { background:radial-gradient(circle at 35% 35%,#dff3e4 0 14%,transparent 16%),#4f9a6c;box-shadow:0 1px 0 #24583a; }
+#pwa-note .pwa-buttons { display:flex;flex-wrap:wrap;gap:8px;margin-top:10px; }
+#pwa-note .pwa-buttons:empty { display:none; }
+#pwa-note button {
+  min-height:44px;padding:6px 12px;border:1px solid #b7a07c;border-radius:3px 6px 4px 3px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  font:16px/1.1 'Chromara Cuaderno',system-ui,sans-serif;-webkit-font-smoothing:none;color:#392c3f;background:#efe2c2;box-shadow:1px 3px 0 #8f7a58;
+  transition:transform 160ms cubic-bezier(.3,1.7,.5,1);
+}
+#pwa-note button.is-main { background:linear-gradient(170deg,#f2c160,#d49b3c);border-color:#7a5420;color:#3a2a1c;box-shadow:1px 3px 0 #5d4126; }
+#pwa-note button.is-warning { background:linear-gradient(170deg,#ea8a80,#c0504a);border-color:#7a2a2a;color:#fff4ea;box-shadow:1px 3px 0 #5a1a1a; }
+#pwa-note button:active { transform:translateY(2px) scale(.96); }
+#pwa-note .pwa-share { display:inline-block;width:14px;height:16px;vertical-align:-3px;border:2px solid #5d86cc;border-top:none;border-radius:0 0 2px 2px;position:relative;margin:0 2px; }
+#pwa-note .pwa-share::before { content:'';position:absolute;left:4px;top:-8px;width:2px;height:12px;background:#5d86cc; }
+#pwa-note .pwa-share::after { content:'';position:absolute;left:1px;top:-8px;width:6px;height:6px;border-left:2px solid #5d86cc;border-top:2px solid #5d86cc;transform:rotate(45deg);box-sizing:border-box;left:2px; }
+body.pwa-turning::after {
+  content:'';position:fixed;inset:0;z-index:40;pointer-events:all;background:linear-gradient(100deg,#0b0912 0 48%,#1e1828 50%,#f4e7c8 51%,#e1cca2 100%);background-size:260% 100%;
+  animation:pwa-turn 700ms cubic-bezier(.6,0,.3,1) forwards;
+}
+@keyframes pwa-turn { from { background-position:100% 0; } to { background-position:0 0; } }
+.is-standalone #touch-fullscreen { display:none !important; }
+.ui-still #pwa-note,.ui-still #pwa-note button { transition:none; }
+@media (prefers-reduced-motion:reduce) { #pwa-note,#pwa-note button { transition:none; } body.pwa-turning::after { animation:none;background:#0b0912; } }

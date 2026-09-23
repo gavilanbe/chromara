@@ -1,18 +1,30 @@
 {
+  "id": "./",
   "name": "Chromara",
   "short_name": "Chromara",
-  "description": "Un JRPG de bolsillo: tres gotas de color devuelven el pigmento a un cuaderno de pintor.",
+  "description": "Un JRPG de bolsillo: tres gotas de color devuelven el pigmento a un cuaderno de pintor. Se juega sin conexión.",
   "lang": "es",
-  "start_url": "./index.html",
+  "dir": "ltr",
+  "start_url": "./",
   "scope": "./",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "any",
   "background_color": "#0b0912",
   "theme_color": "#0b0912",
-  "categories": ["games"],
+  "categories": ["games", "entertainment"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": "focus-existing" },
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "icons/screenshots/narrow-mapa.png", "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "El mapa del cuaderno en vertical: tocar para ir" },
+    { "src": "icons/screenshots/narrow-paleta.png", "sizes": "720x1280", "type": "image/png", "form_factor": "narrow", "label": "Un combate con la paleta de herramientas" },
+    { "src": "icons/screenshots/wide-mapa.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide", "label": "El mapa en horizontal" },
+    { "src": "icons/screenshots/wide-paleta.png", "sizes": "1280x720", "type": "image/png", "form_factor": "wide", "label": "Combate en horizontal" }
   ]
 }

@@ -117,6 +117,8 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   });
   assert.equal(current,'restored');
   // A failed fetch/decode must preserve both a world cue and the revised battle score.
+  // Let decodes still in flight from the race settle first: an already-downloaded cue is rightly reused.
+  await page.waitForFunction(()=>!Object.keys(__chromara.Audio.decoding||{}).length,null,{timeout:20000});
   for(const name of ['atelier','battle']) {
    await page.route('**/music/'+name+'.opus.ogg*',route=>route.abort());
    await page.evaluate(name=>{delete __chromara.Audio.buffers[name];__chromara.Audio.play(name,{restart:true});},name);
