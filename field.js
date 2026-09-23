@@ -324,6 +324,8 @@ function fieldSpirit(img, key, x, y, a, sc, col, alpha, tip) {
   const prev = g.globalAlpha; g.globalAlpha = prev * alpha * .5; for (const [ox, oy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, 1]]) drawProp(halo, x + ox, y + oy, a, 1, tip[0], tip[1], sc);
   g.globalAlpha = prev * alpha * .85; drawProp(img, x, y, a, 1, tip[0], tip[1], sc); g.globalAlpha = prev;
 }
+function fieldSpiritKind(art) { return art.kind === 'color' ? art.tool : art.kind === 'trazar' ? 'lapiz' : art.kind === 'borrar' ? 'goma' : 'pincel'; }
+function fieldSpiritColor(art) { return art.kind === 'aguada' ? '#8ec8e8' : C(art.color); }
 function drawFieldEffects(cx, cy) {
   const s = OW.fieldCast; if (!s) return;
   { // invocación
@@ -334,8 +336,8 @@ function drawFieldEffects(cx, cy) {
     fieldPillar(x, y, 7, 60 * Math.min(1, q * 1.6), oc, t, (q > .2 ? 1 : q * 5) * (1 - out));
     if (inv < 34) for (let i = 0; i < 10; i++) { const a = i * .63 + t * .12, d = 40 * (1 - ((q * 2 + i * .1) % 1)); g.fillStyle = i % 2 ? oc : paint; g.fillRect(Math.round(x + Math.cos(a) * d), Math.round(y - 14 + Math.sin(a) * d * .5), 2, 2); } // las motas convergen
     // el espíritu de la herramienta se manifiesta sobre el líder, girando despacio, antes de salir
-    if (inv >= 16 && s.t < 16) { const k = clamp((inv - 16) / 14, 0, 1), key = s.art.kind === 'color' ? s.art.tool : s.art.kind === 'trazar' ? 'lapiz' : s.art.kind === 'borrar' ? 'goma' : 'pincel', img = key === 'goma' ? propSprite('goma') : propSprite(key, key === 'pincel' && s.art.kind === 'aguada' ? '#8ec8e8' : C(s.art.color)), P = PROP[key];
-      const bob = Math.sin(t * .15) * 2, sc = .4 + k * .7, lx = x, ly = y - 56 + bob; fieldSpirit(img, key + s.art.id, lx, ly, -1.57 + Math.sin(t * .08) * .3, sc, paint, k * (s.t >= 0 ? 1 - s.t / 16 : 1), P.tip);
+    if (inv >= 16 && s.t < 16) { const k = clamp((inv - 16) / 14, 0, 1), key = fieldSpiritKind(s.art), bob = Math.sin(t * .15) * 2, lx = x, ly = y - 44 + bob - (1 - k) * 10, e = Prefs.shake ? easeBack(k) : 1;
+      drawSpirit(key, fieldSpiritColor(s.art), paint, lx, ly, { sx: e, sy: e, alpha: k * (s.t >= 0 ? 1 - s.t / 16 : 1) });
       if (Prefs.shake) for (let i = 0; i < 6; i++) { const a = t * .1 + i * 1.05; g.fillStyle = '#fff8e6'; g.fillRect(Math.round(lx + Math.cos(a) * 14 * k), Math.round(ly - 6 + Math.sin(a) * 5 * k), 1, 1); } }
     if (inv < 34) return;
     // en el objeto: su propio círculo y pilar mientras la magia actúa
@@ -350,28 +352,28 @@ function drawFieldEffects(cx, cy) {
   const trail = (q, w, c) => { const n = 10; let prev = arc(Math.max(0, q - .35)); for (let i = 1; i <= n; i++) { const qq = Math.max(0, q - .35 + .35 * i / n), p = arc(qq); pstroke(prev[0], prev[1], p[0], p[1], Math.max(1, w * i / n), c, 1, 0, false); prev = p; } };
   if (k === 'color') { // 2) la herramienta de la gota vuela en grande dejando su cinta; 3) tres brochazos anchos y salpicadura
     const P = PROP[s.art.tool], img = propSprite(s.art.tool, col);
-    if (t >= 16 && t < 36) { const q = (t - 16) / 20, [x, y] = arc(q); trail(q, 4, col); fieldSpirit(img, s.art.tool + s.art.id, x, y, -.6 + q * .4, 1.3, col, 1, P.tip); }
+    if (t >= 16 && t < 36) { const q = (t - 16) / 20, [x, y] = arc(q); trail(q, 4, col); drawSpirit(s.art.tool, col, rp.hi, x, y, { a: -.3 + q * .3 }); }
     if (t >= 36 && t < 64) { const q = (t - 36) / 28, strokes = Math.min(3, Math.floor(q * 3.6));
-      for (let i = 0; i < 3; i++) { if (i > strokes) break; const f = i < strokes ? 1 : (q * 3.6) % 1, y = ay - 7 + i * 6, x0 = ax - 12, x1 = x0 + 24 * f; if (f > 0) fieldBand(x0, y, x1, y + (i % 2 ? 1 : -1), 5, col); if (i === strokes) drawProp(img, x1, y - 2, -.5, 1, P.tip[0], P.tip[1], 1.1); } }
+      for (let i = 0; i < 3; i++) { if (i > strokes) break; const f = i < strokes ? 1 : (q * 3.6) % 1, y = ay - 7 + i * 6, x0 = ax - 12, x1 = x0 + 24 * f; if (f > 0) fieldBand(x0, y, x1, y + (i % 2 ? 1 : -1), 5, col); if (i === strokes) drawSpirit(s.art.tool, col, rp.hi, x1, y - 1, { a: -.2 }); } }
     if (t >= 44 && t < 76) { const q = (t - 44) / 32, real = Game.puzzle.real[s.target.sketch?.id]; paintRing(ax, ay, q, real ? C(s.target.sketch.color) : col, real ? 40 : 24);
       for (let i = 0; i < 12; i++) { const a = i * .52, d = q * (real ? 30 : 18); g.globalAlpha = 1 - q; g.fillStyle = i % 3 ? col : rp.hi; g.fillRect(Math.round(ax + Math.cos(a) * d), Math.round(ay + Math.sin(a) * d * .6 - Math.sin(q * Math.PI) * 10 + q * q * 8), 2, 2); } g.globalAlpha = 1;
       if (real && shake) for (let i = 0; i < 6; i++) { const a = i * 1.05 + t * .1, d = 10 + q * 24; g.fillStyle = '#fff8e6'; const X = Math.round(ax + Math.cos(a) * d), Y = Math.round(ay + Math.sin(a) * d * .6); g.fillRect(X - 1, Y, 3, 1); g.fillRect(X, Y - 1, 1, 3); } } }
   if (k === 'trazar') { // el lápiz, enorme, se clava en la chincheta y arrastra la línea; saltan virutas y la línea vibra al tensarse
     const P = PROP.lapiz, img = propSprite('lapiz', C('amarillo')), [bx, by] = [s.aim2[0] - cx, s.aim2[1] - cy], d = s.draw || 0;
-    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); trail(q, 2, '#6a6480'); fieldSpirit(img, 'lapiztrazar', x, y, -.95, 1.3, '#fff3c0', 1, P.tip); }
-    if (t >= 30 && t < 78) { const x = lerp(ax, bx, d), y = lerp(ay + 2, by + 2, d); drawProp(img, x, y, -.95 + Math.sin(t * .9) * .06, 1, P.tip[0], P.tip[1], 1.2);
+    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); trail(q, 2, '#6a6480'); drawSpirit('lapiz', C('amarillo'), '#fff3c0', x, y, { a: -.5 }); }
+    if (t >= 30 && t < 78) { const x = lerp(ax, bx, d), y = lerp(ay + 2, by + 2, d); drawSpirit('lapiz', C('amarillo'), '#fff3c0', x, y, { a: -.5 + Math.sin(t * .9) * .05 });
       for (let i = 0; i < 5; i++) { const ph = ((t + i * 5) % 16) / 16; g.fillStyle = i % 2 ? '#e8cf9a' : '#4a4460'; g.fillRect(Math.round(x - 4 + i * 2 - ph * 6), Math.round(y - ph * 12 + ph * ph * 16), 2, 1); } }
     if (t >= 70 && t < 92) { const q = (t - 70) / 22, amp = Math.sin(q * Math.PI * 6) * (1 - q) * 3; for (const [px, py] of [[ax, ay], [bx, by]]) paintRing(px, py, q, '#6a6480', 14); if (shake) { g.fillStyle = '#9a98b0'; for (let i = 0; i <= 12; i++) { const f = i / 12; g.fillRect(Math.round(lerp(ax, bx, f)), Math.round(lerp(ay, by, f) + 3 + Math.sin(f * Math.PI) * amp), 1, 1); } } } }
   if (k === 'borrar') { // una goma gigante baja y frota; se aplasta a cada pasada, las virutas rosas se amontonan y el grafito se levanta en motas
     const img = propSprite('goma');
-    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); fieldSpirit(img, 'gomaborrar', x, y, .25, 1.8, '#f0b8c8', 1, PROP.goma.tip); }
-    if (t >= 30 && t < 78) { const rub = Math.sin((t - 30) * .55), sq = shake ? 1 + Math.abs(rub) * .18 : 1; g.save(); g.translate(ax + rub * 12, ay - 6); g.scale(sq, 2 - sq); drawProp(img, 0, 0, .25, 1, PROP.goma.tip[0], PROP.goma.tip[1], 1.8); g.restore();
+    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); drawSpirit('goma', null, '#ffd0dc', x, y, { a: Math.sin(q * Math.PI) * .3 }); }
+    if (t >= 30 && t < 78) { const rub = Math.sin((t - 30) * .55), sq = shake ? 1 + Math.abs(rub) * .14 : 1; drawSpirit('goma', null, '#ffd0dc', ax + rub * 12, ay + 4, { sx: sq, sy: 2 - sq, a: rub * .08 });
       for (let i = 0; i < 10; i++) { const ph = ((t * 1.3 + i * 7) % 26) / 26, side = i % 2 ? 1 : -1; g.fillStyle = i % 3 ? '#e88aa0' : '#f4f0ea'; g.fillRect(Math.round(ax + side * (8 + ph * 14)), Math.round(ay - 4 + ph * 14 - Math.sin(ph * Math.PI) * 8), 2, 1); }
       for (let i = 0; i < 4; i++) { const ph = ((t + i * 11) % 30) / 30; g.fillStyle = '#4a4460'; g.globalAlpha = 1 - ph; g.fillRect(Math.round(ax - 6 + i * 4), Math.round(ay - 6 - ph * 22), 1, 1); } g.globalAlpha = 1; }
     if (t >= 30) { const n = Math.min(14, (t - 30) >> 2); for (let i = 0; i < n; i++) { g.fillStyle = i % 3 ? '#e88aa0' : '#c96a86'; g.fillRect(Math.round(ax - 14 + (i * 7) % 28), Math.round(ay + 7 + (i % 3)), 2, 1); } } } // montoncito de virutas
   if (k === 'aguada') { // el pincel se carga de agua y pinta una nube de acuarela; llueve, el charco se abre en ondas y la tinta se deshace en volutas grises
     const P = PROP.pincel, w = s.wash || 0, cloudK = clamp((t - 20) / 14, 0, 1), fade = t > 84 ? (96 - t) / 12 : 1;
-    if (t >= 14 && t < 30) { const q = (t - 14) / 16, [x, y] = arc(q); trail(q, 3, '#9fd0ea'); fieldSpirit(propSprite('pincel', '#8ec8e8'), 'pincelaguada', x, y, -.6, 1.3, '#b8e0f0', 1, P.tip); }
+    if (t >= 14 && t < 30) { const q = (t - 14) / 16, [x, y] = arc(q); trail(q, 3, '#9fd0ea'); drawSpirit('pincel', '#8ec8e8', '#e8f6fb', x, y, { a: -.3 }); }
     if (t >= 20) { g.save(); g.globalAlpha = fade; [[-10, 2, 8], [0, -2, 11], [11, 1, 8], [-4, 4, 7], [6, 5, 7]].forEach(([dx, dy, r]) => { g.fillStyle = '#6fa6d8'; g.beginPath(); g.ellipse(ax + dx, ay - 34 + dy + 1, r * cloudK, r * .7 * cloudK, 0, 0, 6.29); g.fill(); g.fillStyle = '#b8e0f0'; g.beginPath(); g.ellipse(ax + dx, ay - 34 + dy, r * cloudK, r * .65 * cloudK, 0, 0, 6.29); g.fill(); g.fillStyle = '#e8f6fb'; g.fillRect(Math.round(ax + dx - r * .5), Math.round(ay - 37 + dy), Math.round(r * .6 * cloudK), 1); });
       if (t > 30 && t < 84) for (let i = 0; i < 10; i++) { const ph = ((t * 3 + i * 13) % 30) / 30; g.fillStyle = i % 3 ? '#6fb4d8' : '#e8f6fb'; g.fillRect(Math.round(ax - 16 + i * 3.4), Math.round(ay - 26 + ph * 30), 1, 3); }
       for (let r = 0; r < 3; r++) { const q = ((t - 30 + r * 12) % 36) / 36; if (t < 30) break; g.strokeStyle = '#9fd0ea'; g.globalAlpha = (1 - q) * .8 * fade; g.beginPath(); g.ellipse(ax, ay + 5, 4 + q * 20, 1.5 + q * 7, 0, 0, 6.29); g.stroke(); }
@@ -392,4 +394,65 @@ function drawFieldUI() {
     g.save(); g.translate(0, Math.round((1 - artIn(at, 14)) * 26)); artTag(label, x, 159 - Math.round(artPop(at) * 3), '#9ec267'); g.restore();
     uiHit(x, 154, w, 24, () => fieldInteract());
   }
+}
+// =====================================================================
+// Espíritus de las herramientas: dibujos propios a su tamaño real (nada se amplía), en vista de tres cuartos con cara de arriba,
+// frente y costado. Cada uno tiene su punto de contacto (tip). Se pintan con halo de luz de su color, un destello que los recorre
+// y chispas; así la parte más vistosa de la magia es la herramienta misma.
+// =====================================================================
+const SPIRITS = {
+  goma: { w: 38, h: 26, tip: [15, 24] },
+  lapiz: { w: 58, h: 18, tip: [2, 15] },
+  brocha: { w: 60, h: 30, tip: [4, 24] },
+  pincel: { w: 56, h: 16, tip: [2, 13] },
+};
+function spiritSprite(kind, color) {
+  return cached('spirit2|' + kind + '|' + color, () => {
+    const S = SPIRITS[kind], c = document.createElement('canvas'); c.width = S.w; c.height = S.h; const x = c.getContext('2d'), rp = ramp(color || '#c0c0c0');
+    const F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); }, poly = (col, pts) => { x.fillStyle = col; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill(); };
+    const INK = '#241e32';
+    if (kind === 'goma') { // goma bicolor en tres cuartos: rosa y azul fieltro, funda de cartón impresa, bordes gastados
+      const top = [[3,9],[9,3],[35,3],[29,9]], front = [[3,9],[29,9],[29,23],[3,23]], side = [[29,9],[35,3],[35,17],[29,23]];
+      poly(INK, [[2,9],[9,2],[36,2],[36,17],[29,24],[2,24]]);
+      poly('#e88a9e', front); poly('#f4b8c4', top); poly('#c46a82', side);
+      poly('#6fa0d0', [[19,9],[29,9],[29,23],[19,23]]); poly('#a8cce8', [[19,9],[25,3],[35,3],[29,9]]); poly('#4a78a8', [[29,9],[35,3],[35,17],[29,23]]); // mitad de fieltro azul
+      poly('#f4ecd8', [[11,9],[18,9],[18,23],[11,23]]); poly('#fffaf0', [[11,9],[17,3],[24,3],[18,9]]); // funda de cartón
+      F('#c9bfa8', 11, 21, 7, 2); F('#8a5a8a', 12, 13, 5, 1); F('#8a5a8a', 12, 15, 4, 1); F('#e8a830', 13, 17, 3, 2); // etiqueta impresa
+      F('#fff0f4', 4, 10, 6, 1); F('#fff0f4', 4, 10, 1, 8); F('#dff0ff', 20, 10, 6, 1); // luz en el canto
+      F('#b0506a', 3, 22, 8, 1); F('#3a5a88', 19, 22, 10, 1); // sombra abajo
+      x.fillStyle = '#d87a90'; x.beginPath(); x.moveTo(3, 20); x.lineTo(7, 24); x.lineTo(3, 24); x.fill(); // esquina gastada
+      F('#fff', 31, 6, 1, 1); F('#fff', 10, 5, 3, 1);
+    } else if (kind === 'lapiz') { // lápiz hexagonal: tres caras (luz, medio, sombra), cono de madera con veta, mina con brillo, virola y goma
+      const y0 = 3; poly(INK, [[1,15],[12,y0 - 1],[48,y0 - 1],[57,y0],[57,y0 + 12],[48,y0 + 13],[12,y0 + 13]]);
+      F('#fbe28a', 13, y0, 34, 4); F('#f2c93a', 13, y0 + 4, 34, 4); F('#c9a02a', 13, y0 + 8, 34, 4); F('#fff3c0', 13, y0, 34, 1); F('#a8801a', 13, y0 + 11, 34, 1); // facetas
+      for (let i = 16; i < 46; i += 7) F('#e8b830', i, y0 + 4, 3, 1); // reflejo de la laca
+      poly('#e8c890', [[12,y0],[2,14],[12,y0 + 12]]); poly('#c9a070', [[12,y0 + 6],[2,14],[12,y0 + 12]]); F('#b08850', 7, 9, 1, 3); F('#b08850', 9, 7, 1, 2); // madera y veta
+      poly('#3a3652', [[5,11],[1,15],[5,14]]); F('#8c8ab0', 3, 12, 1, 1); // mina
+      F('#8c8ab0', 47, y0, 4, 12); F('#c9c4d4', 47, y0, 4, 2); F('#5a5670', 47, y0 + 10, 4, 2); for (let i = 0; i < 4; i += 2) F('#6a6480', 48 + i, y0, 1, 12); // virola
+      F('#e89aa8', 51, y0, 5, 12); F('#f4c0c8', 51, y0, 5, 3); F('#c46a82', 51, y0 + 9, 5, 3); // goma
+      F('#fff', 20, y0 + 1, 8, 1);
+    } else if (kind === 'brocha') { // brocha plana: mango lacado, virola engarzada con clavos, cerdas cargadas que gotean
+      poly(INK, [[22,6],[58,1],[59,6],[24,13]]); poly('#b0703a', [[23,7],[57,2],[58,5],[24,12]]); poly('#e0a060', [[23,7],[57,2],[57,3],[24,9]]); F('#6b4424', 25, 11, 20, 1); // mango
+      poly(INK, [[12,2],[25,4],[25,16],[12,18]]); poly('#9aa0b0', [[13,3],[24,5],[24,15],[13,17]]); poly('#d8dce8', [[13,3],[24,5],[24,7],[13,6]]); F('#5a5f70', 13, 15, 11, 2); F(INK, 17, 9, 2, 2); F(INK, 21, 9, 2, 2); F('#fff', 15, 4, 4, 1); // virola
+      poly(INK, [[1,4],[13,1],[13,19],[1,27]]); poly(rp.base, [[2,5],[12,2],[12,18],[2,26]]);
+      for (let i = 0; i < 10; i++) F(i % 3 ? rp.hi : rp.sh, 3 + (i % 5) * 2, 4 + (i >> 1), 1, 16 - (i % 4)); // cerdas
+      poly(rp.hi, [[2,5],[12,2],[12,5],[2,8]]); F(rp.dk, 2, 22, 6, 4); F(rp.base, 3, 26, 2, 3); F(rp.out, 3, 29, 2, 1); F('#fff', 4, 6, 3, 1); // punta cargada y goterón
+    } else { // pincel redondo: mango fino y largo, virola, mechón que termina en punta cargada
+      poly(INK, [[20,6],[55,4],[55,9],[20,10]]); poly('#2a2438', [[21,7],[54,5],[54,8],[21,9]]); F('#5a5670', 22, 7, 30, 1); F('#8c8ab0', 24, 7, 6, 1); // mango negro lacado
+      poly(INK, [[12,4],[21,5],[21,11],[12,12]]); poly('#c9c4d4', [[13,5],[20,6],[20,10],[13,11]]); F('#f4f0ea', 13, 5, 6, 1); F('#8c8ab0', 13, 10, 7, 1); // virola
+      poly(INK, [[1,13],[5,7],[13,4],[13,12],[6,13]]); poly(rp.base, [[2,12],[6,7],[12,5],[12,11],[6,12]]); poly(rp.hi, [[4,10],[7,7],[12,5],[12,7],[7,9]]); F(rp.dk, 2, 12, 3, 1); F('#fff', 8, 7, 2, 1); // mechón
+    }
+    c.__key = 'spirit2|' + kind + '|' + color; return c;
+  });
+}
+// Pinta un espíritu: halo de su color, el cuerpo, un destello que lo recorre y chispas. (x,y) es el punto de contacto.
+function drawSpirit(kind, color, glow, x, y, opt = {}) {
+  const S = SPIRITS[kind], img = spiritSprite(kind, color), a = opt.a || 0, sx = opt.sx || 1, sy = opt.sy || 1, alpha = opt.alpha ?? 1, t = OW.t;
+  const halo = cached('spirit-halo|' + kind + '|' + color + '|' + glow, () => { const c = document.createElement('canvas'); c.width = S.w + 6; c.height = S.h + 6; const q = c.getContext('2d'); for (const [ox, oy] of [[-2,0],[2,0],[0,-2],[0,2],[-1,-1],[1,1],[1,-1],[-1,1]]) q.drawImage(img, 3 + ox, 3 + oy); q.globalCompositeOperation = 'source-in'; q.fillStyle = glow; q.fillRect(0, 0, c.width, c.height); return c; });
+  const shine = cached('spirit-shine|' + kind, () => { const c = document.createElement('canvas'); c.width = S.w; c.height = S.h; return c; }), sq = shine.getContext('2d');
+  sq.clearRect(0, 0, S.w, S.h); sq.globalCompositeOperation = 'source-over'; sq.drawImage(img, 0, 0); sq.globalCompositeOperation = 'source-atop'; const band = ((t * 2) % (S.w + 40)) - 20; sq.fillStyle = 'rgba(255,248,230,.75)'; sq.beginPath(); sq.moveTo(band, 0); sq.lineTo(band + 5, 0); sq.lineTo(band - 5, S.h); sq.lineTo(band - 10, S.h); sq.fill();
+  g.save(); g.translate(Math.round(x), Math.round(y)); g.rotate(a); g.scale(sx * (opt.flip ? -1 : 1), sy); g.imageSmoothingEnabled = false;
+  const pulse = .55 + .25 * Math.sin(t * .2); g.globalAlpha = alpha * pulse; g.drawImage(halo, -S.tip[0] - 3, -S.tip[1] - 3);
+  g.globalAlpha = alpha; g.drawImage(shine, -S.tip[0], -S.tip[1]); g.restore();
+  if (Prefs.shake && alpha > .3) for (let i = 0; i < 5; i++) { const ph = ((t * .7 + i * 11) % 30) / 30, an = i * 1.26 + t * .05, d = 6 + ph * 16; g.globalAlpha = (1 - ph) * alpha; g.fillStyle = i % 2 ? '#fff8e6' : glow; const px = Math.round(x + Math.cos(an) * d * 1.3 - S.tip[0] * .0), py = Math.round(y - S.h * .4 + Math.sin(an) * d * .6 - ph * 8); g.fillRect(px - 1, py, 3, 1); g.fillRect(px, py - 1, 1, 3); } g.globalAlpha = 1;
 }
