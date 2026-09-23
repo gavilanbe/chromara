@@ -28,10 +28,10 @@ const ESCENAS = {
   tienda() { ESCENAS.mapa(); Game.pigmento = 40; Game.techLevels = { brote: 2 }; openShop(); },
   sepia() { ESCENAS.mapa(); OW.msg = null; OW.x = MAP.merchant.x * TILE + 8; OW.y = MAP.merchant.y * TILE + 34; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H); },
   guia() { ESCENAS.mapa(); openOverlay('guide'); },
-  // ?escena=magias[&paso=0..4]: el anillo abierto frente a cada pieza del taller (garabato, chincheta, boceto, charco).
-  magias() { ESCENAS.mapa(); OW.msg = null; const paso = +(new URLSearchParams(location.search).get('paso') || 0), z = Game.puzzle, spots = [[25 * TILE + 6, 21 * TILE + 4, 'right', 4], [28 * TILE + 8, 21 * TILE + 12, 'down', 3], [34 * TILE + 8, 21 * TILE + 8, 'up', 1], [37 * TILE + 8, 18 * TILE + 8, 'up', 5], [36 * TILE + 8, 15 * TILE + 10, 'right', 0]];
-    if (paso > 0) z.erased = 1; if (paso > 1) z.line = 1; if (paso > 2) { z.real = 1; z.sketch = ['amarillo', 'azul']; } if (paso > 3) z.washed = 1;
-    const [x, y, dir, idx] = spots[paso]; OW.x = x; OW.y = y; OW.dir = dir; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H); if (paso < 4) { openRing(); OW.ring.idx = idx; } },
+  // ?escena=magias[&paso=0..4]: el anillo abierto frente a cada paso del recorrido (garabato, chincheta, pasarela, charco, puerta).
+  magias() { ESCENAS.mapa(); OW.msg = null; const paso = +(new URLSearchParams(location.search).get('paso') || 0), z = Game.puzzle, G = fieldGroups(), spots = [[10, 22, 'right', 4], [12, 17, 'up', 3], [23, 6, 'right', 1], [29, 5, 'right', 5], [31, 5, 'right', 0]];
+    if (paso > 0) G.scribbles.forEach(s => z.erased[s.id] = true); if (paso > 1) G.pairs.forEach(q => z.lines[q.id] = true); if (paso > 2) G.sketches.filter(s => s.color === 'verde').forEach(s => z.real[s.id] = true); if (paso > 3) G.puddles.forEach(n => z.washed[n.id] = true);
+    const [tx, ty, dir, idx] = spots[paso]; OW.x = tx * TILE + 8; OW.y = ty * TILE + 8; OW.dir = dir; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H); openRing(); OW.ring.idx = idx; },
   paleta() { escenaBattle('5'); },
   entrada() { escenaBattle('5'); B.fightStart = B.t; BUI.party = null; },
   paleta3() { escenaBattle('5'); B.menu.idx = 3; },

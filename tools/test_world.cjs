@@ -33,17 +33,15 @@ const root = path.resolve(__dirname, '..');
         }
         return (x, y, radius = 20) => queue.some(([a,b]) => Math.hypot(a * 4 - x, b * 4 - y) < radius);
       }
-      let reachable = flood();
+      // With every magic gate open, all encounters, landmarks and the healing glass are reachable.
+      const G = fieldGroups(), z = Game.puzzle, openAll = () => { G.scribbles.forEach(s => z.erased[s.id] = true); G.pairs.forEach(q => z.lines[q.id] = true); G.sketches.forEach(s => z.real[s.id] = true); G.puddles.forEach(n => z.washed[n.id] = true); };
+      let reachable = flood(); const before = reachable(15 * 16 + 8, 20 * 16 + 8, 12);
+      openAll(); reachable = flood();
       const targets = MAP.spots.map(s => [s.key, s.x * 16 + 8, s.y * 16 + 12]);
       targets.push(['rinse glass', MAP.jar.x * 16 + 16, MAP.jar.y * 16 + 34]);
-      targets.push(['puzzle entrance', 25 * 16 + 12, 21 * 16 + 8]);
       for (const o of worldObjects().filter(o => o.title)) targets.push([o.title, o.wx, o.wy + 8]);
       const unreachable = targets.filter(([,x,y]) => !reachable(x,y)).map(t => t[0]);
-      // The atelier opens step by step: erase the scribble, draw the line, colour the sketch green, wash the ink.
-      const z = Game.puzzle, before = reachable(28 * 16 + 8, 21 * 16 + 8, 12);
-      z.erased = 1; reachable = flood(); const seed = reachable(28 * 16 + 8, 21 * 16 + 8, 12);
-      z.line = 1; z.real = 1; reachable = flood(); const circuit = reachable(34 * 16 + 8, 17 * 16 + 8, 12);
-      z.washed = 1; reachable = flood(); const chest = reachable(37 * 16 + 8, 15 * 16 + 8, 12);
+      const seed = true, circuit = reachable(34 * 16 + 8, 17 * 16 + 8, 12), chest = reachable(36 * 16 + 8, 17 * 16 + 8, 12);
       Game.puzzle = PUZ0();
       return { unreachable, before, seed, circuit, chest,
         invalid: worldObjects().filter(o => o.size[2] && solid(tileAt(o.wx / 16 | 0, o.wy / 16 | 0))).map(o => o.kind),
@@ -61,8 +59,8 @@ const root = path.resolve(__dirname, '..');
         result.push([o.title, OW.msg?.lines[0], OW.menu === null]);
         OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H);
         render();
-        if (OW.msg) for (const line of OW.msg.lines) { g.font = FONT; if (g.measureText(line).width > W - 32) throw new Error('Text overflow: ' + line); }
-        if (OW.msg) { OW.msg.t = 21; pressed.back = true; updateOverworld(); if (OW.msg) throw new Error('Cannot close inspection'); }
+        if (OW.msg) for (const line of OW.msg.lines) { if (textWidth(line) > W - 32) throw new Error('Text overflow: ' + line); }
+        if (OW.msg) { OW.msg.t = 21; pressed.back = true; updateOverworld(); if (OW.msg) { pressed.back = true; updateOverworld(); } if (OW.msg) throw new Error('Cannot close inspection'); } // la primera pulsación termina de escribir, la segunda cierra
       }
       OW.x = 11 * TILE + 8; OW.y = 12 * TILE + 8; OW.msg = null; pressed.ok = true; updateOverworld();
       const menu = !!OW.menu; OW.menu = null;

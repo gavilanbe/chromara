@@ -314,10 +314,10 @@ function groundTile(tx, ty, pal, frame = 0) {
 }
 // Bosque de utensilios 16×24: pinceles clavados (mechón de cerdas cargado de color arriba, mango de madera) y lápices (cuerpo de color, cono de madera, mina). Los contiguos juntan sus mechones en setos.
 const TREE_COLS = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'];
-function treeSprite(pal, mL, mR, vr) {
-  return cached(`tree|${pal}|${mL ? 1 : 0}|${mR ? 1 : 0}|${vr}`, () => {
+function treeSprite(pal, mL, mR, vr, zone) { // zone: el color de la región tiñe su seto; sin zona, el arcoíris de siempre
+  return cached(`tree|${pal}|${mL ? 1 : 0}|${mR ? 1 : 0}|${vr}|${zone ? zone.color + (zone.drained ? 'd' : '') : ''}`, () => {
     const p = PAL[pal], c = document.createElement('canvas'); c.width = 16; c.height = 24; const x = c.getContext('2d');
-    const tint = ramp(worldPigment(TREE_COLS[vr % 6], pal)), pencil = vr % 3 === 2;
+    const hue = zone ? (vr % 4 === 3 ? TREE_COLS[(TREE_COLS.indexOf(zone.color) + (vr & 4 ? 1 : 5)) % 6] : zone.color) : TREE_COLS[vr % 6], tint = ramp(worldPigment(hue, pal, !!zone?.drained)), pencil = vr % 3 === 2;
     if (pencil) { // lápiz: mina, cono de madera, cuerpo facetado, goma abajo
       const body = tint ? tint.base : p.rock2, bodyHi = tint ? tint.hi : p.rock3, bodyDk = tint ? tint.sh : p.rockOut;
       px(x, '#14121c', 7, 0, 2, 2); px(x, p.wood2, 6, 2, 4, 1); px(x, p.wood, 5, 3, 6, 2); px(x, p.wood3, 6, 3, 2, 1); px(x, p.wood2, 5, 4, 1, 1); px(x, p.wood2, 10, 4, 1, 1);
@@ -351,7 +351,14 @@ DATA.map.forEach((row, y) => {
     else if (ch === 'V') { MAP.jar = { x, y }; ch = '.'; }
     else if (ch === 'M') { MAP.merchant = { x, y }; ch = '.'; }
     else if (ch === 'S') { (MAP.signs = MAP.signs || []).push({ x, y, lines: DATA.signs[x + ',' + y] || ['Post-it'] }); ch = '.'; }
-    else if ('HREpQbN'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], torn: [], pit: [], pins: [], puddle: [] }; if (ch === 'H') P.torn.push([x, y]); else if (ch === 'R') P.river.push([x, y]); else if (ch === 'Q') P.pit.push([x, y]); else if (ch === 'b') { P.pit.push([x, y]); P.sketch = [x, y]; } else if (ch === 'p') P.pins.push([x, y]); else if (ch === 'N') P.puddle.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; ch = ch === 'R' ? ',' : '.'; }
+    else if (ch === 'f') { MAP.fold = [x, y]; ch = '.'; }
+    else if ('HRQpNgoveE'.includes(ch)) { // piezas de las magias de campo (field.js): se agrupan por vecindad al leerlas
+      const P = MAP.pz = MAP.pz || { torn: [], ink: [], pins: [], puddle: [], sketch: [], chests: [] }, nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => (DATA.map[y + b] || '')[x + a]);
+      if (ch === 'H') P.torn.push([x, y]); else if (ch === 'R' || ch === 'Q') P.ink.push([x, y]); else if (ch === 'p') P.pins.push([x, y]); else if (ch === 'N') P.puddle.push([x, y]);
+      else if (ch === 'E') P.estuche = [x, y]; else if (ch === 'e') P.chests.push([x, y]);
+      else { const water = nb.includes('~'); if (!water) P.ink.push([x, y]); P.sketch.push([x, y, { g: 'verde', o: 'naranja', v: 'violeta' }[ch]]); ch = water ? '~' : 'R'; }
+      ch = ch === '~' ? '~' : ch === 'R' || ch === 'Q' ? ',' : '.'; // debajo: agua, tinta (suelo tiznado, sólido por field.js) o hierba
+    }
     else if (DATA.encounters[ch]) { MAP.spots.push({ key: ch, x, y }); ch = ch === 'B' ? ',' : (ch === '5' ? ',' : '.'); }
     out += ch;
   }
@@ -400,13 +407,16 @@ function initOverworld() {
   if (Game.intro) OW.msg = { lines: DATA.texts.intro, t: 0 };
   OW.msgWait = true;
 }
-function pzSolidTile(tx, ty) { return fieldPuzzleSolid(tx, ty); }
+function pzSolidTile(tx, ty) { return fieldPuzzleOverride(tx, ty) === true; }
 function walkable(px, py) { // hitbox pies 8×6
   if (typeof chapterBlocked === 'function' && chapterBlocked(px, py)) return false;
   if (worldBlocked(px, py) || merchantBlocked(px, py)) return false;
-  for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (pzSolidTile((px + dx) / TILE | 0, (py + dy) / TILE | 0)) return false;
   if (MAP.jar) { const jx = MAP.jar.x * TILE, jy = MAP.jar.y * TILE; if (px > jx - 4 && px < jx + 36 && py > jy - 2 && py < jy + 30) return false; }
-  for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (solid(tileAt((px + dx) / TILE | 0, (py + dy) / TILE | 0))) return false;
+  for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) {
+    const tx = (px + dx) / TILE | 0, ty = (py + dy) / TILE | 0, o = fieldPuzzleOverride(tx, ty); // las magias abren (o cierran) casillas
+    if (o === true) return false; if (o === false) continue;
+    if (solid(tileAt(tx, ty))) return false;
+  }
   return true;
 }
 // A room change settles for 24 frames before switching; crossing the doorway
@@ -414,7 +424,7 @@ function walkable(px, py) { // hitbox pies 8×6
 function worldCue() {
   if (Game.page === 1) return typeof CHAPTER !== 'undefined' && CHAPTER.complete ? 'restored' : 'atelier';
   if (Game.palette === 'vivo') return 'restored';
-  return OW.x >= 28 * TILE && OW.y >= 16 * TILE && OW.y < 25 * TILE ? 'atelier' : 'map';
+  return OW.x >= 28 * TILE && OW.y >= 16 * TILE ? 'atelier' : 'map';
 }
 function updateWorldMusic() {
   const cue = worldCue();
@@ -536,7 +546,7 @@ function drawOverworld() {
   const ents = [];
   for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
     const ch = tileAt(tx, ty); g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
-    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => g.drawImage(treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7), tx * TILE - cx, ty * TILE - 8 - cy) });
+    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => g.drawImage(treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7, Game.page === 1 ? null : worldRegion(tx, ty)), tx * TILE - cx, ty * TILE - 8 - cy) });
   }
   drawWorldGround(g, cx, cy, pal);
   drawRinseGround(cx, cy, pal);

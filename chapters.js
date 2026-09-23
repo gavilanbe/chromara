@@ -36,7 +36,7 @@ function chapterProps(){return [
   {kind:'jar',x:28,y:5,color:'violeta',drained:true}, {kind:'tube',x:36,y:6,color:'azul',drained:true},
   {kind:'boat',x:16,y:13,color:'azul'}, {kind:'fan',x:8,y:17,color:'violeta'}
 ];}
-function chapterPortal(){return Game.page===1?{x:4*16+8,y:25*16+12}:{x:5*16+8,y:22*16+12};}
+function chapterPortal(){return Game.page===1?{x:4*16+8,y:25*16+12}:MAP.fold?{x:MAP.fold[0]*16+8,y:MAP.fold[1]*16+12}:{x:5*16+8,y:22*16+12};}
 function chapterSealsOpen(){return CHAPTER.seals.every(s=>Game.defeated.has(s.key));}
 function chapterBlocked(x,y){return Game.page===1&&!chapterSealsOpen()&&x>26*16&&x<37*16&&y<8*16+6;}
 function chapterNear(){const p=chapterPortal();return Math.hypot(OW.x-p.x,OW.y-p.y)<30;}

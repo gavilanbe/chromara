@@ -39,7 +39,7 @@ test('each level 2 choreography runs to the end, spends its own cost and deals d
   assert(run('B.party.every(u=>u.wz===0&&u.wx===u.hx&&u.wy===u.hy)'),id+' left someone out of place');
  }
 });
-test('Sepia stands on the map, blocks her own spot, opens the shop and cuts no path',()=>{
+test('Sepia stands in the Refugio, blocks her own spot, opens the shop and is reachable from the start',()=>{
  run(`resetGame();Game.intro=false;initOverworld();OW.msg=null;setState('overworld');`);
  const m=run('merchantAt()');assert(m,'no merchant on the map');assert.equal(run(`walkable(${m.x},${m.y})`),false);
  run(`OW.x=${m.x};OW.y=${m.y}+22;pressed.ok=true;updateOverworld();`);assert.equal(run('Game.overlay?.type'),'shop');
@@ -47,7 +47,7 @@ test('Sepia stands on the map, blocks her own spot, opens the shop and cuts no p
  const lost=run(`(()=>{const nx=MAP.w*4,ny=MAP.h*4,start=[Math.round(MAP.spawn[0]*4+2),Math.round(MAP.spawn[1]*4+3)],seen=new Set([start[1]*nx+start[0]]),q=[start];
   for(let i=0;i<q.length;i++){const [x,y]=q[i];for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const a=x+dx,b=y+dy,k=b*nx+a;if(a<0||b<0||a>=nx||b>=ny||seen.has(k)||!walkable(a*4,b*4))continue;seen.add(k);q.push([a,b]);}}
   const near=(x,y,r)=>q.some(([a,b])=>Math.hypot(a*4-x,b*4-y)<r);
-  return [...MAP.spots.map(s=>[s.key,s.x*16+8,s.y*16+12]),['sepia',${m.x},${m.y}+18]].filter(([,x,y])=>!near(x,y,20)).map(t=>t[0]);})()`);
+  return [['sepia',${m.x},${m.y}+18],['vaso',MAP.jar.x*16+16,MAP.jar.y*16+34]].filter(([,x,y])=>!near(x,y,20)).map(t=>t[0]);})()`);
  assert.equal(lost.length,0,'unreachable: '+[...lost].join(','));
 });
 console.log(checks+' shop checks passed.');

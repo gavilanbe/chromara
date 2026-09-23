@@ -37,8 +37,8 @@ for(const mobile of [false,true,'bindings']){
  for(let i=0;i<run('DATA.bossDialogue.length');i++)for(const ch of [0,12,999])layout('dialogue '+i+'/'+ch,`drawDialogue({i:${i},ch:${ch},t:50})`);
  run('OW.msg=null;Game.overlay=null');
  // the field ring, aimed at each piece of the atelier, with every art selected and each stage of the puzzle
- for(const [x,y,dir] of [[25*16+6,21*16+4,'right'],[28*16+8,21*16+12,'down'],[34*16+8,21*16+8,'up'],[37*16+8,18*16+8,'up'],[10*16,10*16,'down']])for(let idx=0;idx<6;idx++)for(const stage of [0,1]){
-  run(`OW.x=${x};OW.y=${y};OW.dir='${dir}';OW.cam.x=clamp(OW.x-W/2,0,MAP.w*TILE-W);OW.cam.y=clamp(OW.y-H/2,0,MAP.h*TILE-H);Game.puzzle=PUZ0();if(${stage}){Game.puzzle.erased=1;Game.puzzle.line=1;Game.puzzle.sketch=['rojo'];}openRing();OW.ring.idx=${idx};OW.ring.t=20;`);
+ for(const [x,y,dir] of [[10*16+8,22*16+8,'right'],[12*16+8,17*16+8,'up'],[23*16+8,6*16+8,'right'],[29*16+8,5*16+8,'right'],[34*16+8,21*16+8,'up'],[37*16+8,26*16+8,'down']])for(let idx=0;idx<6;idx++)for(const stage of [0,1]){
+  run(`OW.x=${x};OW.y=${y};OW.dir='${dir}';OW.cam.x=clamp(OW.x-W/2,0,MAP.w*TILE-W);OW.cam.y=clamp(OW.y-H/2,0,MAP.h*TILE-H);Game.puzzle=PUZ0();if(${stage}){for(const t of fieldGroups().sketches)Game.puzzle.paint[t.id]=['rojo'];}openRing();OW.ring.idx=${idx};OW.ring.t=20;`);
   layout('field '+x+','+y+'/'+idx+'/'+stage, 'drawRing()');
  }
  run('OW.ring=null');layout('pigment','drawPigmentHUD()');layout('rinse','OW.heal=true;OW.jar.phase="clear";drawRinseUI();OW.heal=false');
@@ -63,7 +63,7 @@ test('UI clock advances through options while combat remains paused',()=>{
  scenario();run("openOverlay('settings');releaseInputs();const atelierTime=ARTUI.t,battleTime=B.t;update()");assert.equal(run('ARTUI.t===atelierTime+1&&B.t===battleTime'),true);
 });
 test('field ring icons select without casting, consuming MP or changing a puzzle',()=>{
- scenario();run("Game.state='overworld';OW.x=25*16+6;OW.y=21*16+4;OW.dir='right';openRing();OW.ring.t=20;const atelierPuzzle=JSON.stringify(Game.puzzle),atelierMP=Party.map(p=>p.cur.mp).join();UI_HITS.length=0;drawRing();UI_HITS[1].hover()");
+ scenario();run("Game.state='overworld';OW.x=10*16+8;OW.y=22*16+8;OW.dir='right';openRing();OW.ring.t=20;const atelierPuzzle=JSON.stringify(Game.puzzle),atelierMP=Party.map(p=>p.cur.mp).join();UI_HITS.length=0;drawRing();UI_HITS[1].hover()");
  assert.equal(run('OW.ring.idx'),1);assert.equal(run('JSON.stringify(Game.puzzle)===atelierPuzzle&&Party.map(p=>p.cur.mp).join()===atelierMP'),true);
 });
 test('map buttons withdraw during cinematics and field actions cannot open studies',()=>{
