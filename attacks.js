@@ -420,7 +420,7 @@ function emberStorm(sx, sy, n = 26, seed = 4) {
   const rnd = seeded(seed * 13 + (B.stats.actions | 0)), embers = Array.from({ length: n }, () => ({ a: rnd() * 6.28, v: 2 + rnd() * 5, g: .06 + rnd() * .08, s: rnd() < .3 ? 2 : 1, life: 16 + rnd() * 16, c: rnd() }));
   const f = fx(34, () => { for (const e of embers) { if (f.t > e.life) continue; const q = f.t / e.life, x = sx + Math.cos(e.a) * e.v * f.t, y = sy + Math.sin(e.a) * e.v * f.t * .7 + e.g * f.t * f.t; g.globalAlpha = 1 - q * q; g.fillStyle = q < .3 ? '#fff3c0' : q < .6 ? C('amarillo') : e.c < .5 ? C('naranja') : C('rojo'); g.fillRect(Math.round(x), Math.round(y), e.s, e.s); } g.globalAlpha = 1; });
 }
-// Llamarada, «la página arde»: rojo y amarillo se funden en naranja y la gota sube al cielo. Ámbar esboza a lápiz un fénix a su
+// Nivel 2 de la Llamarada (sin usar todavía), «la página arde»: rojo y amarillo se funden en naranja y la gota sube al cielo. Ámbar esboza a lápiz un fénix a su
 // alrededor, línea a línea; Carmín lo rellena a brochazos rojos y, donde el rojo pisa el amarillo, el naranja nace desde el corazón.
 // El dibujo prende: llamas en el filo de las alas, un aleteo, y el fénix cruza el cielo quemando la página a su paso (agujeros con
 // borde de brasa por los que se ve la oscuridad de detrás del papel); cae en picado sobre la fila de enemigos, los enciende uno a uno
@@ -487,7 +487,7 @@ function pageBurns() {
   });
   return { list, f, add(x, y, r) { list.push({ x, y, r, at: f.t, seed: list.length * 7 + 3, heal: 0 }); } };
 }
-function* techLlamarada(users, targets, tech, col) {
+function* techLlamaradaFenix(users, targets, tech, col) { // reservada para el nivel 2 de la mezcla: aún no la usa ninguna técnica
   const red = users.find(u => u.id === 'carmin') || users[0], yel = users.find(u => u.id === 'ambar') || users[1] || users[0], mid = centroid(users), ec = enemyC();
   const OR = C('naranja'), YE = C('amarillo'), RE = C('rojo'), dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Llamarada');
   // 1) fusión de pigmentos; la gota naranja sube al cielo, donde se va a dibujar el fénix
@@ -560,6 +560,104 @@ function* techLlamarada(users, targets, tech, col) {
   }
   pilB.dur = 0; pilF.dur = 0; burns.f.dur = 0;
   yield* wait(8); users.forEach(u => { u.pose = 'idle'; u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); camReset();
+}
+// Llamarada, la cerilla: rojo y amarillo se funden en naranja; Ámbar se planta junto a Carmín y raspa el lápiz por las cerdas
+// cargadas de rojo hasta que prende; Carmín batea la bola con la brocha; el estallido abre una onda por el suelo que va
+// encendiendo a cada enemigo cuando su frente de llamas lo alcanza, envuelto en fuego por delante y por detrás, con humo, ascuas y el suelo chamuscado.
+function* techLlamarada(users, targets, tech, col) {
+  const red = users.find(u => u.id === 'carmin') || users[0], yel = users.find(u => u.id === 'ambar') || users[1] || users[0], mid = centroid(users), ec = enemyC();
+  const OR = C('naranja'), YE = C('amarillo'), RE = C('rojo'), dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Llamarada');
+  // 1) fusión de pigmentos
+  camFocus(mid[0], mid[1], { dist: 96, turn: .35, h: 52, pitch: .55, hy: 84, ease: .1 }); users.forEach(u => u.pose = 'charge');
+  const { of } = yield* fuseAt(users, mid[0], mid[1], 22, OR); yield* wait(4); of.dur = 0;
+  // 2) la cerilla: la brocha de Carmín, tumbada y cargada de rojo; Ámbar salta a su lado con el lápiz
+  const bro = propSprite('brocha', RE), lap = propSprite('lapiz', YE), st = { k: 0, fire: 0, hold: 1, scrape: 0, swing: 0, lift: 0, star: 0 };
+  camFocus(red.wx, red.wy, { dist: 72, turn: .3, h: 40, ease: .1, subjects: users, headroom: 22 });
+  const [sx, sy] = side(red, -20); yield* whop(yel, sx, sy, 8, 12); yel.pose = 'attack';
+  // La brocha se apoya en Carmín (mango a su izquierda, cerdas hacia los enemigos); todo lo demás se mide desde su pivote.
+  const K = .8, brushAt = () => { const c = PJ(above(red, .55)), s = c[2]; return { x: c[0] - 20 * s, y: c[1] + 2 * s - st.lift * s, s, a: -.18 - st.swing }; };
+  const local = (b, lx, ly) => [b.x + (lx * Math.cos(b.a) - ly * Math.sin(b.a)) * K * b.s, b.y + (lx * Math.sin(b.a) + ly * Math.cos(b.a)) * K * b.s];
+  const tipAt = () => { const b = brushAt(), [x, y] = local(b, 57, 9); return [x, y, b.s]; };
+  const gh = propGhosts(5), sparks = [], srnd = seeded(31), arc = [];
+  const pf = fx(999, () => {
+    if (!st.hold) return; const b = brushAt();
+    if (st.swing) gh.push(bro, b.x, b.y, b.a, 1, 1, 11, K * b.s); gh.draw();
+    drawProp(bro, b.x, b.y, b.a, 1, 1, 11, K * b.s);
+    if (st.scrape) { const [px, py] = local(b, 37 + st.k * 22, -7 + st.k * 5); drawProp(lap, px, py, 1.05, 1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], .95 * b.s); }
+    for (const sp of sparks) { if (sp.t < 0 || sp.t > sp.life) continue; const q = sp.t / sp.life, x = sp.x + sp.vx * sp.t, y = sp.y + sp.vy * sp.t + .12 * sp.t * sp.t; g.fillStyle = q < .4 ? '#fff3c0' : q < .7 ? YE : OR; g.fillRect(Math.round(x), Math.round(y), sp.big ? 2 : 1, sp.big ? 2 : 1); if (q < .5) g.fillRect(Math.round(x - sp.vx), Math.round(y - sp.vy), 1, 1); }
+    // arden todas las cerdas: brasa a lo largo de la cabeza de la brocha y una lengua por mechón, la de la punta la mayor
+    if (st.fire > 0) { const [tx, ty, s] = tipAt(); g.globalAlpha = .28 * st.fire * Math.max(.5, Prefs.flash); pixDisc(tx - 6 * s, ty, (10 + st.fire * 16) * s, OR); g.globalAlpha = 1;
+      for (let j = 0; j < 5; j++) { const f = clamp(st.fire * 1.6 - j * .15, 0, 1); if (f <= 0) continue; const [bx, by] = local(b, 40 + j * 4.4, 4 + j * 1.2); g.fillStyle = (pf.t + j) % 4 < 2 ? '#ffb347' : '#fff3c0'; g.fillRect(Math.round(bx), Math.round(by), 2, 1); drawFire(bx, by + 3 * s, (2 + f * 3 + (j === 4 ? 3 : 0)) * s, (6 + f * (j === 4 ? 26 : 14)) * s, pf.t + j * 4, j + 1, .95); } }
+    // el bateo deja un arco de fuego detrás de la brocha
+    arc.forEach((p, i) => { if (i) pstroke(arc[i - 1][0], arc[i - 1][1], p[0], p[1], Math.max(1, (2 + i * 1.4) * b.s), i > arc.length - 3 ? '#fff3c0' : i % 2 ? OR : YE, 1, 0, false); });
+    if (st.star > 0) { const [tx, ty, s] = tipAt(), r = (6 + st.star * 10) * s; g.fillStyle = '#fff3c0'; g.fillRect(Math.round(tx - r), Math.round(ty), Math.round(r * 2), 1); g.fillRect(Math.round(tx), Math.round(ty - r), 1, Math.round(r * 2)); g.fillRect(Math.round(tx - r * .4), Math.round(ty - 1), Math.round(r * .8), 3); g.fillRect(Math.round(tx - 1), Math.round(ty - r * .4), 3, Math.round(r * .8)); }
+  });
+  pf.tick = () => { for (const sp of sparks) sp.t++; while (sparks.length && sparks[0].t > sparks[0].life) sparks.shift(); };
+  const spark = n => { if (!Prefs.shake) return; const b = brushAt(), [px, py] = local(b, 37 + st.k * 22, -7 + st.k * 5); for (let j = 0; j < n; j++) sparks.push({ x: px, y: py, vx: (srnd() - .5) * 4, vy: -1 - srnd() * 2.8, t: 0, life: 10 + srnd() * 10, big: srnd() < .3 }); };
+  const sparkAt = [red.wx, red.wy, red.def.h * 1.1];
+  for (let r = 0; r < 3; r++) {
+    Audio.sfx('scratch_long', { vol: .8 }); st.scrape = 1;
+    for (let i = 1; i <= 8; i++) { st.k = i / 8; yel.wz = Math.sin(i * .8) * 2; if (Prefs.shake) B.shake = i > 5 ? 1 : 0; spark(2 + r); yield; }
+    smokeColumn(sparkAt[0] + 4, sparkAt[1], sparkAt[2] - 6, 2, 8, 4, 11 + r); // bocanada de fricción al final de cada pasada
+    if (r < 2) { for (let i = 1; i <= 4; i++) { st.k = 1 - i / 4; yield; } yel.wz = 0; }
+  }
+  st.scrape = 0; yel.wz = 0;
+  // 3) prende: destello en la punta y la llama crece con las cerdas
+  Audio.sfx('fwoom'); Audio.sfx('crackle', { when: .1 }); B.flash = { col: '#fff3c0', a: .35 }; B.slowmo = 8; B.hitstop = 2;
+  { const [tx, ty] = tipAt(); emberStorm(tx, ty, 14, 9); }
+  for (let i = 1; i <= 18; i++) { st.fire = i / 18; users.forEach(u => u.wz = Math.sin(i * .5) * 2); if (i % 3 === 0) spark(1); yield; }
+  users.forEach(u => { u.wz = 0; u.pose = 'attack'; });
+  // 4) el bateo: Carmín echa la brocha atrás y la lanza hacia delante; la bola sale disparada
+  yield* whop(yel, ...side(red, -30), 6, 6); yel.pose = 'idle';
+  Audio.sfx('charge', { semi: 0, vol: .5 }); for (let i = 1; i <= 7; i++) { st.swing = -.55 * i / 7; st.lift = 4 * i / 7; red.gesture = Prefs.shake ? { sx: 1 + .1 * i / 7, sy: 1 - .1 * i / 7 } : null; yield; }
+  Audio.sfx('whip'); Audio.sfx('drop_fall', { when: .1 });
+  for (let i = 1; i <= 5; i++) { st.swing = -.55 + 2.2 * (i / 5) ** 1.6; st.lift = 4 - 6 * i / 5; red.gesture = Prefs.shake ? { sx: 1.12 - .12 * i / 5, sy: .88 + .12 * i / 5 } : null; if (Prefs.shake) { const [tx, ty] = tipAt(); arc.push([tx, ty]); } if (i === 3) { st.fire = 0; red.wz = 6; st.star = 1; Audio.sfx('impact_sub', { vol: .5 }); } yield; }
+  red.gesture = null; red.wz = 0; B.hitstop = 4;
+  // La cámara espera en la fila de enemigos, cerca: la bola sale por arriba del cuadro y cae en picado sobre ellos.
+  camFocus(ec[0], ec[1], { dist: 96, turn: -.2, h: 52, pitch: .58, ease: .09, subjects: targets, headroom: 30, solo: true });
+  const ball = { wx: red.wx, wy: red.wy, wz: red.def.h + 8, trail: [] }, sh = shadowFx(ball.wx, ball.wy, 4, 999);
+  const bf = fx(999, () => {
+    // cola de cometa: las posiciones anteriores arden cada vez más pequeñas; delante, la bola con halo
+    ball.trail.forEach((p, i) => { const c = PJ(p), k = (i + 1) / (ball.trail.length + 1); drawFire(c[0], c[1] + 6 * c[2], 7 * k * c[2], 18 * k * c[2], bf.t + i, 3 + i, .35 + .5 * k); });
+    const c = PJ([ball.wx, ball.wy, ball.wz]); g.globalAlpha = .3 * Math.max(.5, Prefs.flash); g.fillStyle = OR; g.beginPath(); g.arc(c[0], c[1], 20 * c[2], 0, 6.29); g.fill(); g.globalAlpha = 1;
+    drawFire(c[0], c[1] + 9 * c[2], 13 * c[2], 36 * c[2], bf.t, 2); pixDisc(c[0], c[1] - 2 * c[2], Math.max(2, 7 * c[2]), C('amarillo'), null, '#ffffff'); pixDisc(c[0] - 1, c[1] - 3 * c[2], Math.max(1, 4 * c[2]), '#fff3c0');
+  });
+  for (let i = 1; i <= 22; i++) { const k = i / 22; st.star = Math.max(0, st.star - .25); if (arc.length && i % 2) arc.shift(); if (i <= 8) { st.swing = lerp(1.65, 0, i / 8); st.lift = lerp(-2, 0, i / 8); } else st.hold = 0; if (i % 2) ball.trail.unshift([ball.wx, ball.wy, ball.wz]); if (ball.trail.length > 7) ball.trail.pop(); ball.wx = lerp(red.wx, ec[0], k); ball.wy = lerp(red.wy, ec[1], k); ball.wz = red.def.h + 8 + Math.sin(k * Math.PI) * 30 - k * 20;
+    if (i % 4 === 2) { const dx = ball.wx, dy = ball.wy; B.particles.push({ wx: dx, wy: dy, wz: ball.wz, vx: 0, vy: 0, vz: -.5, g: .12, col: OR, t: 0, life: 16, size: 2 }); afterFx(8, () => { mark({ kind: 'blob', p: [dx, dy, 0], w: 3, col: '#3a2a22', seed: i, grow: 3, life: 200, under: true }); flames(dx, dy, 1, 2); }); } // gotas ardiendo que chamuscan el suelo
+    sh.draw = () => { const c = project(ball.wx, ball.wy, 0); if (c) shadow(c[0], c[1], Math.round((6 + (1 - Math.sin(k * Math.PI)) * 14) * c[2])); };
+    for (let j = 0; j < 2; j++) B.particles.push({ wx: ball.wx + R(-4, 4), wy: ball.wy + R(-2, 2), wz: ball.wz + R(-4, 4), vx: R(-.4, .4), vy: 0, vz: R(-.4, .8), g: -.01, col: j ? OR : YE, t: 0, life: 16, size: 2 }); yield; }
+  bf.dur = 0; sh.dur = 0; pf.dur = 0; st.hold = 0;
+  // 5) impacto: fotograma de todos, estallido dentado, onda de fuego por el suelo y ascuas hasta la cámara
+  Audio.sfx('fwoom'); Audio.sfx('impact_sub', { vol: .9 }); Audio.sfx('crackle', { when: .2 }); B.flash = { col: '#fff3c0', a: .7 }; B.shake = 9; B.hitstop = 8; B.slowmo = 14;
+  impactFrame(targets, OR, 1.4); { const c = PJ([ec[0], ec[1], 8]); emberStorm(c[0], c[1], 30, 4); }
+  burst(ec[0], ec[1], 6, YE, 24, 3, 30, .1); burst(ec[0], ec[1], 6, OR, 24, 2.2, 36, .06);
+  const blast = fx(22, () => { const c = PJ([ec[0], ec[1], 6]), q = blast.t / 22, e = 1 - (1 - q) ** 3; g.globalAlpha = q > .45 ? (1 - q) / .55 : 1; drawBlast(c[0], c[1], (6 + e * 46) * c[2], q, blast.t); g.globalAlpha = 1; });
+  // Frente de llamas: un anillo de lenguas de fuego que se abre por el suelo desde el impacto; enciende a cada enemigo al alcanzarlo.
+  const front = { r: 0, a: 1 }, ringB = fx(999, () => { if (front.r <= 0 || front.a <= 0) return; const n = 30; for (let j = 0; j < n; j++) { const an = j / n * 6.283, back = Math.sin(an) < 0; if (!back) continue; const c = PJ([ec[0] + Math.cos(an) * front.r, ec[1] + Math.sin(an) * front.r, 0]); drawFire(c[0], c[1], 4 * c[2], (10 + 4 * Math.sin(ringB.t * .5 + j)) * c[2], ringB.t + j * 2, j, front.a); } }, true),
+    ringF = fx(999, () => { if (front.r <= 0 || front.a <= 0) return; const n = 30; for (let j = 0; j < n; j++) { const an = j / n * 6.283; if (Math.sin(an) < 0) continue; const c = PJ([ec[0] + Math.cos(an) * front.r, ec[1] + Math.sin(an) * front.r, 0]); drawFire(c[0], c[1], 4 * c[2], (10 + 4 * Math.sin(ringF.t * .5 + j)) * c[2], ringF.t + j * 2, j + 40, front.a); } });
+  const heat = overlay(80, OR, .12, 6, 34); smokeColumn(ec[0], ec[1], 10, 14, 70, 26, 1);
+  mark({ kind: 'pool', p: [ec[0], ec[1] + 2, 0], w: 30, col: '#3a2a22', grow: 8, life: 280, under: true });
+  // 6) la onda enciende a cada enemigo por orden de distancia: fuego detrás (ancho) y delante (fino), humo y chamuscado
+  const order = [...targets].sort((a, b) => Math.hypot(a.wx - ec[0], a.wy - ec[1]) - Math.hypot(b.wx - ec[0], b.wy - ec[1]));
+  const pillars = order.map((t, j) => ({ t, seed: j * 3 + 1, k: 0, at: 99, lit: false, d: Math.hypot(t.wx - ec[0], t.wy - ec[1]) })), reach = Math.max(40, ...pillars.map(p => p.d + 14));
+  const fireOf = (p, front) => { const c = PJ([p.t.wx, p.t.wy, 0]), s = c[2] * (p.t.boss ? 1.35 : 1.6), w = p.t.def.w * (front ? .38 : .7) * s * p.k, h = p.t.def.h * (front ? 1.2 : 2.3) * s * p.k; drawFire(c[0] + (front ? 2 : 0), c[1] + (front ? 3 : 1), w, h, pilB.t + p.seed * 5, p.seed + (front ? 20 : 0), front ? .8 : 1); };
+  const pilB = fx(999, () => { for (const p of pillars) if (p.k > 0) fireOf(p, false); }, true), pilF = fx(999, () => { for (const p of pillars) if (p.k > 0) fireOf(p, true); });
+  for (let i = 0; i < 50; i++) {
+    front.r = reach * Math.min(1, (1 - (1 - i / 26) ** 2)); front.a = i < 30 ? 1 : Math.max(0, (40 - i) / 10);
+    for (const p of pillars) {
+      if (!p.lit && front.r >= p.d) p.at = i;
+      p.k = clamp((i - p.at) / 8, 0, 1) * (i > 36 ? (50 - i) / 14 : 1);
+      if (!p.lit && i >= p.at) { p.lit = true; p.t.pose = 'hurt'; p.t.poseT = 14; Audio.sfx('fwoom', { vol: .55, pan: -.2 }); burst(p.t.wx, p.t.wy, p.t.def.h * .5, YE, 10, 1.8, 20, .08); smokeColumn(p.t.wx, p.t.wy, p.t.def.h, 6, 40, p.t.def.w * .6, p.seed + 3); mark({ kind: 'blob', p: [p.t.wx, p.t.wy, 0], w: p.t.def.w * .5, col: '#1e1a2c', grow: 6, life: 260, seed: 5 + p.seed, under: true }); mark({ kind: 'pool', p: [p.t.wx, p.t.wy + 2, 0], w: p.t.def.w * .9, col: '#3a2a22', grow: 8, life: 260, under: true }); }
+      if (p.lit && i === p.at + 4) { dmg(p.t); goop(p.t, OR, 90); }
+      if (p.lit && p.k > .3 && i % 2 === 0) flames(p.t.wx, p.t.wy, 1, p.t.def.w * .35);
+    }
+    if (i % 5 === 0) mark({ kind: 'pool', p: [ec[0] + R(-50, 50), ec[1] + R(-20, 20), 0], w: R(4, 9), col: i % 10 ? '#5a2a2a' : OR, grow: 4, life: 200, under: true });
+    yield;
+  }
+  pilB.dur = 0; pilF.dur = 0; ringB.dur = 0; ringF.dur = 0;
+  // 7) rescoldos: ascuas que flotan y los dos vuelven a su sitio
+  for (let i = 0; i < 16; i++) { B.particles.push({ wx: ec[0] + R(-60, 60), wy: ec[1] + R(-24, 24), wz: R(0, 10), vx: R(-.2, .2), vy: 0, vz: R(.3, .8), g: -.01, col: i & 1 ? OR : YE, t: 0, life: 40, size: 1 }); yield; }
+  yield* whop(yel, yel.hx, yel.hy, 10, 8); yield* wait(6); users.forEach(u => { u.pose = 'idle'; u.wx = u.hx; u.wy = u.hy; }); camReset();
 }
 // ---- Brote: verde de píxel. Todo lo que sigue se dibuja fila a fila con fillRect/pstroke, sin curvas lisas, y es determinista:
 // dibujar dos veces el mismo frame da la misma planta, y dibujar nunca consume el azar del combate.
