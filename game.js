@@ -349,6 +349,7 @@ DATA.map.forEach((row, y) => {
     let ch = row[x];
     if (ch === 'P') { MAP.spawn = [x, y]; ch = '.'; }
     else if (ch === 'V') { MAP.jar = { x, y }; ch = '.'; }
+    else if (ch === 'M') { MAP.merchant = { x, y }; ch = '.'; }
     else if (ch === 'S') { (MAP.signs = MAP.signs || []).push({ x, y, lines: DATA.signs[x + ',' + y] || ['Post-it'] }); ch = '.'; }
     else if ('HREw'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], torn: [] }; if (ch === 'H') P.torn.push([x, y]); else if (ch === 'R') P.river.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; else if (ch === 'w') P.seed = [x, y]; ch = ch === 'R' ? ',' : '.'; }
     else if (DATA.encounters[ch]) { MAP.spots.push({ key: ch, x, y }); ch = ch === 'B' ? ',' : (ch === '5' ? ',' : '.'); }
@@ -370,7 +371,7 @@ function cursor(x, y, col = '#f4f0ea') { g.fillStyle = col; g.fillRect(x, y, 1, 
 // 3. Estado global de partida
 // =====================================================================
 const PUZ0 = () => fieldPuzzleState();
-const Game = { state: 'cover', owned: {}, puzzle: null, t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, studies: {}, seenTechs: new Set(), overlay: null, defeated: new Set(), met: new Set(), bossDown: false, intro: true, debug: false }; // met: grupos de enemigos ya vistos (transición corta)
+const Game = { state: 'cover', owned: {}, puzzle: null, t: 0, pigmento: 0, palette: 'gris', inventory: { ...DATA.inventory }, studies: {}, techLevels: {}, seenTechs: new Set(), overlay: null, defeated: new Set(), met: new Set(), bossDown: false, intro: true, debug: false }; // met: grupos de enemigos ya vistos (transición corta)
 function effStats(p) { // base + arma + accesorio
   const wpn = DATA.weapons[p.weapon] || {}, acc = DATA.accessories[p.acc] || {};
   const s = { hp: p.hp, mp: p.mp, atk: p.atk, def: p.def, spd: p.spd };
@@ -402,7 +403,7 @@ function initOverworld() {
 function pzSolidTile(tx, ty) { return fieldPuzzleSolid(tx, ty); }
 function walkable(px, py) { // hitbox pies 8×6
   if (typeof chapterBlocked === 'function' && chapterBlocked(px, py)) return false;
-  if (worldBlocked(px, py)) return false;
+  if (worldBlocked(px, py) || merchantBlocked(px, py)) return false;
   for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (pzSolidTile((px + dx) / TILE | 0, (py + dy) / TILE | 0)) return false;
   if (MAP.jar) { const jx = MAP.jar.x * TILE, jy = MAP.jar.y * TILE; if (px > jx - 4 && px < jx + 36 && py > jy - 2 && py < jy + 30) return false; }
   for (const [dx, dy] of [[-4, -1], [3, -1], [-4, 3], [3, 3]]) if (solid(tileAt((px + dx) / TILE | 0, (py + dy) / TILE | 0))) return false;
@@ -449,7 +450,7 @@ function updateOverworld() {
   for (const sg of MAP.signs || []) { const d = Math.hypot(OW.x - sg.x * TILE - 8, OW.y - sg.y * TILE - 8); if (d < 14 && !sg.read) { sg.read = true; OW.msg = { lines: sg.lines, t: 0 }; Audio.sfx('page'); return; } if (d > 24) sg.read = false; }
   if (OW.hint > 0) OW.hint--;
 
-  if (hit('ok')) { if (typeof chapterInteract === 'function' && chapterInteract()) return; if (fieldInteract()) return; const landmark = worldNearby(); if (landmark) { OW.msg = { lines: [landmark.title, ...landmark.lines], t: 0 }; Audio.sfx('page'); return; } openMenu(); return; }
+  if (hit('ok')) { if (typeof chapterInteract === 'function' && chapterInteract()) return; if (fieldInteract()) return; if (merchantNear()) { openShop(); return; } const landmark = worldNearby(); if (landmark) { OW.msg = { lines: [landmark.title, ...landmark.lines], t: 0 }; Audio.sfx('page'); return; } openMenu(); return; }
   if (hit('ring')) { openRing(); return; }
   // movimiento con aceleración y frenada; el líder bota al andar (es una gota)
   let dx = 0, dy = 0; if (keys.left) dx--; if (keys.right) dx++; if (keys.up) dy--; if (keys.down) dy++;
@@ -546,6 +547,7 @@ function drawOverworld() {
   drawFieldPuzzle(ents, cx, cy, pal);
   for (const sg of MAP.signs || []) ents.push({ y: sg.y * TILE + 14, draw: () => { shadow(sg.x * TILE + 8 - cx, sg.y * TILE + 14 - cy, 8); g.drawImage(signSprite(), sg.x * TILE + 1 - cx, sg.y * TILE - 2 - cy); } });
   if (MAP.jar) ents.push({ y: MAP.jar.y * TILE + 34, draw: () => drawRinseVessel(cx, cy, pal) });
+  drawMerchant(ents, cx, cy);
   if (!(OW.landT > 900)) Party.forEach((p, i) => {
     if (typeof CHAPTER !== 'undefined' && CHAPTER.turn) { if (CHAPTER.turn.t < 96 || CHAPTER.turn.t >= 166) ents.push({y:OW.y,draw:()=>chapterDrawTraveller(i,cx,cy)}); return; }
     let x = OW.x, y = OW.y, dir = OW.dir || 'down';

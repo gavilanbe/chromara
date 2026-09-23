@@ -420,7 +420,7 @@ function emberStorm(sx, sy, n = 26, seed = 4) {
   const rnd = seeded(seed * 13 + (B.stats.actions | 0)), embers = Array.from({ length: n }, () => ({ a: rnd() * 6.28, v: 2 + rnd() * 5, g: .06 + rnd() * .08, s: rnd() < .3 ? 2 : 1, life: 16 + rnd() * 16, c: rnd() }));
   const f = fx(34, () => { for (const e of embers) { if (f.t > e.life) continue; const q = f.t / e.life, x = sx + Math.cos(e.a) * e.v * f.t, y = sy + Math.sin(e.a) * e.v * f.t * .7 + e.g * f.t * f.t; g.globalAlpha = 1 - q * q; g.fillStyle = q < .3 ? '#fff3c0' : q < .6 ? C('amarillo') : e.c < .5 ? C('naranja') : C('rojo'); g.fillRect(Math.round(x), Math.round(y), e.s, e.s); } g.globalAlpha = 1; });
 }
-// Nivel 2 de la Llamarada (sin usar todavía), «la página arde»: rojo y amarillo se funden en naranja y la gota sube al cielo. Ámbar esboza a lápiz un fénix a su
+// Nivel 2 de la Llamarada, Fénix («la página arde»): rojo y amarillo se funden en naranja y la gota sube al cielo. Ámbar esboza a lápiz un fénix a su
 // alrededor, línea a línea; Carmín lo rellena a brochazos rojos y, donde el rojo pisa el amarillo, el naranja nace desde el corazón.
 // El dibujo prende: llamas en el filo de las alas, un aleteo, y el fénix cruza el cielo quemando la página a su paso (agujeros con
 // borde de brasa por los que se ve la oscuridad de detrás del papel); cae en picado sobre la fila de enemigos, los enciende uno a uno
@@ -487,9 +487,9 @@ function pageBurns() {
   });
   return { list, f, add(x, y, r) { list.push({ x, y, r, at: f.t, seed: list.length * 7 + 3, heal: 0 }); } };
 }
-function* techLlamaradaFenix(users, targets, tech, col) { // reservada para el nivel 2 de la mezcla: aún no la usa ninguna técnica
+function* techLlamaradaFenix(users, targets, tech, col) { // nivel 2 de la Llamarada: Fénix, se compra a Sepia
   const red = users.find(u => u.id === 'carmin') || users[0], yel = users.find(u => u.id === 'ambar') || users[1] || users[0], mid = centroid(users), ec = enemyC();
-  const OR = C('naranja'), YE = C('amarillo'), RE = C('rojo'), dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Llamarada');
+  const OR = C('naranja'), YE = C('amarillo'), RE = C('rojo'), dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, tech.name);
   // 1) fusión de pigmentos; la gota naranja sube al cielo, donde se va a dibujar el fénix
   camFocus(mid[0], mid[1], { dist: 96, turn: .35, h: 52, pitch: .55, hy: 84, ease: .1 }); users.forEach(u => u.pose = 'charge');
   const { of, orb } = yield* fuseAt(users, mid[0], mid[1], 22, OR); yield* wait(4);
@@ -822,6 +822,77 @@ function* techBrote(users, targets, tech, col) {
   users.forEach(u => u.pose = 'hop'); for (let i = 1; i <= 12; i++) { const k = i / 12, z = Math.sin(k * Math.PI) * 12; blu.wx = lerp(bx, blu.hx, k); blu.wy = lerp(by, blu.hy, k); yel.wx = lerp(ax, yel.hx, k); yel.wy = lerp(ay, yel.hy, k); blu.wz = yel.wz = z; yield; }
   users.forEach(u => { u.wz = 0; u.pose = 'idle'; u.wx = u.hx; u.wy = u.hy; }); yield* wait(6); camReset();
 }
+// ---- Nivel 2 del Brote: Selva. La gota verde se hunde en el claro; Ámbar traza a lápiz un tronco que sube hasta el cielo y
+// abre ramas, y Añil le pinta la copa a pinceladas redondas. Las raíces corren bajo tierra hasta cada enemigo, revientan el suelo
+// bajo sus pies y lo alzan envuelto; la copa florece y suelta frutos amarillos y azules que caen sobre el grupo y lo curan.
+function* techSelva(users, targets, tech, col) {
+  const yel = users.find(u => u.id === 'ambar') || users[0], blu = users.find(u => u.id === 'anil') || users[1] || users[0], mid = centroid(users), ec = enemyC(), pc = partyC();
+  const GR = C('verde'), YE = C('amarillo'), BL = C('azul'), LP = leafPalette(), YR = ramp(YE), BR = ramp(BL);
+  const dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, tech.name);
+  camFocus(mid[0], mid[1], { dist: 96, turn: .35, h: 52, pitch: .55, hy: 84, ease: .1 }); users.forEach(u => u.pose = 'charge');
+  const { of, orb } = yield* fuseAt(users, mid[0], mid[1], 22, GR); yield* wait(4);
+  // 1) la gota se hunde en el claro entre los dos bandos
+  const sp = [lerp(ec[0], pc[0], .5), lerp(ec[1], pc[1], .5)], TOP = 74;
+  camFocus(sp[0], sp[1], { dist: 92, turn: .25, h: 52, pitch: .46, f: 170, hy: 100, ease: .08, subjects: users, points: [[sp[0], sp[1], TOP, 26]] });
+  Audio.sfx('fwip'); const r0 = orb.r;
+  for (let i = 1; i <= 16; i++) { const k = i / 16; orb.wx = lerp(mid[0], sp[0], k); orb.wy = lerp(mid[1], sp[1], k); orb.wz = 22 + Math.sin(k * Math.PI) * 36 - k * 22; orb.r = lerp(r0, 4, k); yield; }
+  of.dur = 0; Audio.sfx('plop', { semi: -5 }); B.shake = 3; burst(sp[0], sp[1], 2, '#8a6a4a', 12, 1.6, 20, .1); mark({ kind: 'pool', p: [sp[0], sp[1] + 1, 0], w: 12, col: '#5a4630', grow: 6, life: 480, under: true });
+  // 2) el tronco: Ámbar lo traza desde la tierra hasta el cielo; se ensancha abajo y abre cuatro ramas
+  const tree = { trunk: 0, branches: 0, canopy: 0, bloom: 0, alpha: 1, sway: 0 }, lap = propSprite('lapiz', YE), pin = propSprite('pincel', BL), tool = { pencil: 0, brush: 0, bx: 0, by: 0 };
+  const trunkPts = Array.from({ length: 9 }, (_, i) => { const k = i / 8; return [sp[0] + Math.sin(k * 3) * 3, sp[1], k * TOP]; });
+  const branchPts = [[.55, -1, 26, 16], [.68, 1, 24, 12], [.8, -1, 18, 10], [.86, 1, 16, 8]].map(([k, dir, len, rise]) => { const b = pointAt(trunkPts, k); return [b, [b[0] + B.axis.rx * dir * len * .5, b[1] + B.axis.ry * dir * len * .5, b[2] + rise * .6], [b[0] + B.axis.rx * dir * len, b[1] + B.axis.ry * dir * len, b[2] + rise]]; });
+  const blobs = [[0, 0, 0, 22], [-18, 0, -6, 15], [18, 0, -4, 16], [-9, 0, 12, 14], [10, 0, 11, 14], [-24, 0, 8, 11], [24, 0, 9, 11], [0, 0, 20, 12]]; // [dx lateral, _, dz, radio]
+  const bark = { out: '#241e32', base: '#7a5230', hi: '#a8784a', sh: '#5a3a22' };
+  const tf = fx(999, () => {
+    g.globalAlpha = tree.alpha;
+    if (tree.trunk > 0) { drawVine(trunkPts, tree.trunk, 9, bark, 2, tree.alpha); drawVine(trunkPts.slice(0, 4), Math.min(1, tree.trunk * 3), 13, bark, 3, tree.alpha); }
+    branchPts.forEach((bp, i) => { const k = clamp(tree.branches * 4 - i, 0, 1); if (k > 0) drawVine(bp, k, 4, bark, 5 + i, tree.alpha); });
+    // la copa: pinceladas redondas de verde con sombra azulada y brillo amarillo, y flores al final
+    const top = PJ([sp[0], sp[1], TOP - 4]), s = top[2];
+    blobs.forEach(([dx, , dz, r], i) => { const k = clamp(tree.canopy * blobs.length - i, 0, 1); if (k <= 0) return; const x = top[0] + dx * s + Math.sin(tf.t * .05 + i) * tree.sway, y = top[1] - dz * s, rr = r * s * (.5 + .5 * k);
+      pixDisc(x + 2, y + 3, rr, LP.sh, LP.out); pixDisc(x, y, rr * .92, LP.base, null, LP.hi); pixDisc(x - rr * .3, y - rr * .35, rr * .35, LP.hi); });
+    if (tree.bloom > 0) blobs.forEach(([dx, , dz, r], i) => { if (i % 2) return; const x = top[0] + (dx + (i % 3 - 1) * 5) * s, y = top[1] - (dz + r * .4) * s; pixFlower(x, y, tree.bloom, s * .8, tf.t + i * 7, i); });
+    if (tool.pencil > 0) { const tip = PJ(pointAt(trunkPts, tree.trunk)); drawProp(lap, tip[0] + 2, tip[1], -1.05, 1, PROP.lapiz.tip[0], PROP.lapiz.tip[1], .6 * tip[2], tool.pencil); }
+    if (tool.brush > 0) drawProp(pin, tool.bx, tool.by, -2.1, 1, PROP.pincel.tip[0], PROP.pincel.tip[1], .6 * s, tool.brush);
+    g.globalAlpha = 1;
+  });
+  yel.pose = 'attack'; Audio.sfx('scratch_long'); Audio.sfx('grow', { when: .2 });
+  for (let i = 1; i <= 26; i++) { tree.trunk = 1 - (1 - i / 26) ** 2; tool.pencil = Math.min(1, i / 4); yel.wz = Math.abs(Math.sin(i * .6)) * 3; if (i % 3 === 0) B.particles.push({ wx: sp[0] + R(-4, 4), wy: sp[1], wz: tree.trunk * TOP, vx: R(-.3, .3), vy: 0, vz: -R(.2, .6), g: .05, col: '#8a6a4a', t: 0, life: 16, size: 1 }); if (i % 6 === 0) { B.shake = 1; Audio.sfx('crumbs', { vol: .4 }); } yield; }
+  Audio.sfx('leaves', { vol: .6 }); for (let i = 1; i <= 12; i++) { tree.branches = i / 12; tool.pencil = 1 - i / 12; yield; } yel.wz = 0; yel.pose = 'idle';
+  // 3) la copa: Añil pinta pinceladas redondas, una tras otra
+  blu.pose = 'attack'; Audio.sfx('brush_sweep');
+  for (let i = 1; i <= 24; i++) { tree.canopy = i / 24; const n = Math.min(blobs.length - 1, Math.floor(tree.canopy * blobs.length)), top = PJ([sp[0], sp[1], TOP - 4]), [dx, , dz] = blobs[n]; tool.brush = Math.min(1, i / 4); tool.bx = top[0] + dx * top[2] + 6; tool.by = top[1] - dz * top[2] - 4 + Math.sin(i * 1.4) * 3; blu.wz = Math.abs(Math.sin(i * .7)) * 3; if (i % 4 === 0) Audio.sfx('brush_big', { vol: .4 }); yield; }
+  for (let i = 1; i <= 5; i++) { tool.brush = 1 - i / 5; yield; } blu.wz = 0; blu.pose = 'idle'; tree.sway = 1.2;
+  // 4) raíces: corren bajo tierra desde la base hasta cada enemigo, revientan el suelo y lo alzan enroscado
+  camFocus(ec[0], ec[1], { dist: 118, turn: .9, h: 56, pitch: .54, ease: .08, subjects: targets, headroom: 26, points: [[sp[0], sp[1], 0, 10]] }); // de lado: el tronco queda al borde y las raíces cruzan el plano
+  const order = [...targets].sort((a, b) => Math.hypot(a.wx - sp[0], a.wy - sp[1]) - Math.hypot(b.wx - sp[0], b.wy - sp[1]));
+  const roots = order.map((t, j) => { const n = 8, ground = [], climb = []; for (let i = 0; i <= n; i++) { const k = i / n, bow = Math.sin(k * Math.PI); ground.push([lerp(sp[0], t.wx, k) + Math.sin(k * 7 + j) * 5 * bow, lerp(sp[1], t.wy, k) + Math.cos(k * 5 + j) * 3 * bow, 0]); }
+    const es = t.boss ? 1.35 : 1.6; for (let i = 0; i <= 10; i++) { const a = i * 1.1 + j, k = i / 10; climb.push([t.wx + Math.cos(a) * t.def.w * .45 * es, t.wy + Math.sin(a) * 5, k * t.def.h * .9 * es]); }
+    return { t, j, ground, climb, gk: 0, ck: 0, at: j * 6, lift: 0, hit: false }; });
+  const rg = fx(999, () => { for (const r of roots) if (r.gk > 0) drawVine(r.ground, r.gk, 3.4, bark, r.j + 11, tree.alpha); }, true);
+  const rc = fx(999, () => { for (const r of roots) if (r.ck > 0) drawVine(r.climb.map(p => [p[0], p[1], p[2] + r.lift]), r.ck, 3, LP, r.j + 21, tree.alpha); });
+  for (let i = 0; i < 58; i++) {
+    for (const r of roots) { const a = i - r.at; if (a < 0) continue; r.gk = clamp(a / 14, 0, 1);
+      if (a === 14) { Audio.sfx('crumbs'); Audio.sfx('leaves', { vol: .6 }); burst(r.t.wx, r.t.wy, 2, '#8a6a4a', 14, 2, 22, .12); mark({ kind: 'blob', p: [r.t.wx, r.t.wy, 0], w: r.t.def.w * .55, col: '#5a4630', grow: 6, life: 300, seed: r.j + 3, under: true }); B.shake = Math.max(B.shake, 4); }
+      if (a >= 14) { const q = clamp((a - 14) / 12, 0, 1); r.ck = q; r.lift = Math.sin(Math.min(1, q * 1.2) * Math.PI * .5) * 16 * (a > 40 ? Math.max(0, (52 - a) / 12) : 1); r.t.wz = r.lift; r.t.sqz = q; if (!r.hit && q >= .7) { r.hit = true; dmg(r.t); goop(r.t, GR, 100); impactFrame(r.t, GR, .9); } } }
+    yield;
+  }
+  roots.forEach(r => { r.t.wz = 0; r.t.sqz = 0; });
+  // 5) la copa florece y suelta frutos que caen sobre el grupo: cada fruto que llega cura
+  camFocus(pc[0], pc[1], { dist: 92, turn: .3, h: 54, pitch: .48, ease: .08, subjects: alive(B.party), headroom: 40, points: [[sp[0], sp[1], TOP, 18]] });
+  Audio.sfx('heal_bells'); for (let i = 1; i <= 12; i++) { tree.bloom = i / 12; yield; }
+  const fruits = alive(B.party).flatMap((p, j) => [0, 1].map(k => ({ p, from: [sp[0] + R(-14, 14), sp[1] + R(-4, 4), TOP - 6], k: -(j * 5 + k * 9), col: k ? BL : YE, done: false })));
+  const ff = fx(999, () => { for (const f of fruits) { if (f.k <= 0 || f.k >= 1) continue; const q = f.k, c = PJ([lerp(f.from[0], f.p.wx, q), lerp(f.from[1], f.p.wy, q), lerp(f.from[2], f.p.def.h * .9, q) + Math.sin(q * Math.PI) * 18]), r = Math.max(2, 3.5 * c[2]), rp = ramp(f.col); pixDisc(c[0], c[1], r, f.col, rp.out, rp.hi); g.fillStyle = LP.base; g.fillRect(Math.round(c[0]), Math.round(c[1] - r - 2), 1, 2); } });
+  const healed = new Set();
+  for (let i = 0; i < 44; i++) { for (const f of fruits) { if (f.done) continue; f.k += 1 / 18; if (f.k >= 1) { f.done = true; Audio.sfx('plop', { semi: 5 }); burst(f.p.wx, f.p.wy, f.p.def.h, f.col, 6, 1.2, 16, .06); if (!healed.has(f.p)) { healed.add(f.p); heal(f.p, Math.round(f.p.maxhp * tech.heal)); f.p.uiHeal = 20; sparkle(f.p.wx, f.p.wy, f.p.def.h + 8, '#fbe28a'); f.p.pose = 'happy'; } } }
+    if (i % 3 === 0) B.particles.push({ wx: sp[0] + R(-26, 26), wy: sp[1] + R(-6, 6), wz: TOP, vx: R(-.4, .4), vy: 0, vz: -R(.1, .3), g: .01, col: i % 2 ? LP.hi : LP.base, t: 0, life: 50, size: 2 }); yield; }
+  ff.dur = 0;
+  // 6) la selva vuelve a la página: el árbol se desvanece y quedan hojas y la tierra removida
+  for (let i = 1; i <= 16; i++) { tree.alpha = 1 - i / 16; yield; }
+  tf.dur = 0; rg.dur = 0; rc.dur = 0;
+  for (let i = 0; i < 5; i++) mark({ kind: 'blob', p: [sp[0] + R(-18, 18), sp[1] + R(-7, 7), 0], w: 5, col: i % 2 ? LP.base : LP.hi, grow: 4, life: 240, seed: 31 + i, under: true });
+  users.forEach(u => { u.pose = 'idle'; u.wz = 0; }); alive(B.party).forEach(p => { if (p.pose === 'happy') p.pose = 'idle'; }); yield* wait(6); camReset();
+}
 const i2 = (a, b) => Math.random() < .5 ? a : b;
 // Eclipse pintado: la página se hace de noche y Carmín pinta un sol rojo en el cielo con la brocha (tres pasadas que lo revelan por
 // filas) mientras Añil pinta una luna azul con el pincel; luego el pincel arrastra la luna sobre el sol, su sombra tramada barre el
@@ -963,6 +1034,101 @@ function* techArcoiris(users, targets, tech, col) {
   bf.dur = 0; users.forEach(u => u.pose = 'happy'); for (let i = 1; i <= 14; i++) { users.forEach((u, j) => { u.wz = Math.max(0, Math.sin((i + j * 2) / 14 * Math.PI)) * 8; }); yield; }
   users.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); yield* wait(20); users.forEach(u => u.pose = 'idle'); camReset();
 }
+// ---- Nivel 2 del Eclipse: Eclipse total. Cae la noche sobre toda la página; Carmín y Añil alzan juntos un sol rojo y una luna azul
+// que se funden en un disco negro con corona violeta justo encima del enemigo. El agujero le absorbe la tinta (hilos que suben
+// en espiral y lo dejan pálido y encogido) y, cuando está lleno, cae entero sobre él: sello violeta, anillos y Lento.
+function* techEclipseTotal(users, t, tech, col) {
+  const VI = C('violeta'), RE = C('rojo'), BL = C('azul'), VR = ramp(VI), RR = ramp(RE), BR = ramp(BL), PAPER = '#f4f0ea', INK = '#0b0912';
+  const red = users.find(u => u.id === 'carmin') || users[0], blue = users.find(u => u.id === 'anil') || users[1] || users[0];
+  camFocus(t.wx, t.wy, { dist: 96, turn: -.2, h: 60, pitch: .5, f: 165, headroom: 70, subjects: [t] }); users.forEach(u => u.pose = 'charge');
+  const night = overlay(999, '#07050c', .82, 30, 16), st = { sun: 0, moon: 0, merge: 0, corona: 0, hole: 0, full: 0, fall: 0, squash: 0 };
+  const stars = fx(999, () => { const k = clamp(stars.t / 30, 0, 1), rnd = seeded(91); for (let i = 0; i < 40; i++) { const x = rnd() * W, y = rnd() * 110, tw = (Math.sin(stars.t * .2 + i * 1.7) + 1) * .5; if (rnd() < k) { g.globalAlpha = k * (.3 + tw * .7); g.fillStyle = i % 7 ? PAPER : VR.hi; g.fillRect(x | 0, y | 0, 1, 1); if (i % 9 === 0) { g.fillRect((x | 0) - 1, y | 0, 3, 1); g.fillRect(x | 0, (y | 0) - 1, 1, 3); } } } g.globalAlpha = 1; });
+  // el disco vive sobre el enemigo, en el cielo del plano
+  const at = () => { const c = PJ([t.wx, t.wy, t.def.h * (t.boss ? 1.35 : 1.6) + 40]); return [c[0], Math.max(26, c[1]), c[2]]; };
+  const sky = fx(999, () => {
+    const [cx, cy, s] = at(), R0 = 17 * Math.max(1, s * .9), sep = (1 - st.merge) * 34;
+    if (st.sun > 0 && st.merge < 1) { pixDisc(cx - sep, cy, R0 * st.sun, RE, RR.out, RR.hi); for (let i = 0; i < 12; i++) { const a = i * .52 + sky.t * .04, L = R0 * st.sun * (1.35 + .2 * Math.sin(sky.t * .3 + i)); pstroke(cx - sep + Math.cos(a) * (R0 + 2), cy + Math.sin(a) * (R0 + 2), cx - sep + Math.cos(a) * L, cy + Math.sin(a) * L, 1, RR.hi, 1, 0, false); } }
+    if (st.moon > 0 && st.merge < 1) { pixDisc(cx + sep, cy, R0 * st.moon, BL, BR.out, BR.hi); pixDisc(cx + sep + R0 * .3, cy + R0 * .2, R0 * .2 * st.moon, BR.sh); }
+    if (st.corona > 0) { for (let i = 0; i < 24; i++) { const a = i * .262 + sky.t * .03, L = R0 * (1.3 + st.corona * (1 + .35 * Math.sin(sky.t * .35 + i * 2.3))); pstroke(cx + Math.cos(a) * (R0 + 1), cy + Math.sin(a) * (R0 + 1), cx + Math.cos(a) * L, cy + Math.sin(a) * L, i % 3 ? 1 : 2, i % 2 ? VI : PAPER, 1, 0, false); } g.globalAlpha = .25 * st.corona; pixDisc(cx, cy, R0 * 2.6, VI); g.globalAlpha = 1; }
+    if (st.hole > 0) { pixDisc(cx, cy, R0 * (1 + st.full * .25), INK, VR.out); pixRing(cx, cy, R0 * .7 * (1 + st.full * .3), R0 * .7 * (1 + st.full * .3), VR.dk); g.fillStyle = VR.hi; g.fillRect(Math.round(cx - R0 * .5), Math.round(cy - R0 * .6), 3, 1); }
+  });
+  // 1) los dos alzan su astro: Carmín el sol, Añil la luna
+  Audio.sfx('hum_down'); Audio.sfx('charge', { semi: 0 }); Audio.sfx('charge', { semi: 7, when: .12 }); sparkle(...above(red, 1.5), RR.hi); sparkle(...above(blue, 1.5), BR.hi);
+  for (let i = 1; i <= 22; i++) { st.sun = Math.min(1, i / 14); st.moon = clamp((i - 6) / 14, 0, 1); red.wz = Math.sin(i * .5) * 2; blue.wz = Math.cos(i * .5) * 2; if (i % 4 === 0) { B.particles.push({ wx: red.wx, wy: red.wy, wz: red.def.h, tx: t.wx, ty: t.wy, tz: 60, col: RE, t: 0, life: 16, dur: 16, arc: 10, stream: true, size: 2 }); B.particles.push({ wx: blue.wx, wy: blue.wy, wz: blue.def.h, tx: t.wx, ty: t.wy, tz: 60, col: BL, t: 0, life: 16, dur: 16, arc: 10, stream: true, size: 2 }); } yield; }
+  users.forEach(u => u.wz = 0);
+  // 2) se juntan y se tapan: totalidad, corona y el disco se vuelve un agujero negro
+  Audio.sfx('brush_hiss', { vol: .5 });
+  for (let i = 1; i <= 20; i++) { st.merge = (i / 20) ** 2; yield; }
+  Audio.sfx('glass'); Audio.sfx('mix', { colours: users.map(u => SEMI[u.id] ?? 0) }); B.flash = { col: VI, a: .5 }; B.hitstop = 6; B.shake = 3; st.hole = 1;
+  for (let i = 1; i <= 12; i++) { st.corona = i / 12; yield; }
+  // 3) absorbe: la tinta del enemigo sube en hilos espirales hasta el agujero; el enemigo palidece y se encoge
+  camFocus(t.wx, t.wy, { dist: 84, turn: -.25, h: 54, pitch: .5, f: 165, headroom: 64, subjects: [t] }); Audio.sfx('ink_tide'); Audio.sfx('saturate', { when: .3, vol: .5 });
+  const strands = fx(999, () => { const [cx, cy] = at(), b = PJ(above(t, .5)); for (let j = 0; j < 5; j++) { const ph = strands.t * .15 + j * 1.26; let px = b[0], py = b[1]; for (let k = 1; k <= 12; k++) { const q = k / 12, x = lerp(b[0], cx, q) + Math.sin(ph + q * 8) * 10 * (1 - q), y = lerp(b[1], cy, q * q); pstroke(px, py, x, y, Math.max(1, 3 - q * 2), j % 2 ? '#1e1a2c' : VR.dk, 1, 0, false); px = x; py = y; } } }, true);
+  for (let i = 1; i <= 34; i++) { st.full = i / 34; t.sqz = i / 34 * .8; t.sketch = i > 20 ? 1 : 0; if (i % 2) B.particles.push({ wx: t.wx + R(-8, 8), wy: t.wy, wz: t.def.h * R(.3, 1), tx: t.wx, ty: t.wy, tz: 64, col: i % 4 ? '#1e1a2c' : VI, t: 0, life: 14, dur: 14, arc: 6, stream: true, size: 2 }); if (i % 6 === 0) { Audio.sfx('slow_drip', { vol: .5 }); B.shake = 1; } yield; }
+  strands.dur = 0; t.sketch = 0;
+  // 4) el agujero lleno cae entero sobre el enemigo como un tampón y lo sella en violeta
+  Audio.sfx('drop_fall'); const sh = shadowFx(t.wx, t.wy, 6, 999); sky.dur = 0; stars.dur = Math.min(stars.dur, stars.t + 20);
+  const fall = fx(999, () => { const [cx, cy, s] = at(), g2 = PJ(above(t, .45)), y = lerp(cy, g2[1], st.fall ** 2), r = 17 * Math.max(1, s * .9) * 1.25 * (1 + st.fall * .3);
+    for (let j = 4; j >= 1; j--) { const kk = Math.max(0, st.fall - j * .07); g.globalAlpha = .18 * (5 - j) / 4; pixDisc(cx, lerp(cy, g2[1], kk * kk), r, VI); } g.globalAlpha = 1;
+    pixDisc(cx, y, r * (1 + st.squash * .4), VI, VR.out, VR.hi, r * (1 - st.squash * .5)); pixDisc(cx, y, r * .55 * (1 - st.squash * .3), INK); });
+  for (let i = 1; i <= 10; i++) { st.fall = i / 10; sh.draw = () => { const c = project(t.wx, t.wy, 0); if (c) shadow(c[0], c[1], Math.round((8 + st.fall * 34) * c[2])); }; yield; }
+  sh.dur = 0; t.sqz = 0; Audio.sfx('impact_sub'); Audio.sfx('glass', { when: .08 }); B.hitstop = 14; B.shake = 10; B.slowmo = 18; B.flash = { col: PAPER, a: .7 }; impactFrame(t, VI, 1.6);
+  damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, tech.name); if (tech.status) applyStatus(t, tech.status, 3); goop(t, VI, 140); lensSplatter(VI, 8, 11); lensSplatter('#1e1a2c', 4, 12);
+  const blast = fx(26, () => { const c = PJ(above(t, .6)), q = blast.t / 26; g.globalAlpha = q > .5 ? (1 - q) * 2 : 1; drawColorBlast(c[0], c[1], (10 + (1 - (1 - q) ** 3) * 50) * c[2], q, blast.t, [INK, VR.dk, VI, VR.hi, PAPER]); g.globalAlpha = 1; });
+  for (let k = 0; k < 3; k++) { const ring = fx(30, () => { const c = project(t.wx, t.wy, 0); if (!c) return; const q = clamp((ring.t - k * 5) / 25, 0, 1); if (q <= 0) return; g.globalAlpha = 1 - q; pixRing(c[0], c[1], (8 + q * 110) * c[2], (3 + q * 42) * c[2], [VI, VR.hi, PAPER][k]); g.globalAlpha = 1; }, true); }
+  for (let i = 1; i <= 9; i++) { st.squash = i <= 3 ? i / 3 : (9 - i) / 6; yield; } fall.dur = 0;
+  mark({ kind: 'pool', p: [t.wx, t.wy + 2, 0], w: t.def.w * 1.3, col: VR.dk, grow: 3, life: 260, under: true }); mark({ kind: 'blob', p: [t.wx, t.wy, 0], w: t.def.w * .7, col: VI, grow: 3, life: 260, seed: 4, under: true });
+  for (let j = 0; j < 8; j++) { const a = j / 8 * 6.28; mark({ kind: 'path', pts: [[t.wx, t.wy, 0], [t.wx + Math.cos(a) * t.def.w, t.wy + Math.sin(a) * t.def.w * .45, 0]], w: 2, col: VI, grow: 4, life: 240, under: true }); }
+  burst(t.wx, t.wy, 6, VI, 26, 2.8, 30, .1); burst(t.wx, t.wy, t.def.h, PAPER, 10, 1.6, 22, .05); drips(t.wx, t.wy, t.def.h * .9, VI, 12);
+  yield* wait(20);
+  // 5) amanece: la noche se retira
+  night.dur = Math.min(night.dur, night.t + 16); stars.dur = Math.min(stars.dur, stars.t + 10);
+  users.forEach(u => u.pose = 'happy'); yield* wait(18); users.forEach(u => u.pose = 'idle'); camReset();
+}
+// ---- Nivel 2 del Arcoíris: Espectro. Los tres pintan juntos un puente de arcoíris que nace a sus pies y aterriza sobre los enemigos;
+// por él bajan seis ríos de color, uno tras otro, que rompen sobre la fila en olas de su color. Al final el puente se rompe en
+// gotas de seis colores que llueven sobre todo el campo.
+function* techEspectro(users, targets, tech, col) {
+  const ec = enemyC(), pc = partyC(), RB = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'].map(C), PAPER = '#f4f0ea';
+  const dmg = t => damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, tech.name);
+  camFocus(pc[0], pc[1], { dist: 96, turn: .35, h: 52, pitch: .55, hy: 84, ease: .1 }); users.forEach(u => u.pose = 'charge');
+  const { of } = yield* fuseAt(users, pc[0], pc[1], 22, PAPER); yield* wait(4); of.dur = 0;
+  // el puente: un arco de mundo de la fila del grupo a la de los enemigos; seis bandas paralelas
+  const A = [pc[0], pc[1]], Z = [ec[0], ec[1]], span = Math.hypot(Z[0] - A[0], Z[1] - A[1]), H0 = Math.max(60, span * .55);
+  const at = (k, band) => { const off = (band - 2.5) * 2.2; return [lerp(A[0], Z[0], k) + B.axis.rx * off, lerp(A[1], Z[1], k) + B.axis.ry * off, Math.sin(k * Math.PI) * H0 + 4]; };
+  camFocus(lerp(A[0], Z[0], .5), lerp(A[1], Z[1], .5), { dist: 150, turn: .95, h: 64, pitch: .5, f: 170, hy: 104, ease: .07, subjects: [...users, ...targets], points: [[lerp(A[0], Z[0], .5), lerp(A[1], Z[1], .5), H0, 12]] }); // de lado: el puente cruza el plano entero
+  const br = { k: 0, alpha: 1, rivers: [], crack: 0 };
+  const bf = fx(999, () => {
+    const n = 40; g.globalAlpha = br.alpha;
+    for (let b = 0; b < 6; b++) { let prev = null; for (let i = 0; i <= n * br.k; i++) { const k = i / n, c = PJ(at(k, b)); if (prev) { const gap = br.crack > 0 && ((i * 7 + b * 3) % 11) / 11 < br.crack; if (!gap) pstroke(prev[0], prev[1], c[0], c[1], Math.max(2, 3.2 * c[2]), RB[b], 1, 0, false); } prev = c; } }
+    // brillo del borde de arriba y contorno de tinta del de abajo
+    let p0 = null, p1 = null; for (let i = 0; i <= n * br.k; i++) { const k = i / n, a = PJ(at(k, -.6)), z = PJ(at(k, 5.6)); if (p0 && br.crack < .3) { pstroke(p0[0], p0[1], a[0], a[1], 1, PAPER, 1, 0, false); pstroke(p1[0], p1[1], z[0], z[1], 1, '#2a2438', 1, 0, false); } p0 = a; p1 = z; }
+    // los ríos: una lengua brillante de cada color que baja por su banda
+    for (const r of br.rivers) { if (r.k <= 0 || r.k >= 1.15) continue; for (let j = 0; j < 6; j++) { const k = Math.min(1, r.k - j * .025); if (k <= 0) continue; const c = PJ(at(k, r.b)); pixDisc(c[0], c[1], Math.max(1.5, (4 - j * .5) * c[2]), j ? RB[r.b] : PAPER, j ? null : ramp(RB[r.b]).out); } }
+    g.globalAlpha = 1;
+  });
+  // 1) los tres lo pintan: cada uno sube su color y el arco crece desde sus pies
+  Audio.sfx('rainbow'); users.forEach(u => u.pose = 'attack');
+  for (let i = 1; i <= 30; i++) { br.k = 1 - (1 - i / 30) ** 2; users.forEach((u, j) => { u.wz = Math.abs(Math.sin(i * .5 + j)) * 4; }); if (i % 5 === 0) Audio.sfx('cursor', { semi: [0, 2, 4, 5, 7, 9][(i / 5 - 1) % 6], vol: .5 }); if (i % 2) { const c = at(br.k, RI(0, 5)); B.particles.push({ wx: c[0], wy: c[1], wz: c[2], vx: R(-.3, .3), vy: 0, vz: R(-.2, .4), g: .02, col: '#ffffff', t: 0, life: 12, size: 1 }); } yield; }
+  users.forEach(u => u.wz = 0);
+  // 2) seis ríos de color bajan uno tras otro y rompen en olas sobre la fila
+  camFocus(ec[0], ec[1], { dist: 104, turn: .5, h: 56, pitch: .54, ease: .1, subjects: targets, headroom: 30, points: [[lerp(A[0], Z[0], .75), lerp(A[1], Z[1], .75), H0 * .7, 10]] });
+  const waves = [], wf = fx(999, () => { for (const w of waves) { const q = (wf.t - w.at) / 24; if (q < 0 || q > 1) continue; for (const t of targets) { const c = PJ([t.wx, t.wy, 0]), r = (10 + q * 40) * c[2]; g.globalAlpha = (1 - q) * .9; g.fillStyle = w.col; g.beginPath(); g.ellipse(c[0], c[1] - (1 - q) * 6, r, r * .38, 0, Math.PI, 0); g.fill(); g.fillStyle = ramp(w.col).hi; g.fillRect(Math.round(c[0] - r * .6), Math.round(c[1] - r * .38 - (1 - q) * 6), Math.round(r * 1.2), 1); } } g.globalAlpha = 1; });
+  br.rivers = RB.map((_, b) => ({ b, k: -b * .18 }));
+  const landed = new Set(); let hitDone = false;
+  for (let i = 0; i < 64; i++) {
+    for (const r of br.rivers) { const was = r.k; r.k += 1 / 22; if (was < 1 && r.k >= 1) { waves.push({ col: RB[r.b], at: wf.t }); Audio.sfx('splash_clean', { semi: r.b * 2, vol: .7 }); B.shake = Math.max(B.shake, 3);
+      for (const t of targets) { t.goop = null; goop(t, RB[r.b], 40); burst(t.wx, t.wy, t.def.h * .5, RB[r.b], 8, 1.8, 22, .08); mark({ kind: 'pool', p: [t.wx + R(-8, 8), t.wy + R(-4, 4), 0], w: R(6, 11), col: RB[r.b], grow: 6, life: 220, under: true }); }
+      if (r.b === 5 && !hitDone) { hitDone = true; B.hitstop = 8; B.slowmo = 12; B.flash = { col: '#ffffff', a: .6 }; impactFrame(targets, PAPER, 1.4); for (const t of targets) { dmg(t); const c = PJ([t.wx, t.wy, t.def.h * .6]); fx(24, function () { const q = this.t / 24; g.globalAlpha = q > .5 ? (1 - q) * 2 : 1; drawColorBlast(c[0], c[1], (8 + (1 - (1 - q) ** 3) * 38) * c[2], q, this.t, RB); g.globalAlpha = 1; }); } lensSplatter(RB[0], 3, 5); lensSplatter(RB[2], 3, 6); lensSplatter(RB[4], 3, 7); } } }
+    yield;
+  }
+  // 3) el puente se rompe en gotas de seis colores que llueven sobre todo el campo
+  Audio.sfx('glass'); Audio.sfx('heal_bells', { when: .3 }); B.rainbow = 30;
+  for (let i = 1; i <= 30; i++) { br.crack = i / 22; br.alpha = Math.max(0, 1 - Math.max(0, i - 14) / 16); if (i % 2) for (let j = 0; j < 3; j++) { const c = at(Math.random(), RI(0, 5)); B.particles.push({ wx: c[0], wy: c[1], wz: c[2], vx: R(-.3, .3), vy: 0, vz: -R(.5, 1.2), g: .06, col: RB[RI(0, 5)], t: 0, life: 40, size: 2 }); } yield; }
+  bf.dur = 0; wf.dur = 0;
+  users.forEach(u => u.pose = 'happy'); for (let i = 1; i <= 14; i++) { users.forEach((u, j) => { u.wz = Math.max(0, Math.sin((i + j * 2) / 14 * Math.PI)) * 8; }); yield; }
+  users.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; }); yield* wait(14); users.forEach(u => u.pose = 'idle'); camReset();
+}
 // =====================================================================
 // Despacho de acciones
 // =====================================================================
@@ -972,7 +1138,7 @@ function* actAttack(u, target) {
   yield* enemyAttack(u, t);
 }
 function* actTech(users, tech, targets, col) {
-  const id = Object.keys(DATA.techs).find(k => DATA.techs[k] === tech);
+  const id = tech.id || Object.keys(DATA.techs).find(k => DATA.techs[k] === tech), lv2 = tech.level === 2;
   if (id === 'brochazo') yield* techBrochazo(users[0], targets[0], tech, col);
   else if (id === 'tachon') yield* techTachon(users[0], targets[0], tech, col);
   else if (id === 'manchurron') yield* techManchurron(users[0], targets[0], tech, col);
@@ -985,10 +1151,10 @@ function* actTech(users, tech, targets, col) {
   else if (id === 'firma') yield* techFirma(users[0], targets[0], tech, col);
   else if (id === 'taquigrafia') yield* techTaquigrafia(users[0], targets, tech, col);
   else if (id === 'caligrafia') yield* techCaligrafia(users[0], targets[0], tech, col);
-  else if (id === 'llamarada') yield* techLlamarada(users, targets, tech, col);
-  else if (id === 'brote') yield* techBrote(users, targets, tech, col);
-  else if (id === 'eclipse') yield* techEclipse(users, targets[0], tech, col);
-  else if (id === 'arcoiris') yield* techArcoiris(users, targets, tech, col);
+  else if (id === 'llamarada') yield* (lv2 ? techLlamaradaFenix : techLlamarada)(users, targets, tech, col);
+  else if (id === 'brote') yield* (lv2 ? techSelva : techBrote)(users, targets, tech, col);
+  else if (id === 'eclipse') yield* (lv2 ? techEclipseTotal : techEclipse)(users, targets[0], tech, col);
+  else if (id === 'arcoiris') yield* (lv2 ? techEspectro : techArcoiris)(users, targets, tech, col);
   users.forEach(u => { u.pose = 'idle'; u.wz = 0; });
 }
 // =====================================================================

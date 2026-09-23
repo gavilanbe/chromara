@@ -658,7 +658,7 @@ function resetGame() {
   if (typeof CHAPTER !== 'undefined' && Game.page === 1) chapterInstall(0);
   if (typeof CHAPTER !== 'undefined') { CHAPTER.turn=null;CHAPTER.pages=[];CHAPTER.complete=false;CHAPTER.visited=new Set([0]); }
   Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false; Game.owned = {}; Game.puzzle = PUZ0();
-  Game.studies = {}; Game.seenTechs = new Set();
+  Game.studies = {}; Game.techLevels = {}; Game.seenTechs = new Set();
   Party.forEach((p, i) => { p.weapon = DATA.party[i].weapon; p.acc = DATA.party[i].acc; const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; });
   Audio.positions = {};
   initOverworld(); setState('overworld'); Audio.play(worldCue());

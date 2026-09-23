@@ -72,11 +72,18 @@ function buyStudy(id) {
   if (Game.pigmento < d.cost) { o.message = 'Necesitas ' + (d.cost - Game.pigmento) + ' pigmentos más.'; Audio.sfx('nope'); return false; }
   Game.pigmento -= d.cost; Game.studies[id] = true; o.message = '¡' + d.name + ' aprendido!'; o.stampAt=ARTUI.t; artBurst(285,61+o.idx*27,'#438967'); Audio.sfx('discovery'); return true;
 }
+// La tienda de Sepia: cada receta sube una mezcla a nivel 2 (nuevo nombre, coreografía propia, más potencia).
+function buyRecipe(id) {
+  const o = Game.overlay, M = DATA.merchant, cost = M.recipes[id];
+  if (techLevel(id) >= 2) { o.message = M.owned; Audio.sfx('nope'); return false; }
+  if (Game.pigmento < cost) { o.message = M.poor + ' Te faltan ' + (cost - Game.pigmento) + '.'; Audio.sfx('nope'); return false; }
+  Game.pigmento -= cost; (Game.techLevels ||= {})[id] = 2; o.message = M.thanks; o.stampAt = ARTUI.t; artBurst(292, 56 + o.idx * 21, C(DATA.techs[id].color)); Audio.sfx('discovery'); return true;
+}
 function updateOverlay() {
   const o = Game.overlay; if (!o) return;
   if (o.capture) { if (hit('back') || hit('options')) { o.capture = null; o.message = ''; } return; }
   if (hit('back') || hit('options')) { if (o.type === 'bindings') { o.type = 'settings'; o.idx = 6; } else closeOverlay(); return; }
-  const n = o.type === 'settings' ? OPTIONS.length + 1 : o.type === 'bindings' ? Object.keys(DEFAULT_BINDINGS).length + 1 : o.type === 'studies' ? Object.keys(DATA.studies).length : 3;
+  const n = o.type === 'settings' ? OPTIONS.length + 1 : o.type === 'bindings' ? Object.keys(DEFAULT_BINDINGS).length + 1 : o.type === 'studies' ? Object.keys(DATA.studies).length : o.type === 'shop' ? Object.keys(DATA.merchant.recipes).length : 3;
   const step = hit('down') ? 1 : hit('up') ? -1 : 0;
   if (step) { o.idx = (o.idx + step + n) % n; o.message = ''; Audio.sfx('cursor'); }
   const dir = hit('right') ? 1 : hit('left') ? -1 : 0, ok = hit('ok');
@@ -88,6 +95,7 @@ function updateOverlay() {
     if (o.idx === actions.length) { Prefs.bindings = { ...DEFAULT_BINDINGS }; savePreferences(); o.message = 'Controles restaurados.'; }
     else { o.capture = actions[o.idx]; o.message = typeof MOBILE !== 'undefined' && MOBILE.enabled ? 'Teclado físico: pulsa una tecla. B cancela.' : 'Pulsa una tecla · Esc cancela'; }
   } else if (o.type === 'studies' && ok) buyStudy(Object.keys(DATA.studies)[o.idx]);
+  else if (o.type === 'shop' && ok) buyRecipe(Object.keys(DATA.merchant.recipes)[o.idx]);
   else if (o.type === 'guide' && (dir || ok)) o.idx = (o.idx + (dir || 1) + n) % n;
 }
 function captureBinding(e) {

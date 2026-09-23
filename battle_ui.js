@@ -141,7 +141,7 @@ function paintRing(x, y, k, col, r = 18) {
 function selectedPaintCost(u) {
   const m = B.currentAction ? null : B.menu; if (!m) return 0;
   const p = m.level === 'target' ? m.pending : m.level === 'tech' ? {type:'tech',techId:techsFor(m.unit)[m.idx]?.id} : m.level==='cmd'&&m.idx===3?{type:'role'}:null;
-  if (p?.type === 'tech' && p.techId) { const t = DATA.techs[p.techId]; return (t.users || [t.user]).includes(u.id) ? techCost(u,t) : 0; }
+  if (p?.type === 'tech' && p.techId) { const t = techData(p.techId); return (t.users || [t.user]).includes(u.id) ? techCost(u,t) : 0; }
   return p?.type === 'role' && u === m.unit ? ROLE_ACTIONS[u.id].mp : 0;
 }
 // An oil tube lying along the card. What is left sits against the cap; what was spent
@@ -463,7 +463,7 @@ function drawTargetDetails(m) {
 function drawReservation() {
   const r=B.reservation;if(!r||B.menu&&B.menu.level!=='cmd')return;
   // A small tied pair of paint dabs; each member's brush still shows its ATB.
-  const label=DATA.techs[r.p.techId].name+' / '+battleKey('release')+' soltar',w=textWidth(label)+14;
+  const label=techData(r.p.techId).name+' / '+battleKey('release')+' soltar',w=textWidth(label)+14;
   maskingLabel(317-w,131,w,13,'#e4d5ee');smallText(label,324-w,134,'#674875');uiHit(317-w,129,w,18,cancelReservation);
 }
 // The stamp is the one word the action keeps: a technique's name, brushed on and lifted away before the stroke ends.
@@ -633,7 +633,7 @@ function drawBattleResults() {
 }
 const GUIDE_PAGES = [
   { title:'Pintar y reaccionar',lines:['Núcleo: afinidad del enemigo.','Complementario x2. Mismo color x0.5.','Capa: el aro guarda una gota por acción.','Pincel y Preparar: dura 3 acciones.','Rojo + amarillo: daño y salpicadura.','Amarillo + azul: raíces y cura grupal.','Rojo + azul: interrumpe y firma.','Hilo de tinta: a quién va a atacar.'] },
-  { title:'Tiempo y herramientas',lines:['Brocha llena: turno. Tubo: MP.','Tramo claro del tubo: coste. Lila: reservada.','Liberar conserva el ATB de cada gota.','Paleta: cuatro direcciones o rueda.','Toca para elegir; otra vez para abrir.','Otra gota: su retrato o {swap}.','Volver conserva tu última selección.','Objetivo: flechas o toca su nombre.'] },
+  { title:'Tiempo y herramientas',lines:['Brocha llena: turno. Tubo: MP.','Tramo claro del tubo: coste. Lila: reservada.','Liberar conserva el ATB de cada gota.','Paleta: arriba y abajo, o la rueda.','Toca para elegir; otra vez para abrir.','Otra gota: su retrato o {swap}.','Volver conserva tu última selección.','Objetivo: flechas o toca su nombre.'] },
   { title:'Leer a La Tinta',lines:['I: roba MP. Su núcleo cambia de color.','Reacción o 3 primarios: rompe coraza.','Abrirla: +2 MP para cada gota viva.','II: núcleo abierto. Vigila la marea.','III: vuelve la coraza y borra capas.','Arcoíris brilla con la coraza abierta.','Gotea: lento. Tizne: pega menos.','Perfil: recibe -40%. Rúbrica: +30%.'] },
 ];
 const BINDING_NAMES = { ok:'Confirmar', back:'Volver', swap:'Cambiar gota', release:'Liberar mezcla', options:'Opciones', journal:'Estudios', help:'Guía', up:'Arriba', down:'Abajo', left:'Izquierda', right:'Derecha', ring:'Herramientas' };
@@ -650,9 +650,17 @@ function overlayHighlight(o,y,x=80,w=225,h=15,col='#e8d6ad') {
 function drawOverlay() {
   const o=Game.overlay;if(!o)return;
   UI_HITS.length=0;UI_TEXT.length=0;
-  const cols={settings:'#b08b4e',bindings:'#b08b4e',studies:'#438967',guide:'#597cb1'},col=cols[o.type];
+  const cols={settings:'#b08b4e',bindings:'#b08b4e',studies:'#438967',guide:'#597cb1',shop:'#9a6a3e'},col=cols[o.type];
   const at=artObserve('overlay',o.type+':'+o.idx+':'+(o.message||'')),openedAt=o.openedAt??-99,switchedAt=o.switchedAt??openedAt;
   g.fillStyle='rgba(20,15,28,'+(.6*artFade(openedAt,10)).toFixed(2)+')';g.fillRect(0,0,W,H);
+  if(o.type==='shop'){
+    // En la tienda no hay marcapáginas: Sepia asoma por la izquierda, pegada al cuaderno con cinta, y saluda.
+    g.save();g.translate(Math.round((1-artIn(openedAt,16))*-90),0);
+    maskingLabel(6,26,62,98,'#e6d3b0');g.fillStyle='#c9a26b';g.beginPath();g.ellipse(37,103,24,6,0,0,6.29);g.fill();
+    const hop=Prefs.shake?Math.round(Math.abs(Math.sin(ARTUI.t*.12))*artPop(at)*4):0;drawSprite(merchantSprite((ARTUI.t%150)<5),39,104-hop,2);
+    brushBand(12,110,50,13,'#9a6a3e');textCenter(DATA.merchant.name,37,113,accentInk('#9a6a3e'));
+    g.restore();
+  }else{
   // Paint-stained bookmarks form navigation; each opens its own sheet.
   g.save();g.translate(Math.round((1-artIn(openedAt,16))*-90),0);
   brushBand(14,14,47,151,'#695238');
@@ -667,11 +675,12 @@ function drawOverlay() {
     if(enabled&&!o.capture)uiHit(6,y-2,61,43,()=>switchArtOverlay(type));
   });
   g.restore();
+  }
   // The sheet slides in from the right edge; switching bookmarks turns a fresh leaf.
   g.save();g.translate(Math.round((1-artIn(openedAt,20,4))*260),Math.round((1-artIn(switchedAt,12))*-6));
   artSheet(73,10,239,167,col);
   brushBand(82,15,196,15,col);
-  smallText(({settings:'A tu manera',bindings:'Teclado',studies:'Muestras de color',guide:'Cuaderno de campo'})[o.type],90,19,accentInk(col));
+  smallText(({settings:'A tu manera',bindings:'Teclado',studies:'Muestras de color',guide:'Cuaderno de campo',shop:'Recetas de Sepia · nivel 2'})[o.type],90,19,accentInk(col));
   artButton('overlay-close',battleKey('back'),282,13,26,19,'#d2bd98',()=>{pressed.back=true;});
   g.globalAlpha*=artFade(switchedAt,8);
   const written=text=>({progress:Prefs.shake?(ARTUI.t-artObserve('overlay-note',text))*2.4:Infinity,wet:col});
@@ -724,6 +733,23 @@ function drawOverlay() {
     paragraph(o.message||d.desc,86,134,216,UI_MUTED,2,written(o.message||d.desc));
     const learned=Game.studies[id],enough=Game.pigmento>=d.cost;
     artButton('study-buy',learned?'Aprendido':battleKey('ok')+' aprender',183,159,121,16,'#438967',()=>buyStudy(id),{disabled:learned||!enough,selected:!learned&&enough});
+  }else if(o.type==='shop'){
+    smallText('Tu pigmento',87,33,UI_MUTED);textRight(Game.pigmento,301,33,'#84602b');
+    const ids=Object.keys(DATA.merchant.recipes);
+    ids.forEach((id,i)=>{
+      const t=DATA.techs[id],y=45+i*21,sel=o.idx===i,owned=techLevel(id)>=2,cost=DATA.merchant.recipes[id];
+      maskingLabel(82,y,224,19,sel?'#fff0cb':'#e6dac1');
+      // la receta se lee como una mezcla: los pigmentos de las gotas = el color nuevo
+      let x=91;t.users.forEach((uid,k)=>{paintDab(x,y+9,3,C(DATA.party.find(p=>p.id===uid).color));x+=8;});
+      smallText('=',x-2,y+5,UI_MUTED);paintDab(x+9,y+9,5,C(t.color),sel?artPop(at):0);
+      smallText(t.lv2.name,x+19,y+5,owned?UI_MUTED:UI_INK);smallText('('+t.name+' II)',x+23+textWidth(t.lv2.name),y+5,UI_MUTED);
+      if(owned)artSeal('OK',292,y+10,'#387850',9,o.stampAt??-99);else textRight(cost+' pig.',302,y+5,Game.pigmento>=cost?'#84602b':'#9b343a');
+      uiHit(81,y-1,226,21,()=>artFocus(o,i),()=>artFocus(o,i));
+    });
+    const id=ids[o.idx]||ids[0],t=DATA.techs[id],owned=techLevel(id)>=2,enough=Game.pigmento>=DATA.merchant.recipes[id];
+    const text=o.message?'«'+o.message+'»':t.lv2.desc;
+    paragraph(text,86,134,216,o.message?'#6b4a33':UI_MUTED,2,written(text));
+    artButton('shop-buy',owned?'Ya es tuyo':battleKey('ok')+' comprar',183,159,121,16,'#9a6a3e',()=>buyRecipe(id),{disabled:owned||!enough,selected:!owned&&enough});
   }else{
     const p=GUIDE_PAGES[o.idx];
     smallText((o.idx+1)+'/3',86,37,UI_MUTED);smallText(p.title,115,37);

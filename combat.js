@@ -22,10 +22,15 @@ const TECH_RULES = {
   llamarada: 'Daño naranja a todos los enemigos.', brote: 'Daño verde y cura 35% al grupo.',
   eclipse: 'Gran golpe violeta y Lento: 3 acciones.', arcoiris: 'Gran daño. Abre primero la coraza de La Tinta.',
 };
+// Nivel de una mezcla (1 por defecto; 2 cuando se compra a Sepia). techData devuelve la técnica tal y como se usa ahora:
+// en nivel 2, un objeto con el nombre, la potencia y el coste nuevos (y su id, porque ya no es el mismo objeto de DATA).
+function techLevel(id) { return Game.techLevels?.[id] >= 2 && DATA.techs[id]?.lv2 ? 2 : 1; }
+function techData(id) { const t = DATA.techs[id]; return techLevel(id) === 2 ? { ...t, ...t.lv2, id, level: 2 } : t; }
+function techRule(id) { return techLevel(id) === 2 ? DATA.techs[id].lv2.rule : TECH_RULES[id]; }
 function techCost(u, t) { return Math.max(1, t.mp - (DATA.accessories[u.acc]?.techDiscount || 0)); }
 function isReserved(u) { return !!B.reservation && B.reservation.users.includes(u); }
 function techsFor(u, ignoreReservation = false) {
-  return Object.entries(DATA.techs).filter(([, t]) => t.weapon ? t.weapon === u.data.weapon && t.user === u.id : t.users.includes(u.id)).map(([id, t]) => {
+  return Object.keys(DATA.techs).map(id => [id, techData(id)]).filter(([, t]) => t.weapon ? t.weapon === u.data.weapon && t.user === u.id : t.users.includes(u.id)).map(([id, t]) => {
     const users = t.weapon ? [u] : t.users.map(uid => B.party.find(p => p.id === uid));
     const living = users.every(p => p.alive), free = users.every(p => !p.acting && (ignoreReservation || !isReserved(p)));
     const ready = living && free && users.every(p => p.atb >= 100), mpOk = users.every(p => p.mp >= techCost(p, t));
@@ -117,7 +122,7 @@ function flushPaintEvents() {
   }
 }
 function nearestEnemy(t) { return alive(B.enemies).filter(x => x !== t).sort((a, b) => Math.hypot(a.wx - t.wx, a.wy - t.wy) - Math.hypot(b.wx - t.wx, b.wy - t.wy))[0]; }
-function actionName(p, u) { return p.type === 'tech' ? DATA.techs[p.techId].name : p.type === 'item' ? DATA.items[p.item].name : p.type === 'role' ? ROLE_ACTIONS[u.id].name : p.type === 'reload' ? 'Recargar' : 'Atacar'; }
+function actionName(p, u) { return p.type === 'tech' ? techData(p.techId).name : p.type === 'item' ? DATA.items[p.item].name : p.type === 'role' ? ROLE_ACTIONS[u.id].name : p.type === 'reload' ? 'Recargar' : 'Atacar'; }
 function actionTargetKind(p, u) {
   if (p.type === 'tech') return DATA.techs[p.techId].target;
   if (p.type === 'item') return DATA.items[p.item].target;
@@ -141,8 +146,8 @@ function previewAction(u, p, t) {
     const amount = it.kind === 'revive' ? Math.round(t.maxhp * it.amount) : it.kind === 'heal' ? Math.min(it.amount, t.maxhp - t.hp) : it.kind === 'mp' ? Math.min(it.amount, t.maxmp - t.mp) : t.color === 'negro' ? it.amount : Math.round(it.amount / 3);
     return { col, label: it.kind === 'erase' ? Math.round(amount * damageFactor(t, 'negro') * .92) + '–' + Math.round(amount * damageFactor(t, 'negro') * 1.08) + ' daño' : '+' + amount + (it.kind === 'mp' ? ' MP' : ' HP'), effect: it.desc };
   }
-  const tech = p.type === 'tech' && DATA.techs[p.techId];
-  if (tech?.power === 0) return { col, label: tech.heal ? '+' + Math.min(Math.round(t.maxhp * tech.heal), t.maxhp - t.hp) + ' HP' : 'Daño recibido -40%', effect: TECH_RULES[p.techId] };
+  const tech = p.type === 'tech' && techData(p.techId);
+  if (tech?.power === 0) return { col, label: tech.heal ? '+' + Math.min(Math.round(t.maxhp * tech.heal), t.maxhp - t.hp) + ' HP' : 'Daño recibido -40%', effect: techRule(p.techId) };
   const users = tech?.users ? tech.users.map(id => B.party.find(x => x.id === id)) : [u];
   const atk = users.reduce((sum, x) => sum + x.atk * statusMult(x, 'tiznado'), 0) / users.length;
   const raw = p.type === 'attack' ? basicRaw(u, t) : baseDmg(atk, t.dfn, tech ? tech.power : .65);
@@ -155,7 +160,7 @@ function previewAction(u, p, t) {
   const first = raw * factor * (reaction ? 1.25 : 1), rest = raw * factor * (reaction === 'violeta' && !t.status.firmado ? 1.3 : 1);
   const lo = Math.round(first * .92) + Math.round(rest * .92) * (hits - 1), hi = Math.round(first * 1.08) + Math.round(rest * 1.08) * (hits - 1);
   return { col, mult: wouldExpose(t, col) ? colorMult(col, t.color) : attackMultiplier(t, col), lo, hi, reaction, label: lo + '–' + hi + ' daño',
-    effect: reaction ? 'Reacción ' + DATA.colors[reaction].name + ': ' + ({ naranja: 'salpica al vecino', verde: 'raíces + cura al grupo', violeta: 'interrumpe y debilita' }[reaction]) : p.type === 'role' ? ROLE_ACTIONS[u.id].desc : tech ? TECH_RULES[p.techId] : DATA.weapons[u.data.weapon].desc };
+    effect: reaction ? 'Reacción ' + DATA.colors[reaction].name + ': ' + ({ naranja: 'salpica al vecino', verde: 'raíces + cura al grupo', violeta: 'interrumpe y debilita' }[reaction]) : p.type === 'role' ? ROLE_ACTIONS[u.id].desc : tech ? techRule(p.techId) : DATA.weapons[u.data.weapon].desc };
 }
 function openCmd(u) { B.menu = { unit: u, level: 'cmd', idx: u.lastCmd || 0, opened: B.t }; }
 // The palette is a kidney of wood; its wells run down the far rim, one per row, each with its name written beside it.
@@ -270,7 +275,7 @@ function executeCommand(u, p, targets, reserved = false) {
 }
 function tickReservation() {
   const r = B.reservation; if (!r) return false;
-  if (r.users.some(u => !u.alive || u.mp < techCost(u, DATA.techs[r.p.techId]))) { cancelReservation('Mezcla cancelada: falta una gota o MP'); return false; }
+  if (r.users.some(u => !u.alive || u.mp < techCost(u, techData(r.p.techId)))) { cancelReservation('Mezcla cancelada: falta una gota o MP'); return false; }
   if (!r.users.every(u => u.atb >= 100 && !u.acting)) return false;
   return executeCommand(r.leader, r.p, r.targets, true);
 }

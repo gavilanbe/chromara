@@ -37,6 +37,11 @@ const DATA = {
     savia:     { name: 'Savia de color', short: 'Savia', kind: 'revive', amount: .4, target: 'fallen', desc: 'Revive a una gota con el 40% de vida.' },
   },
   inventory: { gota_agua: 4, tubo: 2, goma_b: 2, savia: 2 },
+  // Sepia, la marchante de pigmentos: una gota de tinta sepia que recorre las páginas con un fardo de tubos a la espalda.
+  // Vende el nivel 2 de cada mezcla a cambio de pigmento.
+  merchant: { name: 'Sepia', title: 'Sepia, marchante de pigmentos',
+    greet: '¿Pigmento fresco? Te enseño a mezclar a lo grande.', thanks: '¡Buena mezcla! Úsala con cariño.', poor: 'Vuelve con más pigmento, cielo.', owned: 'Esa ya la llevas en la brocha.',
+    recipes: { llamarada: 30, brote: 30, eclipse: 38, arcoiris: 48 } },
   studies: {
     veladura: { name: 'Veladura', cost: 18, desc: 'Preparar de Añil moja a todos los enemigos.' },
     relevo: { name: 'Relevo', cost: 22, desc: 'Proteger devuelve 3 MP a la gota protegida.' },
@@ -65,10 +70,14 @@ const DATA = {
     taquigrafia:{ name: 'Taquigrafía', user: 'ambar',  weapon: 'pluma',  mp: 4, power: 0.5, hits: 3, target: 'enemies', desc: 'Tres golpes rapidísimos repartidos.' },
     caligrafia: { name: 'Caligrafía',  user: 'anil',   weapon: 'pluma',  mp: 5, power: 0, heal: 0.4, target: 'ally', cure: true, desc: 'Escribe bien el nombre de un aliado: cura y limpia.' },
     salpicon:   { name: 'Salpicón',    user: 'anil',   weapon: 'pincel', mp: 5, power: 1.1, target: 'enemies', desc: 'Salta y salpica a todos los enemigos.' },
-    llamarada: { name: 'Llamarada',    users: ['carmin', 'ambar'],         color: 'naranja',  mp: 6, power: 1.5, target: 'enemies', desc: 'Rojo+Amarillo: fuego naranja en área.' },
-    brote:     { name: 'Brote',        users: ['ambar', 'anil'],           color: 'verde',    mp: 5, power: 0.7, heal: 0.35, target: 'enemies', desc: 'Amarillo+Azul: brota vida verde. Cura al grupo y daña.' },
-    eclipse:   { name: 'Eclipse',      users: ['carmin', 'anil'],          color: 'violeta',  mp: 7, power: 3.0, target: 'enemy', status: 'lento', desc: 'Rojo+Azul: violeta que aplasta y ralentiza.' },
-    arcoiris:  { name: 'Arcoíris',     users: ['carmin', 'ambar', 'anil'], color: 'blanco',   mp: 8, power: 2.4, target: 'enemies', desc: 'Todos los colores a la vez. Devastador contra la Tinta.' },
+    llamarada: { name: 'Llamarada',    users: ['carmin', 'ambar'],         color: 'naranja',  mp: 6, power: 1.5, target: 'enemies', desc: 'Rojo+Amarillo: fuego naranja en área.',
+      lv2: { name: 'Fénix', mp: 8, power: 2.1, desc: 'Un fénix de pintura quema la página y cae sobre todos.', rule: 'Daño naranja alto a todos los enemigos.' } },
+    brote:     { name: 'Brote',        users: ['ambar', 'anil'],           color: 'verde',    mp: 5, power: 0.7, heal: 0.35, target: 'enemies', desc: 'Amarillo+Azul: brota vida verde. Cura al grupo y daña.',
+      lv2: { name: 'Selva', mp: 7, power: 1.0, heal: 0.55, desc: 'Un árbol entero crece en la página: raíces y frutos.', rule: 'Daño verde a todos y cura 55% al grupo.' } },
+    eclipse:   { name: 'Eclipse',      users: ['carmin', 'anil'],          color: 'violeta',  mp: 7, power: 3.0, target: 'enemy', status: 'lento', desc: 'Rojo+Azul: violeta que aplasta y ralentiza.',
+      lv2: { name: 'Eclipse total', mp: 9, power: 4.2, desc: 'La noche absorbe la tinta del enemigo y lo aplasta.', rule: 'Daño violeta enorme y Lento.' } },
+    arcoiris:  { name: 'Arcoíris',     users: ['carmin', 'ambar', 'anil'], color: 'blanco',   mp: 8, power: 2.4, target: 'enemies', desc: 'Todos los colores a la vez. Devastador contra la Tinta.',
+      lv2: { name: 'Espectro', mp: 10, power: 3.3, desc: 'Seis ríos de color bajan por un puente de arcoíris.', rule: 'Daño de todos los colores a todos.' } },
   },
 
   // ---- Enemigos: las Gotas Negras. core = color robado (su debilidad es el complementario).
@@ -93,7 +102,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  H pliegue sellado con cera  R río de tinta  E estuche del circuito  w semilla  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  M Sepia, la marchante  H pliegue sellado con cera  R río de tinta  E estuche del circuito  w semilla  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -103,7 +112,7 @@ const DATA = {
     'T....T.....=......TTTTTT..,,,x,,,,,,,,,T',
     'T....T.....=......T~~~~T...,,,,,,,,,,,,T',
     'T.....2....=......T~~~~T.....,,,5,,,,..T',
-    'T..........=......T~~~~TT..............T',
+    'T........M.=......T~~~~TT..............T',
     'T....~~~...=.......~~~~~TTT............T',
     'T...~~~~~..=......~~~~~~..TTT.....4....T',
     'T...~~~~~..=.....~~~~~~........TT......T',

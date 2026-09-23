@@ -97,6 +97,7 @@ function worldObjects() {
     if(tileAt(tx,ty)!=='.'||hash2(tx+18,ty)%4!==0||![[1,0],[-1,0],[0,1],[0,-1]].some(([a,b])=>tileAt(tx+a,ty+b)==='~'))continue;
     const wx=tx*TILE+8,wy=ty*TILE+13;
     if(objects.some(o=>Math.hypot(o.wx-wx,o.wy-wy)<25)||MAP.spots.some(o=>Math.hypot(o.x*TILE+8-wx,o.y*TILE+12-wy)<28))continue;
+    if(MAP.merchant&&Math.hypot(MAP.merchant.x*TILE+8-wx,MAP.merchant.y*TILE+12-wy)<36)continue;
     objects.push({id:objects.length,kind:'reeds',wx,wy,color:'verde',size:WORLD_SIZES.reeds});
   }
   // Small flowers gather near the edge of a clearing, never in the puzzle or road.
@@ -108,6 +109,7 @@ function worldObjects() {
     if (MAP.spots.some(o => Math.hypot(o.x * TILE + 8 - wx, o.y * TILE + 12 - wy) < 24)) continue;
     if (MAP.signs.some(o => Math.hypot(o.x * TILE + 8 - wx, o.y * TILE + 8 - wy) < 22)) continue;
     if (MAP.jar && Math.hypot(MAP.jar.x * TILE + 16 - wx, MAP.jar.y * TILE + 20 - wy) < 39) continue;
+    if (MAP.merchant && Math.hypot(MAP.merchant.x * TILE + 8 - wx, MAP.merchant.y * TILE + 12 - wy) < 40) continue; // el puesto de Sepia queda despejado
     objects.push({ id: objects.length, kind: 'flower', wx, wy, color: worldRegion(tx, ty).color, size: WORLD_SIZES.flower, variant: seed % 3 });
   }
   return WORLD_ART.objects = objects;
@@ -297,6 +299,11 @@ function drawWorldLabel() {
     if(age<210){const width=textWidth(region.name)+16,slide=Math.round((1-artIn(at,18))*(width+10))+(age>190&&Prefs.shake?Math.round((age-190)/20*(width+10)):0);artTag(region.name,W-width-5+slide,5,col);}
     else paintDab(W-12,12,4*Math.min(1,artIn(at+210,12)),col);
   }
+  if(merchantNear()&&!fieldNearby().length){ // Sepia: su propio rótulo, que abre la tienda
+    const label=battleKey('ok')+' / '+DATA.merchant.title,w=Math.min(308,textWidth(label)+16),x=Math.round((W-w)/2),nearAt=artObserve('landmark','merchant');
+    g.save();g.translate(0,Math.round((1-artIn(nearAt,14))*26));artTag(label,x,160-Math.round(artPop(nearAt)*3),'#9a6a3e');g.restore();
+    uiHit(x,155,w,24,openShop);return;
+  }
   const nearby=worldNearby();if(!nearby||fieldNearby().length||OW.jar?.toast>0)return;
   const label=battleKey('ok')+' / '+nearby.title,w=Math.min(308,textWidth(label)+16),x=Math.round((W-w)/2);
   const nearAt=artObserve('landmark',nearby.title);
@@ -325,4 +332,43 @@ const WORLD_GLYPHS = {
 function worldTinyText(label,x,y,color) {
   g.fillStyle=color;
   [...label.toUpperCase()].forEach((ch,i)=>{ const base=ch.normalize('NFD')[0],bits=WORLD_GLYPHS[base];if(!bits)return;for(let j=0;j<15;j++)if(bits[j]==='1')g.fillRect(x+i*4+j%3,y+(j/3|0),1,1);if(ch!==base){g.fillRect(x+i*4+2,y-2,1,1);g.fillRect(x+i*4+1,y-1,1,1);} });
+}
+// =====================================================================
+// Sepia, la marchante de pigmentos: una gota de tinta sepia con sombrero de paja y un fardo de tubos a la espalda,
+// sentada junto al camino con su género extendido sobre una manta. Vende el nivel 2 de las mezclas (tienda en settings.js).
+// =====================================================================
+function merchantAt() { const m = MAP.merchant; return m ? { x: m.x * TILE + 8, y: m.y * TILE + 12 } : null; }
+function merchantBlocked(x, y) { const m = merchantAt(); return !!m && Math.abs(x - m.x) < 11 && y > m.y - 7 && y < m.y + 3; }
+function merchantNear() { const m = merchantAt(); return !!m && !OW.act && Math.hypot(OW.x - m.x, (OW.y - (m.y + 6)) * 1.2) < 30; }
+function openShop() { openOverlay('shop'); Game.overlay.message = DATA.merchant.greet; }
+function merchantSprite(blink) {
+  return cached('merchant|' + (blink ? 1 : 0), () => {
+    const c = document.createElement('canvas'); c.width = 26; c.height = 31; const x = c.getContext('2d'), F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    const rp = ramp('#9a6a3e');
+    // el fardo: una caja de madera a la espalda con tubos de pintura asomando
+    [['rojo', 14, 4], ['amarillo', 16, 2], ['azul', 18, 3], ['verde', 20, 5]].forEach(([k, tx, ty]) => { const t = ramp(C(k)); F('#241e32', tx - 1, ty - 1, 4, 10); F(t.base, tx, ty + 1, 2, 8); F(t.hi, tx, ty + 1, 1, 8); F('#c9c4d4', tx, ty, 2, 1); });
+    F('#3a2414', 12, 8, 12, 15); F('#8a5a34', 13, 9, 10, 13); F('#a8784a', 13, 9, 10, 1); F('#6b4424', 13, 13, 10, 1); F('#6b4424', 13, 17, 10, 1); F('#3a2414', 17, 9, 1, 13);
+    // el cuerpo: una gota sepia con brillo arriba a la izquierda y sombra abajo a la derecha
+    for (let y = 8; y <= 29; y++) { const w = y < 15 ? (y - 8) / 7 * 6.5 : Math.sqrt(Math.max(0, 70 - (y - 21) ** 2)); if (w < .5) continue; const a = Math.round(10 - w), b = Math.round(10 + w); F(rp.out, a - 1, y, b - a + 2); F(rp.base, a, y, b - a); if (y > 20) F(rp.sh, Math.round(10 + w * .2), y, Math.max(1, b - Math.round(10 + w * .2))); }
+    F(rp.out, 4, 30, 13); F(rp.hi, 5, 16, 2, 3); F(rp.spec, 5, 16, 1, 1);
+    // cara: ojos (o párpados), mofletes y media sonrisa
+    if (blink) { F('#241e32', 7, 21, 2); F('#241e32', 12, 21, 2); } else { F('#241e32', 7, 20, 1, 2); F('#241e32', 12, 20, 1, 2); F('#ffffff', 7, 20); F('#ffffff', 12, 20); }
+    F('#c9776a', 5, 23, 2); F('#c9776a', 13, 23, 2); F('#241e32', 9, 24, 2); F('#241e32', 8, 23); F('#241e32', 11, 23);
+    // sombrero de paja de ala ancha con cinta roja
+    F('#5a3f1e', 0, 12, 21, 3); F('#d8b070', 1, 12, 19, 2); F('#f0d49a', 2, 12, 8, 1); F('#5a3f1e', 5, 6, 11, 7); F('#d8b070', 6, 7, 9, 5); F('#f0d49a', 7, 7, 3, 1); F('#a6423a', 6, 10, 9, 2); F('#d8b070', 3, 13, 15, 1);
+    c.__key = 'merchant'; return c;
+  });
+}
+function drawMerchant(ents, cx, cy) {
+  const m = merchantAt(); if (!m) return; const x = m.x - cx, y = m.y - cy; if (x < -40 || y < -50 || x > W + 40 || y > H + 40) return;
+  // la manta con el género: tubos tumbados y un par de tarros, siempre bajo los pies
+  ents.push({ y: m.y - 30, draw: () => { g.fillStyle = '#6b4a33'; g.beginPath(); g.ellipse(x - 14, y + 3, 15, 6, 0, 0, 6.29); g.fill(); g.fillStyle = '#c9a26b'; g.beginPath(); g.ellipse(x - 14, y + 2, 14, 5, 0, 0, 6.29); g.fill(); g.fillStyle = '#a6423a'; for (let i = -2; i <= 2; i++) g.fillRect(Math.round(x - 14 + i * 5), y - 2, 1, 8);
+    [['rojo', -24, 0], ['amarillo', -18, 3], ['azul', -11, -1], ['verde', -6, 2]].forEach(([k, dx, dy]) => { const t = ramp(C(k)); g.fillStyle = '#241e32'; g.fillRect(Math.round(x + dx - 1), Math.round(y + dy - 1), 6, 4); g.fillStyle = t.base; g.fillRect(Math.round(x + dx), Math.round(y + dy), 4, 2); g.fillStyle = '#c9c4d4'; g.fillRect(Math.round(x + dx + 4), Math.round(y + dy), 1, 2); }); } });
+  ents.push({ y: m.y, draw: () => {
+    const near = merchantNear(), bob = Prefs.shake ? ((Game.t >> 4) & 1) : 0, blink = (Game.t % 150) < 5, wave = near && Prefs.shake ? Math.round(Math.sin(Game.t * .25) * 1.5) : 0;
+    shadow(x, y, 16); drawSprite(merchantSprite(blink), x + 3, y + 1 - bob, 1);
+    if (wave) { g.fillStyle = '#5a3f1e'; g.fillRect(Math.round(x - 10), Math.round(y - 19 + wave), 3, 1); }
+    // sobre ella flotan tres pinceladas que giran: aquí se mezcla
+    if (!near) { const t = Game.t * .06; ['rojo', 'amarillo', 'azul'].forEach((k, i) => { const a = t + i * 2.09; paintDab(Math.round(x + 1 + Math.cos(a) * 5), Math.round(y - 36 + Math.sin(a) * 2 - bob), 2, C(k)); }); }
+  } });
 }

@@ -72,7 +72,7 @@ function updateTouchControls() {
     if (b.disabled !== !available) b.disabled = !available;
   }
   const battleMenu=Game.state==='battle'&&!Game.overlay&&!B.currentAction?B.menu:null;
-  const label = Game.state === 'pageTurn' ? 'Pasando hoja' : field && typeof chapterNear === 'function' && chapterNear() ? 'Pasar hoja' : Game.state === 'title' || Game.state === 'cover' ? 'Comenzar' : Game.overlay ? 'Elegir' : battleMenu ? battleMenu.level==='target'?'Usar':'Elegir' : OW.msg && Game.state === 'overworld' ? 'Seguir' : field ? (worldNearby() || fieldNearby().length) ? 'Examinar' : 'Menú' : 'Confirmar';
+  const label = Game.state === 'pageTurn' ? 'Pasando hoja' : field && typeof chapterNear === 'function' && chapterNear() ? 'Pasar hoja' : Game.state === 'title' || Game.state === 'cover' ? 'Comenzar' : Game.overlay ? 'Elegir' : battleMenu ? battleMenu.level==='target'?'Usar':'Elegir' : OW.msg && Game.state === 'overworld' ? 'Seguir' : field ? merchantNear() ? 'Comprar' : (worldNearby() || fieldNearby().length) ? 'Examinar' : 'Menú' : 'Confirmar';
   const span = document.querySelector('#touch-confirm span'); if (span.textContent !== label) span.textContent = label;
   const padLabel=document.getElementById('touch-caption'),padText=battleMenu?.level==='cmd'?'Elegir herramienta':battleMenu?.level==='target'?'Elegir objetivo':'Toca o desliza';
   if(padLabel.textContent!==padText)padLabel.textContent=padText;

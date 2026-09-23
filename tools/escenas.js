@@ -24,6 +24,9 @@ const ESCENAS = {
   opciones() { ESCENAS.mapa(); openOverlay('settings'); },
   teclas() { ESCENAS.mapa(); openOverlay('bindings'); Game.overlay.idx = 2; },
   estudios() { ESCENAS.mapa(); Game.pigmento = 40; openOverlay('studies'); },
+  // ?escena=tienda: la tienda de Sepia con pigmento para una receta; ?escena=sepia: el mapa junto a ella.
+  tienda() { ESCENAS.mapa(); Game.pigmento = 40; Game.techLevels = { brote: 2 }; openShop(); },
+  sepia() { ESCENAS.mapa(); OW.msg = null; OW.x = MAP.merchant.x * TILE + 8; OW.y = MAP.merchant.y * TILE + 34; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H); },
   guia() { ESCENAS.mapa(); openOverlay('guide'); },
   magias() { ESCENAS.mapa(); const t = fieldTargets()[0]; OW.x = t.x; OW.y = t.y + 16; OW.ring = { idx: 0, targetId: t.id, t: 0, legend: false }; },
   paleta() { escenaBattle('5'); },
@@ -37,8 +40,8 @@ const ESCENAS = {
   accion() { escenaBattle('5'); executeCommand(B.party[0], { type: 'tech', techId: 'brochazo' }, [B.enemies[0]]); },
   // ?escena=golpe[&quien=0..2][&arma=brocha|lapiz|pincel|pluma]: el golpe básico de cualquier gota con cualquier herramienta.
   golpe() { const q = new URLSearchParams(location.search); escenaBattle('5'); const p = B.party[+(q.get('quien') || 0)] || B.party[0]; if (q.get('arma')) p.data.weapon = q.get('arma'); p.atb = 100; executeCommand(p, { type: 'attack' }, [B.enemies[0]]); },
-  // ?escena=tecnica&id=<techId>: la técnica arranca con todos listos; ?escena=enemigo&forma=<shape> lanza el ataque de un enemigo.
-  tecnica() { escenaBattle('5', false); const id = new URLSearchParams(location.search).get('id') || 'brochazo', t = DATA.techs[id], u = B.party.find(p => p.id === (t.user || t.users[0])); if (t.weapon) u.data.weapon = t.weapon; B.party.forEach(p => { p.atb = 100; p.mp = 30; }); if (t.target === 'ally') B.party[0].hp = 40; executeCommand(u, { type: 'tech', techId: id }, validTargets({ type: 'tech', techId: id }, u)); },
+  // ?escena=tecnica&id=<techId>[&nivel=2]: la técnica arranca con todos listos (nivel 2 si se pide); ?escena=enemigo&forma=<shape> lanza el ataque de un enemigo.
+  tecnica() { escenaBattle('5', false); const id = new URLSearchParams(location.search).get('id') || 'brochazo', t = DATA.techs[id]; if (new URLSearchParams(location.search).get('nivel') === '2') Game.techLevels = { [id]: 2 }; const _ = 0, u = B.party.find(p => p.id === (t.user || t.users[0])); if (t.weapon) u.data.weapon = t.weapon; B.party.forEach(p => { p.atb = 100; p.mp = 30; }); if (t.target === 'ally') B.party[0].hp = 40; executeCommand(u, { type: 'tech', techId: id }, validTargets({ type: 'tech', techId: id }, u)); },
   enemigo() { escenaBattle('5', false); const forma = new URLSearchParams(location.search).get('forma'); if (forma) B.enemies[0].data = { ...B.enemies[0].data, shape: forma }; B.enemies[0].intent = { kind: 'attack', name: 'Planchazo', target: B.party[0] }; B.actQueue.push(tracked(B.enemies[0], actEnemy(B.enemies[0]), [B.enemies[0]], { type: 'enemy' })); },
   corte() { escenaBattle('5', false); B.enemies[0].atb = 80; planEnemy(B.enemies[0]); B.party.forEach(p => p.atb = 100); executeCommand(B.party[1], { type: 'role' }, [B.enemies[0]]); },
   mezcla() { escenaBattle('5', false); putCoat(B.enemies[0], 'amarillo'); B.enemies[0].goop = null; B.party.forEach(p => p.atb = 100); executeCommand(B.party[0], { type: 'attack' }, [B.enemies[0]]); },
