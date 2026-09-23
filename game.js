@@ -468,6 +468,7 @@ function updateOverworld() {
   // movimiento con aceleración y frenada; el líder bota al andar (es una gota)
   let dx = 0, dy = 0; if (keys.left) dx--; if (keys.right) dx++; if (keys.up) dy--; if (keys.down) dy++;
   if (dx && dy) { dx *= .707; dy *= .707; }
+  if (typeof tapSteer === 'function') { if (dx || dy) tapCancel(); else [dx, dy] = tapSteer(); } // tocar el mapa para ir
   const sp = 1.35; OW.vx = lerp(OW.vx || 0, dx * sp, dx ? .3 : .45); OW.vy = lerp(OW.vy || 0, dy * sp, dy ? .3 : .45);
   if (Math.abs(OW.vx) < .04) OW.vx = 0; if (Math.abs(OW.vy) < .04) OW.vy = 0;
   const speed = Math.hypot(OW.vx, OW.vy); OW.moving = speed > .1;
@@ -592,6 +593,7 @@ function drawOverworld() {
   drawWorldAtmosphere(cx, cy, pal);
   drawRinseSpray(cx, cy); drawRinseBursts(cx, cy);
   drawFieldEffects(cx, cy);
+  if (typeof drawTapMark === 'function') drawTapMark(cx, cy);
   for (const d of OW.dust) { g.fillStyle = d.t < d.life * .6 ? ramp(d.col).base : ramp(d.col).sh; g.fillRect(Math.round(d.x - cx), Math.round(d.y - cy), 1, 1); }
   if (OW.fx) OW.fx();
   if (OW.flash) { g.fillStyle = OW.flash.col; g.globalAlpha = OW.flash.a; g.fillRect(0, 0, W, H); g.globalAlpha = 1; OW.flash.a -= .03; if (OW.flash.a <= 0) OW.flash = null; }

@@ -114,8 +114,12 @@ function initPlayerControls() {
     const box = cv.getBoundingClientRect(), x = (e.clientX - box.left) * W / box.width, y = (e.clientY - box.top) * H / box.height;
     const area = UI_HITS.slice().reverse().find(q => x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h);
     if (area) { e.preventDefault(); if(Game.state==='battle'&&!Game.overlay)battlePointerFeedback(x,y);else artBurst(x,y);area.run(); }
+    else if (typeof tapWalk === 'function' && tapWalk(x, y)) { e.preventDefault(); TAP.held = e.pointerId; TAP.movedAt = performance.now(); } // tocar el mapa para ir; arrastrar lo guía
   });
+  const tapRelease = e => { if (typeof TAP !== 'undefined' && TAP.held === e.pointerId) TAP.held = null; };
+  for (const ev of ['pointerup','pointercancel','pointerleave']) cv.addEventListener(ev, tapRelease);
   cv.addEventListener('pointermove', e => {
+    if (typeof TAP !== 'undefined' && TAP.held === e.pointerId && performance.now() - TAP.movedAt > 90) { const box = cv.getBoundingClientRect(); TAP.movedAt = performance.now(); tapWalk((e.clientX - box.left) * W / box.width, (e.clientY - box.top) * H / box.height, true); }
     if(e.pointerType==='touch')return;
     const box=cv.getBoundingClientRect(),x=(e.clientX-box.left)*W/box.width,y=(e.clientY-box.top)*H/box.height;
     const area=UI_HITS.slice().reverse().find(q=>x>=q.x&&x<=q.x+q.w&&y>=q.y&&y<=q.y+q.h);

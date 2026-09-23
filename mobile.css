@@ -1,78 +1,198 @@
-/* The original canvas stays 320×180. Touch controls live outside the artwork. */
+/* The original canvas stays 320×180. Touch controls live outside the artwork, as the painter's things on the desk:
+   the page taped down, notebook tabs for the menus, a palette pad whose drop follows the thumb, a paint pan for A and
+   an eraser for B. Anything that cannot be used right now is only sketched in graphite. */
 html,body { overscroll-behavior:none; }
 #game-shell,#game-screen { display:flex;align-items:center;justify-content:center; }
 #game-shell { width:100%;height:100%; }
 #game-screen { min-width:0;min-height:0; }
+#page { position:relative;line-height:0; }
 #c { display:block;touch-action:none; }
 .touch-only { display:none; }
-body.touch-mode { -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none; }
+body.touch-mode {
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none;
+  --paper:#f4e7c8;--paper-dk:#e1cca2;--ink:#392c3f;--graphite:#6f6680;--lead:#d84a4a;--pad:118px;
+  background:
+    repeating-linear-gradient(93deg,rgba(255,240,220,.018) 0 2px,transparent 2px 9px),
+    radial-gradient(ellipse 90% 80% at 50% 38%,#2a2135 0%,#17121f 58%,#0b0912 100%);
+}
 .touch-mode #game-shell {
   box-sizing:border-box;width:100%;height:100vh;height:100dvh;
   padding:max(4px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(4px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));
-  display:grid;grid-template-columns:112px minmax(0,1fr) 80px;grid-template-rows:44px minmax(0,1fr);gap:4px 6px;
+  display:grid;grid-template-columns:118px minmax(0,1fr) 88px;grid-template-rows:44px minmax(0,1fr);gap:2px 6px;
 }
 .touch-mode #game-screen { width:100%;height:100%;grid-column:2;grid-row:2; }
 .touch-mode #hint { display:none; }
+/* la hoja, pegada con cinta a la mesa */
+.touch-mode #page { box-shadow:0 0 0 2px #221b2b,0 5px 0 2px #07060c,0 14px 30px rgba(0,0,0,.55); }
+.touch-mode #page::before,.touch-mode #page::after {
+  content:'';position:absolute;top:-7px;width:46px;height:15px;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,rgba(236,222,178,.88),rgba(214,196,150,.82));box-shadow:0 1px 0 rgba(0,0,0,.25);
+  -webkit-mask:linear-gradient(90deg,transparent 0 2px,#000 2px calc(100% - 2px),transparent calc(100% - 2px)),repeating-linear-gradient(180deg,#000 0 2px,transparent 2px 3px);
+}
+.touch-mode #page::before { left:-14px;transform:rotate(-24deg); }
+.touch-mode #page::after { right:-14px;transform:rotate(21deg); }
 .touch-mode button { -webkit-tap-highlight-color:transparent;touch-action:none;cursor:pointer; }
 .touch-mode .touch-only { display:flex; }
-.touch-mode #touch-toolbar { grid-column:1/-1;grid-row:1;justify-content:center;gap:6px;min-width:0; }
 .touch-mode .touch-only button {
-  --paint:#d6b474;box-sizing:border-box;min-height:44px;border:1px solid #b7a07c;border-radius:2px 5px 3px 2px;
-  background:linear-gradient(174deg,#f4e7c8 0%,#e4d1a9 92%,#bca17a 93%);color:#392c3f;font:16px/1.15 'Chromara Cuaderno',system-ui,sans-serif;-webkit-font-smoothing:none;
+  --paint:#d6b474;position:relative;box-sizing:border-box;min-height:44px;border:1px solid #b7a07c;border-radius:3px 6px 4px 3px;
+  background:linear-gradient(174deg,var(--paper) 0%,var(--paper-dk) 92%,#bca17a 93%);color:var(--ink);font:16px/1.15 'Chromara Cuaderno',system-ui,sans-serif;-webkit-font-smoothing:none;
   padding:6px 10px;box-shadow:1px 3px 0 #07060c,inset 0 2px 0 #fff2d6;
-  transition:transform 100ms ease,box-shadow 100ms ease,filter 100ms ease;
+  transition:transform 190ms cubic-bezier(.3,1.7,.5,1),box-shadow 120ms ease,filter 120ms ease,opacity 160ms ease;
 }
-.touch-mode .touch-only button:disabled { color:#9e9384;border-color:#514839;background:#302a26;box-shadow:none; }
-.touch-mode .touch-only button.is-held,.touch-mode .touch-only button:active:not(:disabled) { filter:brightness(1.12);transform:translateY(2px) rotate(-1deg);box-shadow:0 1px 0 #07060c; }
+/* lo que ahora no se puede usar queda solo bocetado a lápiz */
+.touch-mode .touch-only button:disabled {
+  color:var(--graphite);border:1px dashed #5b5468;background:rgba(40,34,50,.35);box-shadow:none;filter:none;
+}
+.touch-mode .touch-only button.is-held,.touch-mode .touch-only button:active:not(:disabled) {
+  filter:brightness(1.1);transform:translateY(3px) scale(.94) rotate(-1.5deg);box-shadow:0 0 0 #07060c,inset 0 2px 0 #fff2d6;transition-duration:60ms;
+}
 .touch-mode .touch-only button:focus-visible { outline:2px solid #edcd79;outline-offset:2px; }
-.touch-mode #touch-toolbar button { border-top:4px solid var(--paint);padding-top:3px; }
-.touch-mode #touch-toolbar [data-touch-menu=equipment] { --paint:#b88855; }
-.touch-mode #touch-toolbar [data-touch-action=ring] { --paint:#d86257; }
-.touch-mode #touch-toolbar [data-touch-action=journal] { --paint:#579671; }
-.touch-mode #touch-toolbar [data-touch-action=help] { --paint:#688bc2; }
-.touch-mode #touch-toolbar [data-touch-action=options] { --paint:#a28bba; }
-.touch-mode #touch-toolbar #touch-sound { --paint:#9db7ae; }
-.touch-mode #touch-fullscreen { width:44px;padding:0;font-size:25px; }
-.touch-mode #touch-movement { grid-column:1;grid-row:2;flex-direction:column;align-items:center;justify-content:center;gap:12px; }
-#touch-pad { position:relative;width:112px;height:112px;touch-action:none;border-radius:47% 53% 49% 51%;background:repeating-linear-gradient(14deg,#755737 0 12px,#7f603f 13px 15px);box-shadow:inset 0 2px 0 #b28d5d,0 4px 0 #201725; }
-.touch-mode #touch-pad button { position:absolute;width:44px;height:44px;padding:0;font-size:19px;z-index:1; }
-#touch-pad [data-touch-direction=up] { left:34px;top:0; }
-#touch-pad [data-touch-direction=left] { left:0;top:34px; }
-#touch-pad [data-touch-direction=right] { right:0;top:34px; }
-#touch-pad [data-touch-direction=down] { left:34px;bottom:0; }
-.pad-center { position:absolute;left:43px;top:43px;width:26px;height:26px;border-radius:48% 42% 50% 46%;background:#30273b;box-shadow:inset 2px 2px 0 #57415c;pointer-events:none;z-index:2; }
-.touch-caption { color:#9b8f9f;font:16px/1 'Chromara Cuaderno',system-ui,sans-serif; }
-.touch-mode #touch-actions { grid-column:3;grid-row:2;flex-direction:column;justify-content:center;gap:8px; }
-.touch-mode #touch-actions button { width:80px;padding:6px 3px; }
-.touch-mode #touch-actions [data-touch-action=back] { border-bottom:3px solid #9f87b2; }
-.touch-mode #touch-actions [data-touch-action=swap] { border-bottom:3px solid #6a91c5; }
-.touch-mode #touch-actions [data-touch-action=release] { border-bottom:3px solid #b77871; }
-.touch-mode #touch-actions button b { display:block;font:32px/1 'Chromara Rotulo','Chromara Cuaderno',system-ui,sans-serif; }
-.touch-mode #touch-actions button span { display:block;margin-top:3px;font-size:16px; }
-.touch-mode #touch-actions #touch-confirm { min-height:62px;background:linear-gradient(165deg,#e2bf70,#bc9046);border-color:#efd499;color:#342738;border-radius:40% 43% 32% 37%;box-shadow:inset 2px 3px 0 #f4d891,1px 4px 0 #382c27; }
-.touch-mode #touch-actions #touch-confirm.is-held { background:#edc980;box-shadow:inset 1px 1px 0 #f4d891; }
-/* Portrait phones play too: the page on top, the palette of controls underneath. Rotation lock is no obstacle. */
+/* salpicadura al tocar */
+.touch-splat {
+  position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:52% 48% 55% 45%;pointer-events:none;z-index:3;
+  background:var(--splat,var(--paint));opacity:.85;
+  box-shadow:17px -8px 0 -3px var(--paint),-15px 10px 0 -3px var(--paint),6px 17px 0 -4px var(--splat,var(--paint)),-9px -15px 0 -4px var(--paint),20px 9px 0 -5px var(--splat,var(--paint));
+  animation:touch-splat 420ms cubic-bezier(.2,.7,.3,1) forwards;
+}
+@keyframes touch-splat { from { transform:scale(.2);opacity:.95; } 60% { opacity:.55; } to { transform:scale(3.2) rotate(25deg);opacity:0; } }
+.touch-icon { width:18px;height:18px;flex:none;image-rendering:pixelated; }
+.is-relabel span,.is-relabel { animation:touch-relabel 260ms cubic-bezier(.3,1.8,.5,1); }
+@keyframes touch-relabel { from { transform:scale(.7);opacity:.3; } to { transform:none;opacity:1; } }
+
+/* ---- pestañas del cuaderno ---- */
+.touch-mode #touch-toolbar { grid-column:1/-1;grid-row:1;justify-content:center;align-items:flex-end;gap:5px;min-width:0; }
+.touch-mode #touch-toolbar button {
+  display:flex;align-items:center;gap:5px;min-height:40px;padding:4px 10px 3px;border-radius:9px 11px 0 0;border-bottom:none;
+  border-top:5px solid var(--paint);box-shadow:inset 0 2px 0 #fff2d6,0 -1px 0 #07060c;transform-origin:50% 100%;
+}
+.touch-mode #touch-toolbar button .touch-icon { color:var(--paint);filter:brightness(.72) saturate(1.3); }
+.touch-mode #touch-toolbar button:disabled { border-top:5px dashed #5b5468;border-bottom:none; }
+.touch-mode #touch-toolbar button:disabled .touch-icon { color:var(--graphite);filter:none; }
+.touch-mode #touch-toolbar button.is-held,.touch-mode #touch-toolbar button:active:not(:disabled) { transform:translateY(3px) scaleY(.9); }
+.touch-mode #touch-toolbar [data-touch-menu=equipment] { --paint:#c08a4c; }
+.touch-mode #touch-toolbar [data-touch-action=ring] { --paint:#d8505a; }
+.touch-mode #touch-toolbar [data-touch-action=journal] { --paint:#4f9a6c; }
+.touch-mode #touch-toolbar [data-touch-action=help] { --paint:#5d86cc; }
+.touch-mode #touch-toolbar [data-touch-action=options] { --paint:#9c7cc0; }
+.touch-mode #touch-toolbar #touch-sound { --paint:#6fa89a; }
+.touch-mode #touch-fullscreen { --paint:#8c8ab0;padding:4px 11px 3px; }
+
+/* ---- la cruceta: una paleta de madera con cuatro flechas pintadas y una gota del color del líder ---- */
+.touch-mode #touch-movement { grid-column:1;grid-row:2;flex-direction:column;align-items:center;justify-content:center;gap:10px; }
+#touch-pad {
+  position:relative;width:var(--pad);height:var(--pad);touch-action:none;border-radius:47% 53% 49% 51%;
+  background:radial-gradient(circle at 34% 28%,#a07a4e 0 8%,transparent 30%),repeating-linear-gradient(14deg,#6f5033 0 11px,#7c5b3b 12px 14px);
+  box-shadow:inset 0 3px 0 #b28d5d,inset 0 -4px 0 #4d3522,0 5px 0 #1a121f,0 10px 18px rgba(0,0,0,.45);
+}
+.touch-mode #touch-pad button { position:absolute;width:40%;height:40%;padding:0;z-index:1;border-radius:32% 38% 30% 36%;display:flex;align-items:center;justify-content:center; }
+#touch-pad [data-touch-direction=up] { left:30%;top:0; }
+#touch-pad [data-touch-direction=left] { left:0;top:30%; }
+#touch-pad [data-touch-direction=right] { right:0;top:30%; }
+#touch-pad [data-touch-direction=down] { left:30%;bottom:0; }
+#touch-pad button i { display:block;width:0;height:0;border:8px solid transparent;filter:drop-shadow(0 1px 0 rgba(255,255,255,.5)); }
+#touch-pad [data-touch-direction=up] i { border-bottom:11px solid #4b3a4e;border-top:0;margin-top:-4px; }
+#touch-pad [data-touch-direction=down] i { border-top:11px solid #4b3a4e;border-bottom:0;margin-top:4px; }
+#touch-pad [data-touch-direction=left] i { border-right:11px solid #4b3a4e;border-left:0;margin-left:-4px; }
+#touch-pad [data-touch-direction=right] i { border-left:11px solid #4b3a4e;border-right:0;margin-left:4px; }
+#touch-pad button.is-held i { border-color:transparent; }
+#touch-pad [data-touch-direction=up].is-held i { border-bottom-color:var(--lead); }
+#touch-pad [data-touch-direction=down].is-held i { border-top-color:var(--lead); }
+#touch-pad [data-touch-direction=left].is-held i { border-right-color:var(--lead); }
+#touch-pad [data-touch-direction=right].is-held i { border-left-color:var(--lead); }
+.pad-center { position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:48% 42% 50% 46%;background:#2a2033;box-shadow:inset 2px 3px 0 #140f1a,0 1px 0 #a07a4e;pointer-events:none;z-index:2; }
+.pad-nub {
+  position:absolute;left:12%;top:8%;width:76%;height:80%;border-radius:50% 50% 46% 46% / 58% 58% 42% 42%;
+  background:radial-gradient(circle at 36% 30%,rgba(255,255,255,.75) 0 10%,transparent 12%),radial-gradient(circle at 50% 62%,var(--lead) 0 58%,color-mix(in srgb,var(--lead) 60%,#14121c) 100%);
+  box-shadow:0 2px 0 #140f1a;transition:transform 220ms cubic-bezier(.3,1.9,.5,1);
+}
+.pad-nub.is-dragged { transition:transform 40ms linear; }
+.touch-caption { color:#9b8f9f;font:16px/1 'Chromara Cuaderno',system-ui,sans-serif;text-align:center; }
+
+/* ---- acciones: A es un godet de pintura, B una goma, Y y X dos pastillas de acuarela ---- */
+.touch-mode #touch-actions { grid-column:3;grid-row:2;flex-direction:column;align-items:center;justify-content:center;gap:9px; }
+.touch-mode #touch-actions button { width:84px;padding:4px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center; }
+.touch-mode #touch-actions button b { display:block;font:28px/1 'Chromara Rotulo','Chromara Cuaderno',system-ui,sans-serif; }
+.touch-mode #touch-actions button span { display:block;margin-top:2px;font-size:16px;white-space:nowrap; }
+.touch-mode #touch-actions #touch-confirm {
+  --paint:#c98a2a;--splat:#fff0c0;width:84px;height:84px;min-height:84px;border-radius:50%;border:3px solid #5d4126;color:#3a2a1c;
+  background:radial-gradient(circle at 33% 28%,#fff1c4 0 9%,transparent 11%),radial-gradient(circle at 50% 55%,#f2c160 0 52%,#d49b3c 72%,#a77326 100%);
+  box-shadow:inset 0 -5px 0 rgba(92,58,24,.35),inset 0 3px 0 rgba(255,244,210,.6),0 5px 0 #1a121f,0 9px 16px rgba(0,0,0,.4);
+}
+.touch-mode #touch-actions #touch-confirm b { font-size:34px;text-shadow:0 2px 0 rgba(255,240,200,.6); }
+.touch-mode #touch-actions #touch-confirm.is-ready { animation:touch-ready 1.1s ease-in-out infinite; }
+@keyframes touch-ready {
+  0%,100% { box-shadow:inset 0 -5px 0 rgba(92,58,24,.35),inset 0 3px 0 rgba(255,244,210,.6),0 5px 0 #1a121f,0 0 0 0 rgba(240,192,96,.55); }
+  50% { box-shadow:inset 0 -5px 0 rgba(92,58,24,.35),inset 0 3px 0 rgba(255,244,210,.6),0 5px 0 #1a121f,0 0 0 9px rgba(240,192,96,0); }
+}
+.touch-mode #touch-actions #touch-confirm.is-held,.touch-mode #touch-actions #touch-confirm:active { transform:translateY(4px) scale(.92,.88);box-shadow:inset 0 -2px 0 rgba(92,58,24,.35),0 1px 0 #1a121f; }
+.touch-mode #touch-actions #touch-back {
+  --paint:#e88a9a;--splat:#fbe3e6;min-height:48px;border-radius:9px 8px 10px 9px;border:2px solid #6a4b58;color:#3d2533;
+  background:linear-gradient(90deg,#f7c7cd 0 62%,#6f8fc9 62% 100%);box-shadow:inset 0 3px 0 rgba(255,255,255,.45),inset 0 -3px 0 rgba(90,40,60,.25),0 4px 0 #1a121f;
+}
+.touch-mode #touch-actions #touch-back b { font-size:22px; }
+.touch-mode #touch-actions [data-touch-action=swap],.touch-mode #touch-actions [data-touch-action=release] { min-height:44px;flex-direction:row;gap:5px;border-radius:14px 12px 15px 12px;border-width:2px; }
+.touch-mode #touch-actions [data-touch-action=swap] b,.touch-mode #touch-actions [data-touch-action=release] b { font-size:18px; }
+.touch-mode #touch-actions [data-touch-action=swap] span,.touch-mode #touch-actions [data-touch-action=release] span { margin:0; }
+.touch-mode #touch-actions [data-touch-action=swap]:not(:disabled) { --paint:#6a91d8;border-color:#27427a;background:radial-gradient(circle at 30% 30%,#b6cdf3 0 10%,transparent 12%),linear-gradient(170deg,#85a8e6,#4e74c0);color:#12203f; }
+.touch-mode #touch-actions [data-touch-action=release]:not(:disabled) { --paint:#e07068;border-color:#7a2a2a;background:radial-gradient(circle at 30% 30%,#f7c0b8 0 10%,transparent 12%),linear-gradient(170deg,#ea8a80,#c0504a);color:#3a1212; }
+
+/* ---- retrato: la hoja arriba y, debajo, el estuche con los controles a mano de los pulgares ---- */
 #rotate-device { display:none; }
-.touch-mode.is-portrait #game-shell { grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:6px;padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); }
-.touch-mode.is-portrait #touch-toolbar { grid-column:1/-1;grid-row:1;flex-wrap:wrap;gap:4px; }
-.touch-mode.is-portrait #touch-toolbar button { min-height:40px;padding:2px 7px 4px; }
-.touch-mode.is-portrait #game-screen { grid-column:1/-1;grid-row:2;width:100%;height:auto;aspect-ratio:16/9; }
-.touch-mode.is-portrait #touch-movement { grid-column:1;grid-row:3;align-self:center; }
-.touch-mode.is-portrait #touch-actions { grid-column:2;grid-row:3;display:grid;grid-template-columns:1fr 1fr;gap:6px;align-content:center;min-width:0; }
-.touch-mode.is-portrait #touch-actions button { width:auto;min-width:0;min-height:48px;padding:4px 2px; }
-.touch-mode.is-portrait #touch-actions #touch-confirm { grid-column:1/-1;min-height:64px; }
-.touch-mode.is-portrait #touch-actions button b { font-size:16px; }
-.touch-mode.is-portrait #touch-actions #touch-confirm b { font-size:32px; }
-.touch-mode.ui-still .touch-only button { transition:none; }
+.touch-mode.is-portrait #game-shell {
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,.45fr) auto auto minmax(12px,1fr) auto;gap:0 8px;
+  padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+}
+.touch-mode.is-portrait #game-shell::before {
+  content:'';grid-column:1/-1;grid-row:5;align-self:end;height:calc(var(--pad) + 64px);border-radius:22px 26px 20px 24px;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.06),transparent 60%),repeating-linear-gradient(45deg,#2c2338 0 3px,#292033 3px 6px);
+  box-shadow:inset 0 0 0 2px #3b2f49,inset 0 0 0 7px #2a2134,inset 0 2px 18px rgba(0,0,0,.5),0 6px 0 #0b0912;
+  outline:2px dashed rgba(170,150,190,.22);outline-offset:-12px;
+}
+body.touch-mode.is-portrait { --pad:min(44vw,190px,30vh); }
+.touch-mode.is-portrait #game-screen { grid-column:1/-1;grid-row:2;width:100%;height:auto;aspect-ratio:16/9;margin-top:8px; }
+.touch-mode.is-portrait #touch-toolbar { grid-column:1/-1;grid-row:3;align-items:flex-start;gap:4px;margin-top:9px;flex-wrap:nowrap; }
+.touch-mode.is-portrait #touch-toolbar button {
+  flex:1 1 0;min-width:0;max-width:64px;min-height:46px;padding:5px 2px 4px;justify-content:center;
+  border-radius:0 0 11px 9px;border-top:none;border-bottom:5px solid var(--paint);box-shadow:inset 0 -2px 0 rgba(255,255,255,.3),0 3px 0 #07060c;transform-origin:50% 0;
+}
+.touch-mode.is-portrait #touch-toolbar button:disabled { border-bottom:5px dashed #5b5468;border-top:none; }
+.touch-mode.is-portrait #touch-toolbar button .touch-icon { width:22px;height:22px; }
+.touch-mode.is-portrait #touch-toolbar button span { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap; }
+.touch-mode.is-portrait #touch-toolbar button.is-held,.touch-mode.is-portrait #touch-toolbar button:active:not(:disabled) { transform:translateY(-2px) scaleY(.9); }
+.touch-mode.is-portrait #touch-movement { grid-column:1;grid-row:5;align-self:end;position:relative;z-index:1;height:calc(var(--pad) + 64px);box-sizing:border-box;padding-top:14px;gap:8px; }
+.touch-mode.is-portrait #touch-pad button i { border-width:10px;transform:scale(1.2); }
+.touch-mode.is-portrait #touch-actions {
+  grid-column:2;grid-row:5;align-self:end;position:relative;z-index:1;min-width:0;height:calc(var(--pad) + 64px);box-sizing:border-box;padding:18px 14px 20px 0;
+  display:grid;grid-template-columns:1fr auto;grid-template-rows:1fr 1fr;gap:8px 8px;align-content:stretch;align-items:center;justify-items:center;
+}
+.touch-mode.is-portrait #touch-actions #touch-confirm { grid-column:2;grid-row:1/3;align-self:center;--a:min(27vw,118px,19vh);width:var(--a);height:var(--a);min-height:0;margin-top:-18px; }
+.touch-mode.is-portrait #touch-actions #touch-confirm b { font-size:40px; }
+.touch-mode.is-portrait #touch-actions #touch-back { grid-column:1;grid-row:2;align-self:start;width:100%;max-width:88px;min-height:60px;margin-top:-6px; }
+.touch-mode.is-portrait #touch-actions [data-touch-action=swap] { grid-column:1;grid-row:1;align-self:end;width:100%;max-width:88px; }
+.touch-mode.is-portrait #touch-actions [data-touch-action=release] { position:absolute;right:10px;bottom:6px;width:auto;min-height:40px;padding:2px 10px; }
+
+.touch-mode.ui-still .touch-only button,.touch-mode.ui-still .pad-nub { transition:none; }
 .touch-mode.ui-still .touch-only button.is-held,.touch-mode.ui-still .touch-only button:active:not(:disabled) { transform:none; }
+.touch-mode.ui-still #touch-confirm.is-ready,.touch-mode.ui-still .is-relabel,.touch-mode.ui-still .is-relabel span { animation:none; }
 @media (prefers-reduced-motion:reduce) {
-  .touch-mode .touch-only button { transition:none; }
+  .touch-mode .touch-only button,.pad-nub { transition:none; }
   .touch-mode .touch-only button.is-held,.touch-mode .touch-only button:active:not(:disabled) { transform:none; }
+  #touch-confirm.is-ready,.is-relabel,.is-relabel span,.touch-splat { animation:none; }
+  .touch-splat { display:none; }
 }
 @media (max-height:330px) and (orientation:landscape) {
-  .touch-mode #game-shell { grid-template-rows:44px minmax(0,1fr);row-gap:0; }
-  .touch-mode #touch-actions { gap:3px; }
-  .touch-mode #touch-actions #touch-confirm { min-height:48px; }
+  .touch-mode #game-shell { grid-template-rows:40px minmax(0,1fr);row-gap:0; }
+  .touch-mode #touch-toolbar button { min-height:36px;padding-top:2px; }
+  .touch-mode #touch-actions { gap:4px; }
+  .touch-mode #touch-actions #touch-confirm { width:66px;height:66px;min-height:66px; }
+  .touch-mode #touch-actions #touch-confirm b { font-size:24px; }
   .touch-mode #touch-actions button b { font-size:16px; }
+  .touch-mode #touch-actions button span { font-size:16px; }
+  body.touch-mode { --pad:104px; }
   .touch-mode .touch-caption { display:none; }
+}
+@media (min-height:420px) and (orientation:landscape) {
+  .touch-mode #game-shell { grid-template-columns:132px minmax(0,1fr) 96px; }
+  body.touch-mode { --pad:130px; }
+  .touch-mode #touch-actions #touch-confirm { width:92px;height:92px; }
 }

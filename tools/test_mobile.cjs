@@ -78,4 +78,23 @@ test('Y is available only for another ready painter and arrows still choose well
   swap.handlers.pointerdown(pointer(10,swap));run('updateBattleMenu()');assert.equal(run('B.menu.unit.id'),'anil');events.pointerup.forEach(fn=>fn(pointer(10)));
  }
 });
+test('tapping the map walks there around obstacles, and tapping Sepia opens her shop on arrival',()=>{
+ run(`resetGame();Game.intro=false;initOverworld();OW.msg=null;OW.menu=null;OW.ring=null;setState('overworld');for(const sg of MAP.signs||[])sg.read=true;`);
+ const m=run('merchantAt()');
+ // a spot the lead can reach: straight to it, with no keys held
+ run(`OW.x=${m.x}-60;OW.y=${m.y}+26;OW.cam.x=clamp(OW.x-160,0,MAP.w*16-320);OW.cam.y=clamp(OW.y-90,0,MAP.h*16-180);releaseInputs();`);
+ const tx=run(`${m.x}-20-OW.cam.x`),ty=run(`${m.y}+26-OW.cam.y`);
+ assert.equal(run(`tapWalk(${tx},${ty})`),true,run('JSON.stringify([Game.state,!!OW.menu,!!OW.ring,!!OW.msg,!!OW.act,!!OW.heal,!!Game.overlay,OW.landT])'));assert(run('!!TAP.route'),'no route to an open spot');
+ run(`for(let i=0;i<200&&TAP.route;i++)updateOverworld();`);assert(run('!TAP.route'));
+ assert(run(`Math.hypot(OW.x-(${m.x}-20),OW.y-(${m.y}+26))<6`),'did not arrive: '+run('[OW.x,OW.y]'));
+ // arrow keys take over at once
+ run(`tapWalk(${tx}-40,${ty});keys.up=true;updateOverworld();keys.up=false;`);assert.equal(run('TAP.route'),null);
+ // tapping the merchant herself walks next to her and opens the shop
+ run(`tapWalk(${m.x}-OW.cam.x,${m.y}-OW.cam.y)`);assert(run('TAP.route&&TAP.route.interact'));
+ run(`for(let i=0;i<300&&!Game.overlay;i++){updateOverworld();for(const k in pressed)if(k!=='ok')pressed[k]=false;}`);
+ assert.equal(run('Game.overlay?.type'),'shop');run('closeOverlay()');
+ // an unreachable spot leaves a crossed-out mark and no route
+ run(`OW.x=${m.x}-60;OW.y=${m.y}+26;TAP.route=null;`);assert.equal(run('tapPath(-50,-50)'),null);
+ run('drawOverworld()');
+});
 console.log(`${count} mobile integration checks passed.`);
