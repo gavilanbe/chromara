@@ -287,8 +287,11 @@ function drawFieldPuzzle(ents, cx, cy, pal) {
     const [tx, ty] = n.tiles[0]; if (w < .2 && (OW.t + tx * 13) % 150 > 6 && vis(tx, ty)) { g.fillStyle = '#efe4bf'; g.fillRect(tx * TILE + 5 - cx, ty * TILE + 7 - cy, 2, 2); g.fillRect(tx * TILE + 10 - cx, ty * TILE + 7 - cy, 2, 2); } }
   // cofres: una cajita de madera con cierre de latón; abierta, la tapa queda levantada
   for (const c of p.chests) { const id = 'e@' + c[0] + ',' + c[1]; if (!vis(...c)) continue; const x = c[0] * TILE + 8 - cx, y = c[1] * TILE + 12 - cy, open = z.looted[id] ? 1 : z.lid?.id === id ? z.lid.k : 0, rise = z.lid?.id === id ? z.lid.rise : 0;
-    ents.push({ y: c[1] * TILE + 14, draw: () => { shadow(x, y + 2, 14); g.fillStyle = '#241e32'; g.fillRect(x - 7, y - 9, 14, 11); g.fillStyle = '#8a5a34'; g.fillRect(x - 6, y - 8, 12, 9); g.fillStyle = '#b07a48'; g.fillRect(x - 6, y - 8, 12, 2); g.fillStyle = '#e8c070'; g.fillRect(x - 1, y - 6, 2, 3);
-      g.fillStyle = '#241e32'; g.fillRect(x - 7, y - 12 - open * 5, 14, 4); g.fillStyle = open ? '#6b4424' : '#a8784a'; g.fillRect(x - 6, y - 11 - open * 5, 12, 2);
+    ents.push({ y: c[1] * TILE + 14, draw: () => { shadow(x, y + 2, 16); const F = (col, a, b, w = 1, h = 1) => { g.fillStyle = col; g.fillRect(x + a, y + b, w, h); }; // caja de pinturas de madera en tres cuartos, con cantoneras de latón y salpicaduras
+      F('#241e32', -8, -9, 16, 11); F('#8a5a34', -7, -8, 14, 9); F('#6b4424', -7, -2, 14, 3); F('#a8784a', -7, -8, 14, 1); for (let i = -5; i < 7; i += 4) F('#6b4424', i, -7, 1, 5); // cuerpo con tablas
+      F('#e8c070', -8, -9, 2, 2); F('#e8c070', 6, -9, 2, 2); F('#e8c070', -8, 0, 2, 2); F('#e8c070', 6, 0, 2, 2); F('#e8c070', -1, -6, 3, 4); F('#fff3c0', -1, -6, 1, 1); F('#241e32', 0, -4, 1, 1); // latón y cerradura
+      F(C('rojo'), -5, -3, 2, 1); F(C('azul'), 3, -5, 1, 2); F(C('amarillo'), 4, -1, 2, 1); // salpicaduras
+      const ly = -12 - open * 5; F('#241e32', -8, ly, 16, 4); F(open ? '#5a3a20' : '#b07a48', -7, ly + 1, 14, 2); F(open ? '#6b4424' : '#d8a870', -7, ly + 1, 14, 1); if (open) { F('#fff3c0', -6, -9, 12, 1); } // tapa (abierta, deja ver el brillo de dentro)
       if (rise > 0) { g.globalAlpha = Math.sin(rise * Math.PI); g.fillStyle = '#fff3c0'; g.fillRect(x - 1, y - 14 - rise * 12, 3, 3); g.globalAlpha = 1; } } }); }
   if (p.estuche) { const x = p.estuche[0] * TILE + 8 - cx, y = p.estuche[1] * TILE + 10 - cy;
     ents.push({ y: p.estuche[1] * TILE + 22, draw: () => { shadow(x, y + 10, 17); g.drawImage(pzSprite('estuche', pal), x - 12, y - 13);

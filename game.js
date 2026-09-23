@@ -317,29 +317,29 @@ function groundTile(tx, ty, pal, frame = 0) {
 // Bosque de utensilios 16×24: pinceles clavados (mechón de cerdas cargado de color arriba, mango de madera) y lápices (cuerpo de color, cono de madera, mina). Los contiguos juntan sus mechones en setos.
 const TREE_COLS = ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta'];
 function treeSprite(pal, mL, mR, vr, zone) { // zone: el color de la región tiñe su seto; sin zona, el arcoíris de siempre
-  return cached(`tree|${pal}|${mL ? 1 : 0}|${mR ? 1 : 0}|${vr}|${zone ? zone.color + (zone.drained ? 'd' : '') : ''}`, () => {
+  return cached(`tree2|${pal}|${mL ? 1 : 0}|${mR ? 1 : 0}|${vr}|${zone ? zone.color + (zone.drained ? 'd' : '') : ''}`, () => {
     const p = PAL[pal], c = document.createElement('canvas'); c.width = 16; c.height = 24; const x = c.getContext('2d');
-    const hue = zone ? (vr % 4 === 3 ? TREE_COLS[(TREE_COLS.indexOf(zone.color) + (vr & 4 ? 1 : 5)) % 6] : zone.color) : TREE_COLS[vr % 6], tint = ramp(worldPigment(hue, pal, !!zone?.drained)), pencil = vr % 3 === 2;
-    if (pencil) { // lápiz: mina, cono de madera, cuerpo facetado, goma abajo
-      const body = tint ? tint.base : p.rock2, bodyHi = tint ? tint.hi : p.rock3, bodyDk = tint ? tint.sh : p.rockOut;
-      px(x, '#14121c', 7, 0, 2, 2); px(x, p.wood2, 6, 2, 4, 1); px(x, p.wood, 5, 3, 6, 2); px(x, p.wood3, 6, 3, 2, 1); px(x, p.wood2, 5, 4, 1, 1); px(x, p.wood2, 10, 4, 1, 1);
-      px(x, '#2a2438', 4, 5, 8, 17); px(x, body, 5, 5, 6, 16); px(x, bodyHi, 5, 5, 2, 16); px(x, bodyDk, 9, 5, 2, 16); px(x, bodyHi, 6, 6, 1, 14);
-      px(x, p.ferrule, 5, 19, 6, 2); px(x, p.ferruleHi, 5, 19, 6, 1); px(x, '#2a2438', 4, 21, 8, 1); px(x, '#e89aa8', 5, 21, 6, 2); px(x, '#b86a7c', 5, 23, 6, 1);
+    const hue = zone ? (vr % 4 === 3 ? TREE_COLS[(TREE_COLS.indexOf(zone.color) + (vr & 4 ? 1 : 5)) % 6] : zone.color) : TREE_COLS[vr % 6], tint = ramp(worldPigment(hue, pal, !!zone?.drained)), pencil = vr % 3 === 2 && !mL && !mR;
+    const INK = '#2a2438', F = (col, a, b, w = 1, h = 1) => px(x, col, a, b, w, h);
+    // montoncito de tierra y sombra donde se clava
+    F('rgba(40,28,20,.28)', 3, 22, 10, 2); F('#8a7050', 5, 22, 6, 1); F('#a88a64', 6, 21, 4, 1);
+    if (pencil) { // lápiz clavado: tres caras de laca, cono de madera con veta, mina con brillo, virola rayada y goma
+      F(INK, 4, 3, 8, 19); F(INK, 6, 1, 4, 3); F(INK, 7, 0, 2, 1);
+      F(tint.hi, 5, 6, 2, 13); F(tint.base, 7, 6, 2, 13); F(tint.sh, 9, 6, 2, 13); F('#ffffff', 5, 7, 1, 4); F(tint.dk, 10, 6, 1, 13); // facetas
+      F('#e8c890', 5, 3, 6, 3); F('#c9a070', 8, 3, 3, 3); F('#b08850', 7, 4, 1, 2); F('#3a3652', 7, 1, 2, 2); F('#8c8ab0', 7, 1, 1, 1); // cono y mina
+      F('#c9c4d4', 5, 18, 6, 2); F('#8c8ab0', 5, 19, 6, 1); F('#6a6480', 7, 18, 1, 2); F('#e89aa8', 5, 20, 6, 2); F('#f4c0c8', 5, 20, 2, 1); // virola y goma
       return c;
     }
-    // pincel: mango, virola, mechón redondo (fusionado a los lados si hay vecinos) con la punta cargada de color
-    const brush = tint ? tint : { base: p.bristle, hi: p.bristleHi, sh: p.bristle2, dk: p.tip, out: '#2a2438' };
-    px(x, '#2a2438', 6, 13, 4, 11); px(x, p.wood2, 7, 13, 3, 11); px(x, p.wood, 7, 13, 2, 10); px(x, p.wood3, 7, 14, 1, 8);
-    px(x, p.ferrule2, 5, 11, 6, 3); px(x, p.ferrule, 6, 11, 4, 2); px(x, p.ferruleHi, 6, 11, 4, 1);
-    const ph1 = vr * 1.3, ph2 = vr * 2.1, ell = (X, Y) => { const u = (X + .5 - 8) / 7.4, w = (Y + .5 - 6) / 6.2; return u * u + w * w <= 1 + 0.07 * Math.sin(X * 2.1 + ph1) * Math.sin(Y * 1.7 + ph2); };
-    const inside = (X, Y) => { if (Y < 0 || Y > 12) return false; if (X < 0) return mL && (ell(X + 16, Y) || Y >= 2 && Y <= 10); if (X > 15) return mR && (ell(X - 16, Y) || Y >= 2 && Y <= 10); if (mL && X < 8 && (ell(X + 16, Y) || Y >= 2 && Y <= 10)) return true; if (mR && X >= 8 && (ell(X - 16, Y) || Y >= 2 && Y <= 10)) return true; return ell(X, Y); };
-    for (let Y = 0; Y <= 12; Y++) for (let X = 0; X < 16; X++) {
-      if (!inside(X, Y)) continue;
-      if (!inside(X - 1, Y) || !inside(X + 1, Y) || !inside(X, Y - 1) || !inside(X, Y + 1)) { px(x, brush.out, X, Y); continue; }
-      const streak = (X + vr) % 3 === 0; // cerdas: vetas verticales
-      px(x, Y < 3 ? brush.hi : Y > 9 ? brush.dk : streak ? brush.sh : brush.base, X, Y);
-    }
-    if (!tint) { px(x, p.bristleHi, 6, 2, 2, 1); } else { px(x, '#ffffff', 6, 2, 2, 1); px(x, tint.hi, 5, 3, 1, 1); }
+    // pincel clavado: mango de madera con veta, virola engarzada y mechón de cerdas cargado de pintura, que se une al vecino
+    F(INK, 6, 13, 4, 10); F(p.wood2, 7, 13, 2, 9); F(p.wood, 7, 13, 1, 9); F('#8a5a34', 8, 16, 1, 2); F('#8a5a34', 8, 19, 1, 1); // mango
+    F(INK, 4, 10, 8, 4); F('#9aa0b0', 5, 10, 6, 3); F('#d8dce8', 5, 10, 6, 1); F('#5a5f70', 5, 12, 6, 1); F(INK, 7, 11, 1, 1); // virola
+    const ph = vr * 1.3, inside = (X, Y) => { if (Y < 0 || Y > 11) return false; const u = (X + .5 - 8) / 7.2, w = (Y + .5 - 5.5) / 5.8, ell = u * u + w * w <= 1 + .08 * Math.sin(X * 2.3 + ph);
+      if (X < 0) return mL && Y >= 1 && Y <= 10; if (X > 15) return mR && Y >= 1 && Y <= 10; return ell || (mL && X < 8 && Y >= 1 && Y <= 10) || (mR && X > 7 && Y >= 1 && Y <= 10); };
+    for (let Y = 0; Y <= 11; Y++) for (let X = 0; X < 16; X++) { if (!inside(X, Y)) continue;
+      if (!inside(X - 1, Y) || !inside(X + 1, Y) || !inside(X, Y - 1) || !inside(X, Y + 1)) { F(INK, X, Y); continue; }
+      const k = (X - 8) * -.5 + (5.5 - Y) * .9 + ((X + vr) % 3 === 0 ? -.8 : 0); F(k > 2.4 ? tint.hi : k > 0 ? tint.base : k > -2.2 ? tint.sh : tint.dk, X, Y); } // cerdas con volumen: luz arriba a la izquierda y vetas
+    F('#ffffff', 5, 2, 2, 1); F(tint.hi, 4, 3, 1, 2);
+    if (vr % 4 === 1) { F(tint.base, 11, 12, 1, 3); F(tint.sh, 10, 14, 3, 1); F(INK, 11, 15, 1, 1); } // un goterón de pintura
     return c;
   });
 }
@@ -505,10 +505,12 @@ function updateOverworld() {
 // ---- El vaso de agua del pintor (cura): cristal y coreografía en rinse.js, suelo de 2×2 tiles.
 function jarSprite(pal) { return rinseSprite(pal); }
 
-function signSprite() { // post-it amarillo con chincheta y garabato
-  return cached('sign', () => { const c = document.createElement('canvas'); c.width = 14; c.height = 16; const x = c.getContext('2d');
-    px(x, '#2a2438', 2, 4, 11, 11); px(x, '#f2d96a', 1, 3, 11, 11); px(x, '#fbe98a', 1, 3, 11, 1); px(x, '#d9b93a', 1, 13, 11, 1); px(x, '#d9b93a', 11, 4, 1, 10);
-    px(x, '#6a6480', 3, 6, 6, 1); px(x, '#6a6480', 3, 8, 7, 1); px(x, '#6a6480', 3, 10, 5, 1); px(x, '#e23c3c', 5, 1, 3, 3); px(x, '#ffffff', 5, 1, 1, 1); px(x, '#6a6480', 6, 4, 1, 2);
+function signSprite() { // post-it amarillo clavado con chincheta: esquina levantada, renglones escritos y sombra
+  return cached('sign2', () => { const c = document.createElement('canvas'); c.width = 16; c.height = 18; const x = c.getContext('2d'), F = (col, a, b, w = 1, h = 1) => px(x, col, a, b, w, h);
+    F('rgba(40,28,20,.3)', 3, 6, 12, 12); F('#2a2438', 1, 4, 13, 13); F('#f2d96a', 2, 5, 11, 11); F('#fbe98a', 2, 5, 11, 2); F('#d9b93a', 2, 14, 11, 2); F('#e8c84a', 12, 6, 1, 8);
+    F('#2a2438', 11, 13, 3, 1); F('#2a2438', 13, 11, 1, 3); F('#fff3b0', 11, 14, 2, 1); F('#fff3b0', 12, 12, 1, 2); F('#c9a830', 12, 13, 1, 1); // esquina levantada
+    F('#6a5a8a', 4, 8, 6, 1); F('#6a5a8a', 4, 10, 7, 1); F('#6a5a8a', 4, 12, 4, 1); F('#e23c3c', 9, 12, 2, 1); // renglones y un subrayado
+    F('#2a2438', 6, 0, 5, 5); F('#e23c3c', 7, 1, 3, 3); F('#ff8a80', 7, 1, 1, 1); F('#8a1a28', 9, 3, 1, 1); F('#8c8ab0', 8, 4, 1, 2); // chincheta
     return c; });
 }
 function* healGen() { yield* rinseSequence(); }
