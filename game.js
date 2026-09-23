@@ -239,10 +239,12 @@ function drawGrassTile(x, p, pal, kind, vr) { // la página: fondo de papel-hier
     else if (vr === 12 || (pal === 'vivo' && vr === 14)) flower(x, p, 4 + rnd() * 6 | 0, 3 + rnd() * 6 | 0, vr === 14);
     else if (vr === 15) { const cx = 5 + (rnd() * 6 | 0), cy = 5 + (rnd() * 6 | 0); x.fillStyle = p.hatch; x.fillRect(cx - 1, cy, 3, 1); x.fillRect(cx, cy - 1, 1, 3); x.fillRect(cx - 2, cy - 2, 1, 1); x.fillRect(cx + 2, cy + 2, 1, 1); } // estrellita garabateada
     else if (vr === 10) { x.fillStyle = pal === 'vivo' ? '#e23c3c' : '#8c8490'; x.fillRect(6, 6, 3, 3); x.fillStyle = '#f4f0ea'; x.fillRect(6, 6, 1, 1); x.fillStyle = p.ferrule2; x.fillRect(7, 9, 1, 3); } // chincheta
-  } else if (kind === 'r') { // goma de borrar bicolor
-    px(x, p.grassDk, 3, 13, 11, 1); px(x, p.grassDk, 4, 14, 10, 1);
-    px(x, p.rockOut, 2, 5, 12, 9); px(x, p.eraser, 3, 6, 6, 7); px(x, p.eraserHi, 3, 6, 6, 1); px(x, p.eraserHi, 3, 6, 1, 6); px(x, p.eraser2, 3, 12, 6, 1);
-    px(x, p.ferrule, 9, 6, 4, 7); px(x, p.ferruleHi, 9, 6, 4, 1); px(x, p.ferrule2, 9, 12, 4, 1); px(x, p.ferrule2, 12, 7, 1, 5); px(x, p.rockOut, 8, 6, 1, 7);
+  } else if (kind === 'r') { // goma de borrar bicolor en tres cuartos, medio hundida en el papel
+    px(x, p.grassDk, 2, 14, 13, 1);
+    px(x, '#3a2c3e', 1, 5, 14, 9); px(x, '#3a2c3e', 3, 3, 13, 2);
+    px(x, '#e88a9e', 2, 6, 7, 7); px(x, '#f4b8c4', 3, 4, 7, 2); px(x, '#6fa0d0', 9, 6, 5, 7); px(x, '#a8cce8', 10, 4, 5, 2); px(x, '#4a78a8', 14, 5, 1, 7); // rosa y azul, cara de arriba y costado
+    px(x, '#f4ecd8', 7, 6, 3, 7); px(x, '#fffaf0', 7, 4, 3, 2); px(x, '#e8a830', 8, 8, 1, 2); // funda
+    px(x, '#fff0f4', 2, 6, 1, 5); px(x, '#b0506a', 2, 12, 5, 1); px(x, '#3a5a88', 10, 12, 4, 1); px(x, '#ffffff', 4, 4, 2, 1);
   } else if (kind === 'x') stain(x, '#2a2438', '#3e3852');
 }
 function drawWaterTile(x, p, m, vr, frame) { // aguada: azul lavado con charcos más claros que se mueven, borde oscuro que florece y un hilo de papel en el canto; ondas a lápiz

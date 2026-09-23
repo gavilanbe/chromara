@@ -131,6 +131,8 @@ function worldSprite(o, pal, frame = 0) {
     // Scanline ellipses preserve crisp silhouettes at the native resolution.
     const oval = (col, cx, cy, rx, ry) => { for (let dy = -ry; dy <= ry; dy++) { const half = Math.floor(rx * Math.sqrt(Math.max(0, 1 - dy * dy / (ry * ry)))); rect(col, cx - half, cy + dy, half * 2 + 1); } };
     const gleam = (cx, cy, col = paper) => { rect(col, cx - 2, cy, 5); rect(col, cx, cy - 2, 1, 5); };
+    if (WORLD_HD[o.kind]) { const oval2 = (col, cx, cy, rx, ry) => { if (rx < 1 || ry < 1) { rect(col, Math.round(cx), Math.round(cy)); return; } oval(col, Math.round(cx), Math.round(cy), Math.round(rx), Math.round(ry)); };
+      WORLD_HD[o.kind]({ x, r, rect, poly, oval: oval2, paper, wood, woodHi, woodDk, pal, o, frame }); return worldFinish(c); }
     if (o.kind === 'house') {
       // Glass pigment bottle as a little cottage, ribbed screw-top and paper label.
       oval(ink, 22, 47, 18, 4); rect(ink, 5, 18, 34, 29); oval(ink, 22, 18, 17, 5);
@@ -426,3 +428,86 @@ function drawRegionDetails(cx, cy) {
     }
   }
 }
+// =====================================================================
+// Objetos del mapa redibujados uno a uno. Se pintan sólo con rellenos (tres o cuatro tonos, luz desde arriba a la izquierda y
+// en tres cuartos) y después una pasada común les pone contorno de tinta y un filo de luz: así todos comparten acabado.
+// =====================================================================
+function worldFinish(c, ink = '#3a2c3e', rim = 'rgba(255,248,226,.55)') {
+  const x = c.getContext('2d'), w = c.width, h = c.height, d = x.getImageData(0, 0, w, h), a = (X, Y) => X >= 0 && Y >= 0 && X < w && Y < h && d.data[(Y * w + X) * 4 + 3] > 40, out = [], edge = [];
+  for (let Y = 0; Y < h; Y++) for (let X = 0; X < w; X++) { if (!a(X, Y)) { if (a(X - 1, Y) || a(X + 1, Y) || a(X, Y - 1) || a(X, Y + 1)) out.push([X, Y]); } else if (!a(X - 1, Y) || !a(X, Y - 1)) edge.push([X, Y]); }
+  x.fillStyle = rim; for (const [X, Y] of edge) x.fillRect(X, Y, 1, 1);
+  x.fillStyle = ink; for (const [X, Y] of out) x.fillRect(X, Y, 1, 1);
+  return c;
+}
+const WORLD_HD = {
+  // Refugio: un tarro de pigmento hecho casa. Cristal con hombros, pigmento dentro con su menisco, etiqueta de papel como
+  // fachada con puerta en arco y ventana redonda iluminada, jardinera, tapa de rosca como tejado y chimenea de latón.
+  house(T) { const { x, r, rect, oval, poly, paper, wood, woodHi, woodDk } = T;
+    
+    rect('#9fb4b8', 6, 17, 32, 29); oval('#9fb4b8', 22, 46, 16, 3); oval('#9fb4b8', 22, 17, 16, 4); // cristal
+    rect(r.sh, 7, 24, 30, 21); oval(r.sh, 22, 45, 15, 3); rect(r.base, 7, 24, 26, 19); oval(r.hi, 22, 24, 15, 2); rect(r.dk, 33, 25, 4, 19); // pigmento
+    rect('#d8e8e4', 8, 18, 2, 24); rect('#eef6f2', 8, 19, 1, 10); rect('#7d9498', 36, 18, 1, 26); // brillos del vidrio
+    poly('#f4ead0', [[12,25],[31,24],[31,41],[12,42]]); rect('#fff8e6', 12, 25, 19, 1); rect('#d8c8a0', 12, 40, 19, 2); // etiqueta
+    rect('#6b4424', 18, 31, 7, 11); oval('#6b4424', 21, 31, 3, 3); rect('#8a5a34', 19, 31, 5, 10); oval('#8a5a34', 21, 31, 2, 2); rect('#e8c070', 23, 36, 1, 1); // puerta en arco
+    for (const wx of [13, 26]) { rect('#6b4424', wx, 27, 5, 5); rect('#ffd878', wx + 1, 28, 3, 3); rect('#fff3c0', wx + 1, 28, 1, 1); rect('#6b4424', wx + 2, 28, 1, 3); rect('#6b4424', wx + 1, 29, 3, 1); } // ventanas con luz
+    rect('#8a5a34', 25, 34, 6, 2); for (let i = 0; i < 3; i++) { rect(i % 2 ? '#e8707a' : '#f2c94a', 26 + i * 2, 32, 1, 2); } // jardinera
+    rect(woodDk, 17, 42, 9, 2); rect(woodHi, 17, 42, 9, 1); // escalón
+    rect(wood, 7, 7, 30, 9); oval(woodHi, 22, 7, 15, 3); oval(wood, 22, 15, 15, 2); for (let a = 9; a < 36; a += 3) rect(woodDk, a, 9, 1, 6); rect('#f4d8a0', 10, 6, 12, 1); // tapa de rosca
+    rect('#8a8a96', 29, 0, 4, 7); rect('#c9c4d4', 29, 0, 1, 7); rect('#6a6a78', 28, 0, 6, 2); // chimenea
+    rect(paper, 30, 20, 2, 1); rect(paper, 31, 19, 1, 3); },
+  // Paleta de pintor en tres cuartos: se ve el canto de madera, el agujero del pulgar y seis charcos de color con brillo;
+  // un pincel descansa encima.
+  palette(T) { const { r, oval, rect, poly, wood, woodHi, woodDk, pal } = T;
+    oval(woodDk, 22, 17, 21, 10); oval(wood, 22, 14, 21, 10); oval(woodHi, 21, 12, 18, 7);
+    for (let i = 0; i < 5; i++) rect('#caa06a', 8 + i * 6, 11 + (i % 2), 4, 1); // veta
+    oval(woodDk, 33, 16, 4, 3); oval('#5a3a26', 33, 16, 3, 2); // agujero del pulgar (hundido)
+    [[8,12],[14,7],[23,6],[31,9],[24,19],[13,18]].forEach(([a,b], i) => { const p = ramp(worldPigment(WORLD_COLORS[i], pal)); oval(p.sh, a, b + 1, 4, 2); oval(p.base, a, b, 3, 2); rect(p.hi, a - 2, b - 1, 2); rect('#fff8e6', a - 2, b - 1); });
+    poly('#2a2438', [[16,15],[34,22],[33,23],[15,16]]); poly('#e0a060', [[16,15],[29,20],[29,21],[16,16]]); rect('#c9c4d4', 29, 20, 3, 2); oval(r.base, 34, 23, 2, 1); }, // pincel apoyado
+  // Tarro de agua con pigmento disuelto y un pincel dentro que se dobla en la superficie.
+  jar(T) { const { r, oval, rect, poly, woodHi } = T;
+    rect('#a8bec2', 2, 9, 19, 17); oval('#a8bec2', 11, 26, 9, 2); oval('#8aa2a8', 11, 9, 9, 3);
+    rect(r.sh, 3, 15, 17, 11); oval(r.sh, 11, 26, 8, 2); rect(r.base, 3, 15, 13, 9); oval(r.hi, 11, 15, 8, 2); rect(r.dk, 17, 16, 3, 10); // agua teñida
+    rect('#eef6f2', 4, 10, 1, 13); rect('#d8e8e4', 5, 10, 1, 5); oval('#c9dcdc', 11, 8, 8, 2); oval('#e8f0ec', 11, 7, 7, 1); // vidrio y borde
+    poly('#2a2438', [[13,0],[15,0],[15,15],[13,15]]); rect('#e0a060', 13, 0, 2, 8); rect('#c9c4d4', 13, 8, 2, 3); rect('#2a2438', 13, 11, 2, 4); rect(r.dk, 12, 15, 2, 6); // pincel (doblado bajo el agua)
+    rect('#fff8e6', 7, 12, 1, 1); },
+  // Cristales de pigmento: tres prismas con caras de tres tonos y un destello.
+  crystal(T) { const { r, oval, poly, rect } = T;
+    oval(r.dk, 14, 29, 11, 3);
+    const prism = (a, b, cw, ch) => { poly(r.sh, [[a,b],[a + cw / 2,b - ch],[a + cw,b],[a + cw - 1,b + 7],[a + 1,b + 7]]); poly(r.hi, [[a,b],[a + cw / 2,b - ch],[a + cw / 2,b + 6],[a + 1,b + 7]]); poly(r.base, [[a + cw / 2,b - ch],[a + cw,b],[a + cw - 1,b + 7],[a + cw / 2,b + 6]]); rect('#fff8e6', a + cw / 2 - 2, b - ch + 5, 1, Math.max(2, ch / 3 | 0)); };
+    prism(1, 24, 9, 11); prism(18, 25, 9, 13); prism(8, 22, 12, 20); rect('#fff8e6', 22, 6, 1, 3); rect('#fff8e6', 21, 7, 3, 1); },
+  // Caballete: trípode de madera, lienzo con la receta (A + B = C) pintada en manchas y una repisa con dos tubos.
+  easel(T) { const { r, oval, rect, poly, o, pal, wood, woodHi, woodDk } = T;
+    rect(woodDk, 16, 1, 3, 40); rect(woodHi, 16, 2, 1, 38);
+    poly(wood, [[8,16],[11,16],[5,41],[3,41]]); poly(wood, [[23,16],[26,16],[31,41],[29,41]]); rect(woodHi, 9, 17, 1, 8); rect(woodHi, 24, 17, 1, 8);
+    rect('#e8dcc0', 4, 6, 27, 25); rect('#fbf5e6', 5, 7, 25, 22); rect('#d8c8a0', 5, 27, 25, 2); // lienzo
+    const mix = o.mix || ['rojo', 'azul'], A = ramp(worldPigment(mix[0], pal)), B = ramp(worldPigment(mix[1], pal));
+    oval(A.base, 10, 13, 4, 3); rect(A.hi, 8, 11, 3); oval(B.base, 24, 13, 4, 3); rect(B.hi, 22, 11, 3); rect('#6b5a4a', 16, 13, 3, 1); rect('#6b5a4a', 17, 12, 1, 3); // A + B
+    rect('#6b5a4a', 15, 18, 5, 1); rect('#6b5a4a', 15, 20, 5, 1); oval(r.sh, 17, 25, 6, 3); oval(r.base, 17, 24, 6, 2); rect(r.hi, 14, 23, 4); rect('#fff8e6', 14, 23); // = C
+    rect(woodDk, 1, 31, 32, 3); rect(woodHi, 2, 31, 30, 1); rect(A.base, 5, 29, 5, 2); rect(B.base, 25, 29, 5, 2); rect('#c9c4d4', 10, 29, 2, 2); rect('#c9c4d4', 30, 29, 1, 2); }, // repisa con tubos
+  // Caja de acuarelas abierta en tres cuartos: tapa levantada con pocillos de mezcla manchados, seis pastillas de color con
+  // el brillo del agua y un pincel en su canal.
+  box(T) { const { rect, poly, oval, pal } = T;
+    
+    poly('#8a8696', [[4,1],[44,1],[44,15],[4,15]]); rect('#fbf5e6', 6, 3, 36, 10); rect('#b8b4c0', 4, 1, 40, 1); // tapa
+    for (let i = 0; i < 3; i++) { const p = ramp(worldPigment(WORLD_COLORS[i * 2], pal)); oval('#e8e0cc', 12 + i * 12, 8, 4, 3); oval(worldMix(p.base, '#fbf5e6', .55), 12 + i * 12, 8, 3, 2); } // pocillos de mezcla
+    poly('#6a6676', [[2,16],[46,16],[46,30],[2,30]]); rect('#dcd8d4', 3, 17, 42, 11); rect('#f0ece8', 3, 17, 42, 1); rect('#a8a4a8', 3, 27, 42, 1);
+    for (let i = 0; i < 6; i++) { const p = ramp(worldPigment(WORLD_COLORS[i], pal)); rect('#8a8696', 4 + i * 7, 19, 6, 7); rect(p.sh, 5 + i * 7, 20, 4, 5); rect(p.base, 5 + i * 7, 20, 4, 3); rect(p.hi, 5 + i * 7, 20, 2, 1); rect('#fff8e6', 7 + i * 7, 21); }
+    rect('#2a2438', 8, 28, 30, 1); rect('#e0a060', 8, 28, 14, 1); rect('#c9c4d4', 22, 28, 3, 1); }, // pincel en su canal
+  // Molinillo de papel: seis aspas de papel de color con pliegue, clavadas en un lápiz; gira.
+  mill(T) { const { rect, poly, oval, pal, frame, woodDk } = T;
+    rect('#e89aa8', 19, 46, 5, 4); rect('#8c8ab0', 19, 44, 5, 2); rect('#f2c93a', 19, 18, 5, 26); rect('#fbe28a', 19, 18, 2, 26); rect('#c9a02a', 23, 18, 1, 26); // palo-lápiz
+    for (let i = 0; i < 6; i++) { const a = (i / 6 + frame / 48) * Math.PI * 2, col = ramp(worldPigment(WORLD_COLORS[i], pal)), P = (ang, d) => [Math.round(21 + Math.cos(ang) * d), Math.round(18 + Math.sin(ang) * d)];
+      poly(col.base, [P(a, 2), P(a + .12, 18), P(a + .75, 14)]); poly(col.sh, [P(a, 2), P(a + .45, 16), P(a + .75, 14)]); const [hx, hy] = P(a + .25, 10); rect(col.hi, hx, hy, 2, 1); }
+    oval(woodDk, 21, 18, 3, 3); oval('#e8c070', 21, 18, 2, 2); rect('#fff8e6', 20, 17); },
+  // Abanico de muestras de color con remache de latón.
+  fan(T) { const { x, rect, oval, pal, o } = T;
+    for (let i = 0; i < 5; i++) { const col = ramp(worldPigment(WORLD_COLORS[(i + WORLD_COLORS.indexOf(o.color) + 6) % 6], pal)); x.save(); x.translate(15, 21); x.rotate((i - 2) * .32);
+      x.fillStyle = '#fbf5e6'; x.fillRect(-3, -19, 7, 19); x.fillStyle = col.base; x.fillRect(-2, -18, 5, 7); x.fillStyle = col.hi; x.fillRect(-2, -18, 5, 1); x.fillStyle = col.sh; x.fillRect(-2, -11, 5, 3); x.fillStyle = '#c9bfa8'; x.fillRect(-2, -6, 4, 1); x.fillRect(-2, -4, 3, 1); x.restore(); }
+    oval('#8a5a34', 15, 20, 2, 2); oval('#e8c070', 15, 20, 1, 1); },
+  // Nenúfar: hoja con su muesca y nervios, flor de pétalos de pintura con centro de polen.
+  lotus(T) { const { r, oval, rect, poly, frame, pal } = T;
+    const leaf = pal === 'vivo' ? '#4f8a64' : '#7d9681', leafHi = pal === 'vivo' ? '#78b088' : '#a0b4a0'; oval('#3c6e79', 14, 17, 12, 2); oval(leaf, 14, 15, 12, 3); oval(leafHi, 12, 14, 9, 2); 
+    rect(leaf, 18, 13, 5, 1); rect('#5a7a5a', 8, 15, 5, 1); rect('#5a7a5a', 16, 16, 4, 1); const lift = frame === 1 ? 1 : 0;
+    [[-5,1],[-3,-3],[3,-3],[5,1],[0,-1]].forEach(([a,b]) => { oval(r.sh, 14 + a, 11 + b - lift, 3, 3); oval(r.base, 14 + a, 10 + b - lift, 3, 2); rect(r.hi, 13 + a, 9 + b - lift, 2, 1); });
+    oval('#e8b830', 14, 10 - lift, 2, 1); rect('#fff3c0', 13, 9 - lift, 2, 1); },
+};
