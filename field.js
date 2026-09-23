@@ -107,7 +107,7 @@ function openRing() {
 function fieldCast() {
   const r = OW.ring; if (!r || OW.act) return;
   const art = FIELD[r.idx], target = fieldFacing(), check = fieldCheck(art, target);
-  if (!check.ok) { r.notice = check.why; Audio.sfx('nope', { vol: .3 }); return; }
+  if (!check.ok) { r.notice = check.why; r.deniedAt = r.t; Audio.sfx('nope', { vol: .3 }); return; }
   OW.fieldSelection = r.idx; OW.ring = null; OW.act = fieldGen(art, target, check);
 }
 function updateRing() {
@@ -125,39 +125,66 @@ function fieldArtIcon(art, x, y, r, dim) {
   else if (art.kind === 'trazar') { const s = r / 9; g.fillStyle = dim ? '#9a8f83' : '#4a4460'; g.fillRect(Math.round(x - 7 * s), Math.round(y + 3 * s), Math.round(14 * s), 1); g.fillStyle = dim ? '#9a8f83' : '#c5848b'; g.fillRect(Math.round(x - 8 * s), Math.round(y + 1 * s), 2, 3); g.fillRect(Math.round(x + 7 * s), Math.round(y + 1 * s), 2, 3); g.drawImage(iconSprite('lapiz', dim ? '#bdb3a4' : C('amarillo')), Math.round(x - 5), Math.round(y - 8), 10, 10); }
   else { g.fillStyle = dim ? '#9a8f83' : '#6fb4d8'; g.beginPath(); g.moveTo(x, y - r * .7); g.lineTo(x + r * .45, y + r * .1); g.arc(x, y + r * .15, r * .45, 0, Math.PI); g.closePath(); g.fill(); g.fillStyle = '#e8f6fb'; g.fillRect(Math.round(x - r * .2), Math.round(y - r * .05), 1, 2); }
 }
+// El color de la pintura de cada magia: los colores primarios son el suyo; el lápiz, grafito; la goma, rosa; el agua, agua.
+function fieldArtPaint(art) { return art.kind === 'color' ? C(art.color) : art.kind === 'trazar' ? '#6a6480' : art.kind === 'borrar' ? '#e88aa0' : '#6fb4d8'; }
+// El anillo es un círculo cromático: seis gajos pintados a la acuarela alrededor del líder, uno por magia. La rueda gira hasta
+// dejar arriba la elegida, que sobresale y gotea; el mapa se tiñe de su color; arriba, su nombre y la pintura que gastará.
 function drawRing() {
   UI_HITS.length = 0; UI_TEXT.length = 0;
-  const r = OW.ring, art = FIELD[r.idx], col = C(art.color), target = fieldFacing(), check = fieldCheck(art, target);
-  const intro = Prefs.shake ? Math.max(0, easeBack(clamp(r.t / 14, 0, 1))) : 1, at = artObserve('field', r.idx + ':' + r.notice); // entra con el propio reloj del anillo
-  g.fillStyle = 'rgba(28,20,36,' + (.35 * intro).toFixed(2) + ')'; g.fillRect(0, 0, W, H); // el tiempo se detiene mientras eliges
-  if (!Prefs.shake) r.spin = r.idx; else { let d = r.idx - r.spin; if (d > FIELD.length / 2) d -= FIELD.length; if (d < -FIELD.length / 2) d += FIELD.length; r.spin += d * .3; if (Math.abs(d) < .01) r.spin = r.idx; }
-  const cx = clamp(Math.round(OW.x - OW.cam.x), 48, W - 48), cy = clamp(Math.round(OW.y - OW.cam.y - 12), 44, 104), R0 = 34 * intro; // cerca del líder, pero siempre entero en pantalla
-  g.save(); g.globalAlpha = .5 * intro; g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.ellipse(cx, cy, R0, R0 * .78, 0, 0, 6.29); g.stroke(); g.restore();
+  const r = OW.ring, art = FIELD[r.idx], paint = fieldArtPaint(art), rp = ramp(paint), target = fieldFacing(), check = fieldCheck(art, target), shake = Prefs.shake;
+  const intro = shake ? Math.max(0, easeBack(clamp(r.t / 14, 0, 1))) : 1, at = artObserve('field', r.idx + ':' + r.notice), pop = artPop(at), denied = r.deniedAt != null && r.t - r.deniedAt < 14 ? Math.sin((r.t - r.deniedAt) * 1.6) * (1 - (r.t - r.deniedAt) / 14) * 3 : 0;
+  if (!shake) r.spin = r.idx; else { let d = r.idx - r.spin; if (d > FIELD.length / 2) d -= FIELD.length; if (d < -FIELD.length / 2) d += FIELD.length; r.spin += d * .25; if (Math.abs(d) < .01) r.spin = r.idx; }
+  const [fdx, fdy] = FIELD_DIRS[OW.dir] || [0, 1]; // la rueda se aparta hacia atrás para dejar a la vista lo que hay delante
+  const cx = clamp(Math.round(OW.x - OW.cam.x - fdx * 46), 52, W - 52) + Math.round(denied), cy = clamp(Math.round(OW.y - OW.cam.y - 10 - fdy * 34), 50, 100);
+  // el tiempo se detiene y el papel se tiñe del color de la magia, en capas de acuarela que se abren desde el líder
+  g.fillStyle = 'rgba(28,20,36,' + (.3 * intro).toFixed(2) + ')'; g.fillRect(0, 0, W, H);
+  g.save(); for (let k = 0; k < 3; k++) { g.globalAlpha = (.14 - k * .035) * intro; g.fillStyle = k === 1 ? rp.hi : paint; g.beginPath(); for (let i = 0; i <= 36; i++) { const a = i / 36 * 6.283, rr = (70 + k * 38) * intro * (1 + .06 * Math.sin(a * 5 + k * 2 + r.t * .02)); const X = cx + Math.cos(a) * rr, Y = cy + Math.sin(a) * rr * .8; if (i) g.lineTo(X, Y); else g.moveTo(X, Y); } g.fill(); } g.restore();
+  // la rueda: cada gajo es un trazo de pincel curvo de su color, con canto de tinta, brillo en el borde y cerdas
+  const R0 = 44 * intro, R1 = 17, n = FIELD.length, span = 6.283 / n;
+  g.save(); g.globalAlpha = .45; g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(cx + 2, cy + 3, R0 + 3, (R0 + 3) * .86, 0, 0, 6.29); g.fill(); g.restore();
   FIELD.forEach((a, i) => {
-    const ang = -Math.PI / 2 + (i - r.spin) / FIELD.length * 6.283, x = Math.round(cx + Math.cos(ang) * R0), y = Math.round(cy + Math.sin(ang) * R0 * .78), sel = i === r.idx, dim = !fieldOk(a) || !fieldAfford(a);
-    fieldArtIcon(a, x, y, sel ? 9 + artPop(at) : 6, dim);
-    if (sel) { g.strokeStyle = '#fff3d8'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, 12, 10, 0, 0, 6.29); g.stroke(); }
-    uiHit(x - 11, y - 11, 22, 22, () => { if (r.idx === i) fieldCast(); else { r.idx = i; r.notice = null; Audio.sfx('cursor'); } }, () => { if (r.idx !== i) { r.idx = i; r.notice = null; Audio.sfx('cursor', { vol: .3 }); } });
+    const sel = i === r.idx, usable = fieldOk(a) && fieldAfford(a), col = usable ? fieldArtPaint(a) : '#9a8f83', rr = ramp(col), mid = -Math.PI / 2 + (i - r.spin) * span, out = sel ? 6 + pop * 3 : 0, a0 = mid - span / 2 + .04, a1 = mid + span / 2 - .04;
+    if (intro * n * 1.3 < i) return; // se pinta gajo a gajo
+    const ox = Math.cos(mid) * out, oy = Math.sin(mid) * out * .86, pts = [];
+    for (let k = 0; k <= 10; k++) { const t = lerp(a0, a1, k / 10); pts.push([cx + ox + Math.cos(t) * (R0 + (sel ? 3 : 0)), cy + oy + Math.sin(t) * (R0 + (sel ? 3 : 0)) * .86]); }
+    for (let k = 10; k >= 0; k--) { const t = lerp(a0, a1, k / 10); pts.push([cx + ox + Math.cos(t) * R1, cy + oy + Math.sin(t) * R1 * .86]); }
+    g.fillStyle = '#241e32'; g.beginPath(); pts.forEach(([X, Y], k) => k ? g.lineTo(X + 1, Y + 1) : g.moveTo(X + 1, Y + 1)); g.closePath(); g.fill();
+    g.fillStyle = col; g.beginPath(); pts.forEach(([X, Y], k) => k ? g.lineTo(X, Y) : g.moveTo(X, Y)); g.closePath(); g.fill();
+    for (let k = 1; k < 5; k++) { const t = lerp(a0, a1, k / 5); pstroke(cx + ox + Math.cos(t) * (R1 + 3), cy + oy + Math.sin(t) * (R1 + 3) * .86, cx + ox + Math.cos(t) * (R0 - 3), cy + oy + Math.sin(t) * (R0 - 3) * .86, 1, rr.sh, 1, 0, false); } // cerdas
+    for (let k = 0; k < 10; k++) { const t = lerp(a0, a1, k / 10), t2 = lerp(a0, a1, (k + 1) / 10); pstroke(cx + ox + Math.cos(t) * (R0 - 2), cy + oy + Math.sin(t) * (R0 - 2) * .86, cx + ox + Math.cos(t2) * (R0 - 2), cy + oy + Math.sin(t2) * (R0 - 2) * .86, 1, sel ? '#fff8e6' : rr.hi, 1, 0, false); } // brillo del canto
+    const ix = Math.round(cx + ox + Math.cos(mid) * (R0 + R1) / 2), iy = Math.round(cy + oy + Math.sin(mid) * (R0 + R1) / 2 * .86);
+    fieldArtIcon(a, ix, iy, sel ? 7 : 5, !usable);
+    if (sel && shake && usable) { const q = (r.t % 50) / 50; g.fillStyle = col; const dx = Math.round(cx + ox + Math.cos(mid + .3) * R0), dy = Math.round(cy + oy + Math.sin(mid + .3) * R0 * .86); g.fillRect(dx, dy, 2, 2 + Math.round(q * 3)); if (q > .6) { g.globalAlpha = 1 - (q - .6) / .4; g.fillRect(dx, dy + 5 + Math.round((q - .6) * 30), 2, 2); g.globalAlpha = 1; } } // gotea
+    uiHit(ix - 11, iy - 11, 22, 22, () => { if (r.idx === i) fieldCast(); else { r.idx = i; r.notice = null; Audio.sfx('cursor'); } }, () => { if (r.idx !== i) { r.idx = i; r.notice = null; Audio.sfx('cursor', { vol: .3 }); } });
   });
-  // arriba: el nombre, quién la hace y cuánta pintura cuesta
-  const owners = fieldOwners(art), head = art.name, hw = rotuloWidth(head) + 28 + owners.length * 16 + 34, hx = Math.round((W - hw) / 2), hy = Math.round(4 - (1 - intro) * 30);
-  brushBand(hx, hy, hw, 17, KIT_INK); paintDab(hx + 10, hy + 9, 4, col, artPop(at)); bigText(head, hx + 19, hy + 4, col, { outline: '#0b0912' });
+  // la aguja arriba de la rueda y el hueco del centro, donde queda el líder
+  g.fillStyle = '#241e32'; g.beginPath(); g.moveTo(cx - 4, cy - R0 * .86 - 11); g.lineTo(cx + 4, cy - R0 * .86 - 11); g.lineTo(cx, cy - R0 * .86 - 5); g.fill(); g.fillStyle = '#fff3d8'; g.beginPath(); g.moveTo(cx - 3, cy - R0 * .86 - 10); g.lineTo(cx + 3, cy - R0 * .86 - 10); g.lineTo(cx, cy - R0 * .86 - 6); g.fill();
+  g.strokeStyle = '#fff3d8'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx, cy, R1, R1 * .86, 0, 0, 6.29); g.stroke();
+  { const own = fieldOwners(art); g.fillStyle = '#f1e9d6'; g.beginPath(); g.ellipse(cx, cy, R1 - 1, (R1 - 1) * .86, 0, 0, 6.29); g.fill(); own.forEach((p, i) => { const spr = buildSprite(p.id + '_front_mini', C(p.color), null, { eyes: 'happy' }); drawSprite(spr, cx + (own.length > 1 ? (i ? 6 : -6) : 0), cy + 7, 1); }); } // en el centro, quien pinta
+  // cabecera: el nombre a brocha sobre una banda de su pintura, quién la hace y la pintura que gastará cada uno
+  const owners = fieldOwners(art), head = art.name, hw = rotuloWidth(head) + 30 + owners.length * 46, hx = Math.round((W - hw) / 2), hy = Math.round(3 - (1 - intro) * 30);
+  brushBand(hx + 1, hy + 2, hw, 19, '#1e1a2c'); brushBand(hx, hy, hw, 19, KIT_INK); brushBand(hx + 2, hy + 15, hw - 4, 3, paint);
+  paintDab(hx + 10, hy + 9, 5, paint, pop); bigText(head, hx + 19, hy + 4, rp.hi, { outline: '#0b0912' });
   let ox = hx + 25 + rotuloWidth(head);
-  owners.forEach(p => { const s = effStats(p); sticker(ox + 6, hy + 9, { id: p.id, color: p.color, alive: p.cur.hp > 0, hp: p.cur.hp, maxhp: s.hp, mp: p.cur.mp, maxmp: s.mp }, 6); ox += 16; });
-  const enough = fieldAfford(art); miniTube(ox + 2, hy + 5, col, !enough); smallText(art.mp + ' MP', ox + 9, hy + 5, enough ? '#f4f0ea' : '#e58a8a');
-  // el objetivo: esquinas de lápiz que laten y un reguero de pintura desde el líder; si es un boceto, la mezcla que quedaría
+  owners.forEach(p => { const s = effStats(p), after = Math.max(0, p.cur.mp - art.mp); sticker(ox + 6, hy + 9, { id: p.id, color: p.color, alive: p.cur.hp > 0, hp: p.cur.hp, maxhp: s.hp, mp: p.cur.mp, maxmp: s.mp }, 6);
+    tubeGauge(ox + 14, hy + 4, p.cur.mp / s.mp, C(p.color), p.cur.mp < art.mp); if (p.cur.mp >= art.mp && shake && (r.t >> 3) % 2) { g.fillStyle = '#fff8e6'; g.fillRect(ox + 29 - Math.round(12 * p.cur.mp / s.mp), hy + 5, Math.max(1, Math.round(12 * art.mp / s.mp)), 1); } // parpadea lo que se gastará
+    smallText('-' + art.mp, ox + 35, hy + 5, p.cur.mp >= art.mp ? '#f4f0ea' : '#e58a8a'); ox += 46; });
+  // el objetivo: esquinas de pintura que laten y un reguero de gotas desde la rueda; su nombre, al lado
   if (target) {
-    const xs = target.tiles.map(q => q[0]), ys = target.tiles.map(q => q[1]), tx = (Math.min(...xs) + Math.max(...xs) + 1) / 2 * TILE - OW.cam.x, ty = (Math.min(...ys) + Math.max(...ys) + 1) / 2 * TILE - OW.cam.y, w = (Math.max(...xs) - Math.min(...xs) + 1) * 8 + 3, h = (Math.max(...ys) - Math.min(...ys) + 1) * 8 + 3, pulse = Prefs.shake ? Math.round(Math.sin(r.t * .2) * 1.5) : 0, c2 = check.ok ? col : '#9a8f83';
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const X = tx + a * (w + pulse), Y = ty + b * (h + pulse); pstroke(X, Y, X - a * 5, Y, 2, c2, 1, 0, false); pstroke(X, Y, X, Y - b * 5, 2, c2, 1, 0, false); }
-    for (let i = 1; i < 8; i++) { const k = ((i + r.t * .08) % 8) / 8; g.fillStyle = c2; g.globalAlpha = .3 + k * .6; g.fillRect(Math.round(lerp(cx, tx, k)), Math.round(lerp(cy + 10, ty, k)), 2, 2); } g.globalAlpha = 1;
-    if (target.kind === 'sketch' && art.kind === 'color' && check.ok) { const z = Game.puzzle; let x = tx - 16; [...(z.paint[target.sketch.id] || []), art.color].forEach((c, i, all) => { paintDab(x, ty - h - 10, 3, C(c)); x += 8; if (i < all.length - 1) { smallText('+', x - 4, ty - h - 13, '#f4f0ea'); } }); smallText('=', x - 2, ty - h - 13, '#f4f0ea'); paintDab(x + 7, ty - h - 10, 4, check.mix === 'barro' ? '#78644d' : C(check.mix)); }
+    const xs = target.tiles.map(q => q[0]), ys = target.tiles.map(q => q[1]), tx = (Math.min(...xs) + Math.max(...xs) + 1) / 2 * TILE - OW.cam.x, ty = (Math.min(...ys) + Math.max(...ys) + 1) / 2 * TILE - OW.cam.y, w = (Math.max(...xs) - Math.min(...xs) + 1) * 8 + 3, h = (Math.max(...ys) - Math.min(...ys) + 1) * 8 + 3, pulse = shake ? Math.round(Math.sin(r.t * .2) * 1.5) : 0, c2 = check.ok ? paint : '#9a8f83';
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const X = tx + a * (w + pulse), Y = ty + b * (h + pulse); pstroke(X, Y, X - a * 5, Y, 2, '#241e32', 1, 0, false); pstroke(X, Y, X, Y - b * 5, 2, '#241e32', 1, 0, false); pstroke(X - a, Y - b, X - a * 5, Y - b, 1, c2, 1, 0, false); pstroke(X - a, Y - b, X - a, Y - b * 5, 1, c2, 1, 0, false); }
+    const mid = -Math.PI / 2, sx = cx + Math.cos(mid) * R0, sy = cy + Math.sin(mid) * R0 * .86;
+    for (let i = 1; i < 10; i++) { const k = ((i + r.t * .07) % 10) / 10; g.fillStyle = c2; g.globalAlpha = .35 + k * .6; const q = 1 - k; g.fillRect(Math.round(q * q * sx + 2 * q * k * ((sx + tx) / 2) + k * k * tx), Math.round(q * q * sy + 2 * q * k * (Math.min(sy, ty) - 18) + k * k * ty), k > .5 ? 2 : 1, k > .5 ? 2 : 1); } g.globalAlpha = 1;
+    if (target.kind === 'sketch' && art.kind === 'color' && check.ok) { const z = Game.puzzle; let x = tx - 16; [...(z.paint[target.sketch.id] || []), art.color].forEach((c, i, all) => { paintDab(x, ty - h - 10, 3, C(c)); x += 8; if (i < all.length - 1) smallText('+', x - 4, ty - h - 13, '#f4f0ea'); }); smallText('=', x - 2, ty - h - 13, '#f4f0ea'); paintDab(x + 7, ty - h - 10, 4, check.mix === 'barro' ? '#78644d' : C(check.mix)); }
   }
-  const aim = target ? 'Delante: ' + target.name : 'Delante: nada', note = r.notice || (check.ok ? art.desc : check.why || art.desc), noteAt = artObserve('field-note', note);
-  g.save(); g.translate(0, Math.round((1 - intro) * 40));
-  maskingLabel(6, 136, 308, 38); smallText(aim, 14, 140, check.ok ? UI_INK : UI_MUTED); if (target && check.ok) paintDab(9, 144, 2, col);
-  paragraph(note, 14, 151, 292, r.notice || !check.ok ? '#9c4539' : UI_MUTED, 2, { progress: Prefs.shake ? (ARTUI.t - noteAt) * 2.2 : Infinity, wet: r.notice ? '#c4384a' : col });
-  artButton('field-cast', battleKey('ok') + ' usar', 244, 118, 70, 15, col, fieldCast, { disabled: !check.ok, selected: check.ok });
-  artButton('field-close', battleKey('back'), 6, 118, 26, 15, '#d2bc95', () => { OW.ring = null; Audio.sfx('cancel'); });
+  // la ficha: qué hay delante, si funcionará y por qué
+  const aim = target ? target.name : 'nada delante', note = r.notice || (check.ok ? art.desc : check.why || art.desc), noteAt = artObserve('field-note', note);
+  g.save(); g.translate(0, Math.round((1 - intro) * 50));
+  maskingLabel(6, 134, 308, 40, '#f7efd6'); brushBand(8, 136, 4, 36, paint);
+  paintDab(20, 142, 3, check.ok ? '#8fc07a' : '#c4665a'); smallText((check.ok ? 'Delante: ' : 'Delante: ') + aim, 27, 139, check.ok ? UI_INK : UI_MUTED);
+  paragraph(note, 17, 151, 214, r.notice || !check.ok ? '#9c4539' : UI_MUTED, 2, { progress: shake ? (ARTUI.t - noteAt) * 2.2 : Infinity, wet: r.notice ? '#c4384a' : paint });
+  artButton('field-cast', battleKey('ok') + ' usar', 240, 142, 68, 15, paint, fieldCast, { disabled: !check.ok, selected: check.ok });
+  artButton('field-close', battleKey('back') + ' cerrar', 240, 158, 68, 13, '#d2bc95', () => { OW.ring = null; Audio.sfx('cancel'); });
   g.restore();
 }
 // ---- Usar una magia: la gota alza su color, la herramienta va hasta el objeto y actúa. El estado cambia al llegar.
