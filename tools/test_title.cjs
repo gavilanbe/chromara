@@ -15,9 +15,13 @@ const base = process.argv[2] || 'http://127.0.0.1:8765';
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => window.__chromara);
     await page.evaluate(() => {
-      Game.paused = true; Game.state = 'cover'; COVER.t = 0; COVER.open = 0;
+      Game.paused = true; Game.state = 'cover'; COVER.t = 0; COVER.open = 0; COVER.started = false;
       window.titleSounds = []; Audio.sfx = (name, options) => titleSounds.push({ name, options });
       Audio.play = () => {}; Audio.prepare = () => {};
+      // The closed notebook waits for the first gesture (it unlocks audio) and that gesture skips nothing.
+      for (let i = 0; i < 30; i++) { updateCover(); drawCover(); }
+      if (Game.state !== 'cover' || COVER.started) throw new Error('The cover opened without a gesture');
+      ANYKEY = true;
       for (let i = 0; i < 180 && Game.state === 'cover'; i++) { updateCover(); drawCover(); }
     });
     assert.equal(await page.evaluate(() => Game.state), 'prologue');

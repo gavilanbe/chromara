@@ -110,7 +110,8 @@ function captureBinding(e) {
 function initPlayerControls() {
   cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'Chromara. Flechas para mover, Z confirmar, X volver, O opciones, signo de interrogación para ayuda.');
   cv.addEventListener('pointerdown', e => {
-    Audio.init(); const box = cv.getBoundingClientRect(), x = (e.clientX - box.left) * W / box.width, y = (e.clientY - box.top) * H / box.height;
+    Audio.init(); if (Game.state === 'cover' || Game.state === 'prologue') ANYKEY = true; // un clic abre el cuaderno o salta la cinemática, como una tecla
+    const box = cv.getBoundingClientRect(), x = (e.clientX - box.left) * W / box.width, y = (e.clientY - box.top) * H / box.height;
     const area = UI_HITS.slice().reverse().find(q => x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h);
     if (area) { e.preventDefault(); if(Game.state==='battle'&&!Game.overlay)battlePointerFeedback(x,y);else artBurst(x,y);area.run(); }
   });

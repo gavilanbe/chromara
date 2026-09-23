@@ -130,6 +130,6 @@ function drawPrologue() {
   const q = ease(clamp((t - B0.leap - 24) / (B0.end - B0.leap - 24), 0, 1)), saved = TITLE.t;
   proCamera(() => {
     TITLE.t = 8; drawTitle(); TITLE.t = saved;
-    PRO_HEROES.forEach((h, i) => { const x = 46 + ([0, 2, 4][i] * 23 + 11) * 1.25, y0 = 180, y1 = lerp(y0, 40, clamp(q * 1.6 - i * .15, 0, 1)); if (y1 < y0) { pstroke(x, y0, x, y1, 6, C(h.col), 1, 0, false); pstroke(x - 2, y0, x - 2, y1, 1, ramp(C(h.col)).hi, 1, 0, false); paintDab(Math.round(x), Math.round(y1), 4, C(h.col)); } });
+    PRO_HEROES.forEach((h, i) => { const x = LOGO.x0 + [0, 2, 4][i] * LOGO.cw + 14, y0 = 180, y1 = lerp(y0, LOGO.y0 + 20, clamp(q * 1.6 - i * .15, 0, 1)); if (y1 < y0) { pstroke(x, y0, x, y1, 6, C(h.col), 1, 0, false); pstroke(x - 2, y0, x - 2, y1, 1, ramp(C(h.col)).hi, 1, 0, false); paintDab(Math.round(x), Math.round(y1), 4, C(h.col)); } });
   }, 160, lerp(150, 90, q), lerp(1.8, 1, q));
 }
