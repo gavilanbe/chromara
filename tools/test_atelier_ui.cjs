@@ -45,10 +45,13 @@ for(const mobile of [false,true,'bindings']){
  scenario();layout('victory','B.result=999;B.stats={mixes:18,interrupts:12};drawBattleResults()');layout('defeat','B.t=90;drawDefeat()');
 }
 
-test('every equipment arrow applies the indicated direction with pointer-only input',()=>{
- scenario();run("Game.state='overworld';openMenu();OW.menu.t=20;releaseInputs();UI_HITS.length=0;drawMenu();UI_HITS.find(h=>h.x===289&&h.y===97).run()");
- assert.equal(run('Party[0].weapon'),'lapiz');
- run('UI_HITS.length=0;drawMenu();UI_HITS.find(h=>h.x===265&&h.y===97).run()');assert.equal(run('Party[0].weapon'),'brocha');
+test('pointer: hovering a tool only previews it; clicking a tool or a pocket equips exactly that one',()=>{
+ scenario();run("Game.state='overworld';openMenu();OW.menu.t=20;releaseInputs();UI_HITS.length=0;drawMenu();");
+ const slot=i=>`UI_HITS.find(h=>h.x===MENU_SLOTS.wx(${i})-16&&h.y===26)`,pocket=i=>`UI_HITS.find(h=>h.x===MENU_SLOTS.ax(${i})-1&&h.y===MENU_SLOTS.ay-2)`;
+ run(slot(1)+'.hover()');assert.equal(run('Party[0].weapon'),'brocha','hover must not equip');assert.equal(run('OW.menu.cur[0]'),1);
+ run('UI_HITS.length=0;drawMenu();'+slot(1)+'.run()');assert.equal(run('Party[0].weapon'),'lapiz');assert.equal(run("Party.find(p=>p.id==='ambar').weapon"),'brocha','the other painter swaps');
+ run('UI_HITS.length=0;drawMenu();'+pocket(3)+'.run()');assert.equal(run('Party[0].acc'),'lienzo');
+ run("Game.owned.pluma=false;UI_HITS.length=0;drawMenu();"+slot(3)+'.run()');assert.equal(run('Party[0].weapon'),'lapiz','an unfound tool cannot be worn');
 });
 test('hovering study cards never spends; explicit learning spends once and stamps',()=>{
  scenario();run("Game.state='overworld';openOverlay('studies');Game.pigmento=50;UI_HITS.length=0;drawOverlay();UI_HITS.find(h=>h.y===48).hover()");

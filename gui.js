@@ -134,115 +134,176 @@ function tubeGauge(x, y, f, col, dry) { // tubo de pintura en miniatura: el cuer
   g.fillStyle = '#2a2438'; g.fillRect(x + 16, y + 1, 3, 4); g.fillStyle = dry ? '#9a90a8' : rp.sh; g.fillRect(x + 16, y + 2, 2, 2); if (f < .999 && !dry) { g.fillStyle = '#9a90a8'; g.fillRect(x + 4, y + 2, 1, 1); g.fillRect(x + 6, y + 3, 1, 1); } // pliegues del tubo vacío
 }
 // =====================================================================
-// Estuche de equipo: marcapáginas, ficha del personaje y dos bolsillos de tela.
-// ↑↓ personaje · Z entra en el equipo · ↑↓ arma/accesorio · ◄► cambia (la herramienta entra de golpe y salpica) · X vuelve/cierra
+// El estuche: a la izquierda, la ficha de la gota en una hoja de cuaderno (pestañas de las tres, retrato sobre una acuarela de su
+// color, pintura y trazos que miden sus números); a la derecha, el estuche de tela abierto con las herramientas en sus gomas y
+// los accesorios en sus bolsillos, cada uno con la pegatina de quien lo lleva. Todo se ve a la vez: el cursor previsualiza
+// el cambio (+ATK, −SPD) y sólo se equipa al confirmar; entonces la herramienta vuela del estuche al retrato.
+// ←→/↑↓ gota · Z equipar · ↑↓ herramientas/bolsillos · ←→ elegir · Z ponérselo · X vuelve/cierra
 // =====================================================================
 const ACC_LIST = Object.keys(DATA.accessories), WPN_LIST = Object.keys(DATA.weapons);
 const easeBack = k => 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
-function openMenu() { ARTUI.tracks.delete('equipment'); OW.menu = { idx: 0, level: 'chars', row: 0, t: 0, hl: 30, pop: 0, swing: 0, spl: [], delta: null, flip: 99 }; Audio.sfx('book_open'); }
+const MENU_SLOTS = { wx: i => 186 + i * 35, wy: 30, ax: i => 170 + i * 28, ay: 110 };
+function openMenu() { ARTUI.tracks.delete('equipment'); OW.menu = { idx: 0, level: 'chars', row: 0, cur: [0, 0], t: 0, hopAt: 0, fly: null, stats: null, delta: null }; Audio.sfx('book_open'); Audio.sfx('scratch_long', { when: .08, vol: .4 }); }
 function menuStats(p) { return effStats(p); }
+function menuWeapons() { return WPN_LIST; }
+function menuAvailable(key) { return !DATA.weapons[key].found || !!Game.owned[key]; }
+function menuList(row) { return row === 0 ? WPN_LIST : ACC_LIST; }
+function menuCurrent(p, row) { return menuList(row).indexOf(row === 0 ? p.weapon : p.acc); }
+function menuPreview(p, row, key) { const before = effStats(p), after = effStats({ ...p, [row === 0 ? 'weapon' : 'acc']: key }); return { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp }; }
+function menuSelectChar(m, i) { if (m.idx === i) return; m.idx = i; m.hopAt = m.t; m.stats = null; m.delta = null; m.swapped = null; Audio.sfx('cursor', { semi: SEMI[Party[i].id] || 0 }); Audio.sfx('page', { vol: .4 }); }
+function menuEnter(m, row) { const p = Party[m.idx]; m.level = 'equip'; m.row = row; m.cur[row] = Math.max(0, menuCurrent(p, row)); Audio.sfx('page'); }
 function updateMenu() {
-  const m = OW.menu; if (m.closing) { if (m.t - m.closeT > 10) OW.menu = null; return; }
-  if (m.t < 8) return; // evita que la pulsación de apertura cambie equipo
+  const m = OW.menu; if (m.closing) { if (m.t - m.closeT > 12) OW.menu = null; return; }
+  if (m.t < 8) return; // evita que la pulsación de apertura cambie nada
   const p = Party[m.idx], note = () => Audio.sfx('cursor', { semi: SEMI[p.id] || 0 });
   if (m.level === 'chars') {
-    if (hit('down')) { m.idx = (m.idx + 1) % 3; m.delta=null; m.swapped=null; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); } if (hit('up')) { m.idx = (m.idx + 2) % 3; m.delta=null; m.swapped=null; m.pop = 1; m.flip = 0; note(); Audio.sfx('page', { vol: .5 }); }
-    if (hit('ok')) { m.level = 'equip'; m.row = 0; Audio.sfx('page'); }
+    const step = hit('down') || hit('right') ? 1 : hit('up') || hit('left') ? -1 : 0; if (step) menuSelectChar(m, (m.idx + step + 3) % 3);
+    if (hit('ok')) menuEnter(m, 0);
     if (hit('back')) { m.closing = true; m.closeT = m.t; Audio.sfx('book_close'); }
     return;
   }
-  if (hit('down') || hit('up')) { m.row = 1 - m.row; note(); }
+  if (hit('down') || hit('up')) { m.row = 1 - m.row; m.cur[m.row] = Math.max(0, menuCurrent(p, m.row)); note(); }
   if (hit('back')) { m.level = 'chars'; Audio.sfx('cancel'); return; }
-  const dir = hit('right') ? 1 : hit('left') ? -1 : 0;
-  if (dir) changeEquipment(m, dir);
+  const dir = hit('right') ? 1 : hit('left') ? -1 : 0, L = menuList(m.row);
+  if (dir) { let i = m.cur[m.row]; for (let n = 0; n < L.length; n++) { i = (i + dir + L.length) % L.length; if (m.row === 1 || menuAvailable(L[i])) break; } m.cur[m.row] = i; m.movedAt = m.t; note(); }
+  if (hit('ok')) menuEquip(m, m.row, L[m.cur[m.row]]);
 }
-function changeEquipment(m, dir) {
-  const p=Party[m.idx], before=effStats(p);
-  if (m.row === 0) { const L = WPN_LIST.filter(k => !DATA.weapons[k].found || Game.owned[k]); const i = L.indexOf(p.weapon), nw = L[(i + dir + L.length) % L.length], other = Party.find(q => q !== p && q.weapon === nw); if (other) other.weapon = p.weapon; p.weapon = nw; m.swapped = other ? other.name : null; } // si otro la lleva, se la cambias; las armas encontradas entran en la rueda
-  else { const i = ACC_LIST.indexOf(p.acc); p.acc = ACC_LIST[(i + dir + ACC_LIST.length) % ACC_LIST.length]; }
+// Ponerse algo: si otra gota lleva esa herramienta, se la cambias; la pieza vuela del estuche al retrato.
+function menuEquip(m, row, key) {
+  const p = Party[m.idx], before = effStats(p);
+  if (row === 0 && !menuAvailable(key)) { Audio.sfx('nope'); return false; }
+  if ((row === 0 ? p.weapon : p.acc) === key) { Audio.sfx('nope', { vol: .3 }); m.bumpAt = m.t; return false; }
+  const i = menuList(row).indexOf(key);
+  if (row === 0) { const other = Party.find(q => q !== p && q.weapon === key); if (other) other.weapon = p.weapon; m.swapped = other ? other.name : null; p.weapon = key; }
+  else { p.acc = key; m.swapped = null; }
   const after = effStats(p); p.cur.hp = clamp(p.cur.hp + after.hp - before.hp, 1, after.hp); p.cur.mp = clamp(p.cur.mp + after.mp - before.mp, 0, after.mp);
-  m.delta = { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp, t: 0 };
-  m.swing = 1; m.swingDir = dir; Audio.sfx('fwip'); Audio.sfx('equip', { when: .06 }); Audio.sfx('plop', { when: .14, semi: SEMI[p.id] || 0 });
-  m.changedAt=ARTUI.t;
-  artBurst(128, m.row ? 129 : 103, C(p.color));
+  m.stats = before; m.delta = { atk: after.atk - before.atk, def: after.def - before.def, spd: after.spd - before.spd, hp: after.hp - before.hp, mp: after.mp - before.mp }; m.changedAt = m.t; m.changedWall = ARTUI.t;
+  m.fly = { row, key, at: m.t, from: row === 0 ? [MENU_SLOTS.wx(i), MENU_SLOTS.wy + 12] : [MENU_SLOTS.ax(i) + 12, MENU_SLOTS.ay + 12] };
+  Audio.sfx('fwip'); Audio.sfx('equip', { when: .12 }); Audio.sfx('plop', { when: .3, semi: SEMI[p.id] || 0 });
+  return true;
 }
-
-// Opening: the bookmarks slide in from the spine, the sheet drops and the pockets rise.
-// Closing runs the same choreography backwards during the ten frames before the case disappears.
+// Compatibilidad: cambia al siguiente/anterior de la fila (lo usan los atajos y las pruebas).
+function changeEquipment(m, dir) {
+  const p = Party[m.idx], L = menuList(m.row); let i = menuCurrent(p, m.row);
+  for (let n = 0; n < L.length; n++) { i = (i + dir + L.length) % L.length; if (m.row === 1 || menuAvailable(L[i])) break; }
+  m.cur[m.row] = i; menuEquip(m, m.row, L[i]);
+}
 function menuIn(m, duration = 16, delay = 0) {
   if (!Prefs.shake) return 1;
   const open = Math.max(0, easeBack(clamp((m.t - delay) / (duration * UI_TEMPO), 0, 1)));
-  return m.closing ? easeBack(clamp(1 - (m.t - m.closeT) / 10, 0, 1)) * open : open;
+  return m.closing ? easeBack(clamp(1 - (m.t - m.closeT) / 12, 0, 1)) * open : open;
+}
+// Iconos de los bolsillos, dibujados a mano en 16×16.
+function menuAccIcon(kind, x, y, col, dim) {
+  const F = (c, a, b, w = 1, h = 1) => { g.fillStyle = dim ? '#9a8f83' : c; g.fillRect(Math.round(x + a), Math.round(y + b), w, h); };
+  if (kind === 'paleta') { F('#241e32', 2, 4, 12, 9); F('#c9955a', 3, 5, 10, 7); F('#dcae72', 3, 5, 10, 1); F('#241e32', 10, 9, 2, 2); F(C('rojo'), 4, 6, 2, 2); F(C('amarillo'), 7, 6, 2, 2); F(C('azul'), 5, 9, 2, 2); }
+  else if (kind === 'goma') { F('#241e32', 1, 5, 14, 8); F('#f0b8b5', 2, 6, 7, 6); F('#fff0f0', 2, 6, 7, 1); F('#6fa6d8', 9, 6, 5, 6); F('#a8c8e8', 9, 6, 5, 1); }
+  else if (kind === 'sacapuntas') { F('#241e32', 3, 4, 10, 9); F('#c9c4d4', 4, 5, 8, 7); F('#f0eef6', 4, 5, 8, 1); F('#241e32', 6, 7, 4, 3); F('#8c8ab0', 11, 5, 1, 7); F('#e8cf9a', 7, 8, 2, 1); }
+  else if (kind === 'lienzo') { F('#6b4424', 3, 2, 10, 12); F('#f4f0ea', 4, 3, 8, 10); F(col, 5, 6, 4, 3); F(ramp(col).hi, 5, 6, 4, 1); F('#6b4424', 2, 13, 2, 2); F('#6b4424', 12, 13, 2, 2); }
+  else { F('#241e32', 6, 1, 4, 14); F('#e8e0d0', 7, 2, 2, 12); F('#6a6480', 7, 2, 2, 3); F('#b8b0a0', 8, 5, 1, 8); }
 }
 function drawMenu() {
-  const m=OW.menu; m.t++; m.flip++;
-  UI_HITS.length=0; UI_TEXT.length=0;
-  const p=Party[m.idx], col=C(p.color), s=effStats(p);
-  const at=artObserve('equipment',p.id+':'+m.level+':'+m.row);
-  g.fillStyle='rgba(20,15,28,'+(.48*(Prefs.shake?clamp(m.closing?1-(m.t-m.closeT)/10:m.t/10,0,1):1)).toFixed(2)+')';g.fillRect(0,0,W,H);
-  // Three loose portrait bookmarks stay put while the tool roll changes owner.
-  g.save();g.translate(Math.round((1-menuIn(m,16))*-110),0);
-  brushBand(5,7,90,19,'#34283d');smallText('ESTUCHE',15,13,KIT_LIGHT);
-  g.restore();
-  Party.forEach((q,i)=>{
-    const y=37+i*43,qs=effStats(q),qc=C(q.color),sel=i===m.idx;
-    g.save();g.translate(Math.round((1-menuIn(m,16,3+i*4))*-110),0);
-    maskingLabel(7,y,85,35,sel?'#fff3d2':'#dfd5c1');
-    if(sel)brushBand(29,y+30,57,3,qc);
-    const lift=sel?Math.round(artPop(at)*4):0;
-    sticker(18,y+13-lift,{...q,alive:q.cur.hp>0,hp:q.cur.hp,maxhp:qs.hp,mp:q.cur.mp,maxmp:qs.mp},10);
-    smallText(q.name,33,y+4,sel?UI_INK:UI_MUTED);
-    smallText('HP',33,y+16,UI_MUTED);kitBar(48,y+18,34,q.cur.hp/qs.hp,qc);
-    tubeGauge(34,y+25,q.cur.mp/qs.mp,qc,!q.cur.mp);
-    textRight(q.cur.mp,82,y+25,UI_MUTED);
+  const m = OW.menu; m.t++;
+  UI_HITS.length = 0; UI_TEXT.length = 0;
+  const p = Party[m.idx], col = C(p.color), rp = ramp(col), s = effStats(p), shake = Prefs.shake;
+  const dim = shake ? clamp(m.closing ? 1 - (m.t - m.closeT) / 12 : m.t / 10, 0, 1) : 1;
+  g.fillStyle = 'rgba(20,15,28,' + (.55 * dim).toFixed(2) + ')'; g.fillRect(0, 0, W, H);
+  // ---- la hoja de la ficha entra desde la izquierda
+  g.save(); g.translate(Math.round((1 - menuIn(m, 16)) * -160), 0);
+  artSheet(6, 10, 146, 164, col);
+  // pestañas de las tres gotas, cosidas al borde de la hoja; la elegida sube y lleva una cinta de su color
+  [...Party.keys()].sort((a, b) => (a === m.idx) - (b === m.idx)).forEach(i => { const q = Party[i]; // la elegida, encima de las otras
+    const x = 11 + i * 46, sel = i === m.idx, qc = C(q.color), up = sel ? 3 : 0, qs = effStats(q);
+    g.save(); g.translate(0, Math.round((1 - menuIn(m, 12, 4 + i * 3)) * -24));
+    maskingLabel(x, 13 - up, 44, 17, sel ? '#fff3d2' : '#dcd1bb'); if (sel) brushBand(x + 3, 27 - up, 38, 3, qc);
+    sticker(x + 7, 21 - up, { ...q, alive: q.cur.hp > 0, hp: q.cur.hp, maxhp: qs.hp, mp: q.cur.mp, maxmp: qs.mp }, 5);
+    if (sel) smallText(q.name, x + 13, 17 - up, UI_INK); else { g.fillStyle = '#cfc1a9'; g.fillRect(x + 18, 19, 20, 2); g.fillStyle = qc; g.fillRect(x + 18, 19, Math.round(20 * q.cur.hp / qs.hp), 2); g.fillStyle = '#6fa6d8'; g.fillRect(x + 18, 23, Math.round(20 * q.cur.mp / qs.mp), 1); } // las otras: su pintura de un vistazo
     g.restore();
-    const focus=()=>{if(m.idx!==i){artFocus(m,i);m.delta=null;m.swapped=null;}};
-    uiHit(5,y-2,89,40,()=>{focus();m.level='equip';m.row=0;Audio.sfx('page');},focus);
+    uiHit(x, 10, 42, 22, () => { menuSelectChar(m, i); }, () => { if (m.level === 'chars') menuSelectChar(m, i); });
   });
-  g.save();g.translate(Math.round((1-menuIn(m,16,14))*-110),0);
-  artButton('equip-close',battleKey('back')+' cerrar',7,166,85,12,'#d6c29c',()=>{pressed.back=true;});
-  g.restore();
-  // The portrait is a clipped sketch; numeric stats are pencil annotations.
-  g.save();g.translate(0,Math.round((1-menuIn(m,18,4))*-100));
-  artSheet(104,12,208,74,col);
-  g.fillStyle='#e2d5b9';g.beginPath();g.ellipse(131,49,23,24,-.1,0,6.29);g.fill();
-  const spr=buildSprite(p.id+'_title',col,null,{eyes:p.cur.hp<=0?'ko':'normal'});
-  drawSprite(spr,131,70-Math.round(artPop(at)*3),1.3,false,1.3);
-  smallText(p.name,165,20);smallText(p.role,165,31,UI_MUTED);
-  smallText('HP',165,44,UI_MUTED);smallText(p.cur.hp+'/'+s.hp,184,44);kitBar(251,47,49,p.cur.hp/s.hp,col);
-  smallText('MP',165,55,UI_MUTED);smallText(p.cur.mp+'/'+s.mp,184,55);tubeGauge(269,56,p.cur.mp/s.mp,col,!p.cur.mp);
-  const delta=m.delta&&ARTUI.t-(m.changedAt??-99)<95?m.delta:null;
-  [['ATK',s.atk],['DEF',s.def],['SPD',s.spd]].forEach(([label,n],i)=>{
-    const x=116+i*64;smallText(label,x,74,UI_MUTED);smallText(n,x+22,74);
-    const d=delta?.[label.toLowerCase()];if(d)smallText((d>0?'+':'')+d,x+37,74,d>0?'#34733e':'#a83e3e');
+  // retrato: una acuarela de su color que respira y la gota encima; salta al elegirla y al equiparse
+  const hop = shake ? Math.max(0, Math.sin(clamp((m.t - m.hopAt) / 16, 0, 1) * Math.PI)) : 0, got = shake && m.changedAt ? Math.max(0, 1 - (m.t - m.changedAt - 16) / 14) * ((m.t - m.changedAt) >= 16 ? 1 : 0) : 0;
+  const breathe = shake ? Math.sin(m.t * .06) : 0, px = 44, py = 90;
+  g.save(); g.globalAlpha *= .55; g.fillStyle = rp.hi; g.beginPath(); for (let i = 0; i <= 24; i++) { const a = i / 24 * 6.283, r = 27 + Math.sin(a * 5 + p.id.length) * 2 + breathe; const X = px + Math.cos(a) * r, Y = 62 + Math.sin(a) * r * .9; if (i) g.lineTo(X, Y); else g.moveTo(X, Y); } g.fill(); g.restore();
+  g.save(); g.globalAlpha *= .35; g.fillStyle = col; g.beginPath(); g.ellipse(px + 4, 70, 19, 16, .3, 0, 6.29); g.fill(); g.restore();
+  paintRing(px, 62, clamp((m.t - m.hopAt) / 18, 0, 1), col, 34);
+  shadow(px, py, 22 - Math.round(hop * 6));
+  const spr = buildSprite(p.id + '_title', col, null, { eyes: p.cur.hp <= 0 ? 'ko' : got > .3 || hop > .3 ? 'happy' : ((m.t + m.idx * 40) % 170) < 6 ? 'blink' : 'normal' });
+  const sq = hop > 0 ? [1 - hop * .12, 1 + hop * .14] : got > 0 ? [1 + got * .16, 1 - got * .14] : [1 + breathe * .015, 1 - breathe * .015];
+  const ps = Math.min(1.5, 46 / spr.height); drawSprite(spr, px, py - Math.round(hop * 10), ps * sq[0], false, ps * sq[1]);
+  // nombre y rol, escritos al elegir la gota
+  bigText(p.name, 80, 36, col, { progress: shake ? (m.t - m.hopAt) * 1.2 + 1 : null, outline: '#2a2438' }); smallText(p.role, 80, 49, UI_MUTED);
+  // pintura (HP) y pigmento (MP)
+  smallText('HP', 80, 61, UI_MUTED); textRight(p.cur.hp + '/' + s.hp, 146, 61, p.cur.hp < s.hp * .3 ? '#a12f42' : UI_INK); kitBar(80, 70, 66, p.cur.hp / s.hp, col);
+  smallText('MP', 80, 76, UI_MUTED); textRight(p.cur.mp + '/' + s.mp, 146, 76); tubeGauge(80, 85, p.cur.mp / s.mp, col, !p.cur.mp); kitBar(102, 86, 44, p.cur.mp / s.mp, '#6fa6d8');
+  // los números como trazos de pincel: el largo es el valor; al cambiar, queda la sombra del anterior y el trazo crece o mengua
+  const L = m.level === 'equip' ? menuList(m.row)[m.cur[m.row]] : null, preview = L && (m.row === 1 || menuAvailable(L)) ? menuPreview(p, m.row, L) : null;
+  const grow = m.stats ? clamp((m.t - m.changedAt - 14) / 18, 0, 1) : 1;
+  [['ATK', 'atk'], ['DEF', 'def'], ['SPD', 'spd']].forEach(([label, k], i) => {
+    const y = 102 + i * 13, now = s[k], was = m.stats ? m.stats[k] : now, shown = lerp(was, now, 1 - (1 - grow) ** 3), len = v => Math.round(clamp(v / 28, 0, 1) * 80), intro = menuIn(m, 14, 8 + i * 3);
+    smallText(label, 14, y, UI_MUTED);
+    g.fillStyle = '#e2d6bd'; g.fillRect(40, y + 2, 80, 5);
+    if (m.stats && grow < 1 && was !== now) { g.globalAlpha *= .45; brushBand(40, y + 1, len(was), 7, rp.hi); g.globalAlpha /= .45; }
+    brushBand(40, y + 1, Math.max(3, Math.round(len(shown) * intro)), 7, col); g.fillStyle = rp.hi; g.fillRect(42, y + 2, Math.max(0, Math.round(len(shown) * intro) - 4), 1);
+    const d = preview ? preview[k] : 0; // lo que cambiaría con la pieza bajo el cursor
+    if (d) { const x0 = 40 + len(now), x1 = 40 + len(now + d); g.save(); g.globalAlpha *= .75; if (d > 0) brushBand(x0 - 1, y + 1, Math.max(2, x1 - x0 + 1), 7, '#8fc07a'); else { g.fillStyle = '#e2a0a0'; g.fillRect(x1, y + 2, x0 - x1, 5); } g.restore(); }
+    textRight(Math.round(shown), 132, y, UI_INK);
+    if (d) smallText((d > 0 ? '+' : '') + d, 135, y, d > 0 ? '#34733e' : '#a83e3e');
+    else if (m.delta && m.delta[k] && ARTUI.t - m.changedWall < 80) { const q = (ARTUI.t - m.changedWall) / 80; g.save(); g.globalAlpha *= 1 - q; smallText((m.delta[k] > 0 ? '+' : '') + m.delta[k], 135, y - Math.round(q * 6), m.delta[k] > 0 ? '#34733e' : '#a83e3e'); g.restore(); }
   });
+  // su habilidad de rol
+  const role = { carmin: ['Proteger', 'Cubre el próximo golpe a un aliado: recibe la mitad.'], ambar: ['Interrumpir', 'Golpe ligero (2 MP) que corta una carga anunciada.'], anil: ['Preparar', 'Deja una capa azul (2 MP) para la siguiente mezcla.'] }[p.id];
+  maskingLabel(11, 139, 136, 32, '#f7efd6'); paintDab(18, 145, 3, col); smallText(role[0], 24, 142, UI_INK); paragraph(role[1], 16, 152, 128, UI_MUTED, 2);
   g.restore();
-  // Canvas tool pockets: stitched fabric, projecting tools and masking labels.
-  g.save();g.translate(0,Math.round((1-menuIn(m,18,10))*100));
-  brushBand(103,93,210,49,'#806947');brushBand(107,96,202,43,'#ac9062');
-  g.fillStyle='#dec799';for(let x=109;x<306;x+=5){g.fillRect(x,96,2,1);g.fillRect(x,138,2,1);}
-  const rows=[['ARMA',DATA.weapons[p.weapon]],['ACCESORIO',DATA.accessories[p.acc]]];
-  rows.forEach(([label,item],r)=>{
-    const y=97+r*23,sel=m.level==='equip'&&m.row===r;
-    maskingLabel(143,y,119,19,sel?'#fff2ce':'#e0d1ad');
-    smallText(label,150,y+2,UI_MUTED);smallText(item.name,150,y+11);
-    const move=sel?Math.round(artPop(m.changedAt??-99)*9):0;
-    if(r===0){const prop=PROP[p.weapon];drawProp(propSprite(p.weapon,col),124+move,y+17,-.3,1,prop.tip[0],prop.tip[1],.7);}
-    else g.drawImage(iconSprite(({paleta:'tech',sacapuntas:'lapiz',difumino:'pincel'})[p.acc]||'item',col),114+move,y-1,20,20);
-    if(sel){g.drawImage(iconSprite('pincel',col),134,y+8);brushBand(146,y+20,112,2,col);}
-    const focus=()=>{m.level='equip';if(m.row!==r){m.row=r;Audio.sfx('cursor',{vol:.3});}};
-    uiHit(107,y,154,21,focus);
-    artButton('equip-left'+r,'<',265,y,20,19,sel?col:'#c4b28d',()=>{focus();changeEquipment(m,-1);});
-    artButton('equip-right'+r,'>',289,y,20,19,sel?col:'#c4b28d',()=>{focus();changeEquipment(m,1);});
+  // ---- el estuche de tela, abierto: entra desde la derecha y abre su cremallera
+  g.save(); g.translate(Math.round((1 - menuIn(m, 16, 2)) * 170), 0);
+  brushBand(158, 10, 156, 164, '#3a2a1c'); brushBand(159, 9, 154, 162, '#8a6440'); brushBand(163, 13, 146, 154, '#a37a4c');
+  g.fillStyle = '#d8b882'; for (let x = 166; x < 306; x += 5) { g.fillRect(x, 13, 2, 1); g.fillRect(x, 165, 2, 1); } for (let y = 16; y < 164; y += 5) { g.fillRect(163, y, 1, 2); g.fillRect(308, y, 1, 2); }
+  const zip = shake ? clamp(m.closing ? 1 - (m.t - m.closeT) / 10 : (m.t - 6) / 20, 0, 1) : 1; // la cremallera se abre de izquierda a derecha
+  for (let x = 162; x < 312; x += 2) { const open = (x - 162) / 150 < zip; g.fillStyle = (x / 2) % 2 ? '#c9c4d4' : '#6a6480'; g.fillRect(x, open ? 8 : 9, 2, open ? 1 : 2); }
+  { const zx = 162 + zip * 148; g.fillStyle = '#241e32'; g.fillRect(zx - 2, 5, 6, 8); g.fillStyle = '#e8c070'; g.fillRect(zx - 1, 6, 4, 6); g.fillStyle = '#fff3c0'; g.fillRect(zx - 1, 6, 1, 4); }
+  artButton('equip-close', battleKey('back') + (m.level === 'equip' ? ' volver' : ' cerrar'), 252, 16, 56, 12, '#d6c29c', () => { pressed.back = true; });
+  smallText('Herramientas', 168, 18, m.level === 'equip' && m.row === 0 ? '#fff3d2' : '#e8d5b0');
+  // herramientas en sus gomas: de pie, con la punta arriba; la pegatina dice quién la lleva
+  g.fillStyle = '#e8dcc0'; g.fillRect(166, 56, 140, 5); g.fillStyle = '#c9b88f'; g.fillRect(166, 60, 140, 1);
+  WPN_LIST.forEach((key, i) => {
+    const x = MENU_SLOTS.wx(i), have = menuAvailable(key), holder = Party.find(q => q.weapon === key), mine = holder === p, sel = m.level === 'equip' && m.row === 0 && m.cur[0] === i;
+    const pop = shake ? Math.max(0, easeBack(clamp((m.t - 10 - i * 4) / 12, 0, 1))) : 1, flying = m.fly && m.fly.row === 0 && m.fly.key === key && m.t - m.fly.at < 16;
+    if (sel) { g.save(); g.globalAlpha *= .35; brushBand(x - 14, 28, 28, 58, col); g.restore(); dropCursor(x - 4, 22 - (shake ? Math.round(Math.abs(Math.sin(m.t * .15)) * 2) : 0), col); }
+    if (!have) { g.strokeStyle = '#6b4a33'; g.setLineDash([2, 2]); g.strokeRect(x - 6.5, 34.5, 13, 40); g.setLineDash([]); smallText('?', x - 2, 48, '#e8d5b0'); }
+    else if (!flying) { const lift = (mine ? 6 : 0) + (sel && shake ? Math.round(Math.sin(m.t * .2) * 1.5) : 0), wig = sel && shake ? Math.sin(m.t * .3) * .06 : 0, pc = holder ? C(holder.color) : '#b8ad96';
+      const img = propSprite(key, pc), sc = .8, ox = (img.height / 2 - PROP[key].tip[1]) * sc; // centrada en su goma aunque la punta no esté en medio del dibujo
+      g.save(); g.globalAlpha *= mine ? 1 : .85; drawProp(img, x - ox, 30 - lift + (1 - pop) * 30, -1.57 + wig, 1, PROP[key].tip[0], PROP[key].tip[1], sc); g.restore(); }
+    g.fillStyle = '#d9c9a0'; g.fillRect(x - 7, 55, 14, 7); g.fillStyle = '#b8a37a'; g.fillRect(x - 7, 61, 14, 1); // su goma elástica, por encima
+    if (holder && have) { const qs = effStats(holder); sticker(x, 80, { ...holder, alive: holder.cur.hp > 0, hp: holder.cur.hp, maxhp: qs.hp, mp: holder.cur.mp, maxmp: qs.mp }, 5); }
+    textCenter(DATA.weapons[key].name, x, 89, sel ? '#fff3d2' : have ? '#e8d5b0' : '#b8a37a');
+    uiHit(x - 16, 26, 32, 70, () => { if (m.level !== 'equip' || m.row !== 0) menuEnter(m, 0); m.cur[0] = i; menuEquip(m, 0, key); }, () => { if (have && (m.level !== 'equip' || m.row !== 0 || m.cur[0] !== i)) { m.level = 'equip'; m.row = 0; m.cur[0] = i; Audio.sfx('cursor', { vol: .3 }); } });
   });
+  // bolsillos de los accesorios
+  smallText('Bolsillos', 168, 100, m.level === 'equip' && m.row === 1 ? '#fff3d2' : '#e8d5b0');
+  ACC_LIST.forEach((key, i) => {
+    const x = MENU_SLOTS.ax(i), y = MENU_SLOTS.ay, mine = p.acc === key, sel = m.level === 'equip' && m.row === 1 && m.cur[1] === i, pop = shake ? Math.max(0, easeBack(clamp((m.t - 18 - i * 3) / 12, 0, 1))) : 1;
+    const lift = sel ? 3 + (shake ? Math.round(Math.sin(m.t * .2)) : 0) : 0;
+    g.fillStyle = '#5a3e26'; g.fillRect(x, y + 3, 25, 22); g.fillStyle = mine ? '#c9a06a' : '#b08a58'; g.fillRect(x + 1, y + 2, 23, 21); g.fillStyle = '#d8b882'; for (let k = 0; k < 23; k += 3) g.fillRect(x + 1 + k, y + 3, 2, 1);
+    if (sel) { g.save(); g.globalAlpha *= .4; g.fillStyle = col; g.fillRect(x + 1, y + 2, 23, 21); g.restore(); dropCursor(x + 7, y - 12 - lift, col); }
+    if (!(m.fly && m.fly.row === 1 && m.fly.key === key && m.t - m.fly.at < 16)) menuAccIcon(key, x + 4.5, y + 3 - lift - (1 - pop) * 14, col);
+    const holders = Party.filter(q => q.acc === key); holders.forEach((q, n) => paintDab(x + 5 + n * 6, y + 26, 2.5, C(q.color)));
+    uiHit(x - 1, y - 2, 27, 32, () => { if (m.level !== 'equip' || m.row !== 1) menuEnter(m, 1); m.cur[1] = i; menuEquip(m, 1, key); }, () => { if (m.level !== 'equip' || m.row !== 1 || m.cur[1] !== i) { m.level = 'equip'; m.row = 1; m.cur[1] = i; Audio.sfx('cursor', { vol: .3 }); } });
+  });
+  // la ficha de la pieza bajo el cursor (o, sin cursor, lo que lleva puesto): nombre, qué hace y qué cambiaría
+  const row = m.level === 'equip' ? m.row : 0, key = m.level === 'equip' ? menuList(row)[m.cur[row]] : p.weapon, item = row === 0 ? DATA.weapons[key] : DATA.accessories[key];
+  const worn = (row === 0 ? p.weapon : p.acc) === key, have = row === 1 || menuAvailable(key), info = have ? item.desc : 'Aún no la tienes: está guardada en algún estuche del mapa.';
+  maskingLabel(166, 140, 142, 30, '#f7efd6');
+  smallText(have ? item.name : '???', 172, 144, UI_INK); smallText(worn ? 'puesto' : m.level === 'equip' && have ? battleKey('ok') + ' ponérselo' : '', 302 - textWidth(worn ? 'puesto' : battleKey('ok') + ' ponérselo'), 144, worn ? '#34733e' : UI_MUTED);
+  const noteAt = artObserve('equipment-note', key + ':' + row); paragraph(info, 172, 154, 132, UI_MUTED, 2, { progress: shake ? (ARTUI.t - noteAt) * 2.2 : Infinity, wet: col });
   g.restore();
-  const role={carmin:'Proteger cubre un golpe a mitad de daño.',ambar:'Interrumpir (2 MP) corta una carga.',anil:'Preparar (2 MP) deja una capa azul.'};
-  g.save();g.translate(0,Math.round((1-menuIn(m,16,16))*60));
-  maskingLabel(104,145,209,33);
-  const noteAt=artObserve('equipment-note',(m.level==='equip'?rows[m.row][1].desc:role[p.id])+(m.swapped||''));
-  paragraph(m.level==='equip'?rows[m.row][1].desc:role[p.id],111,149,194,UI_INK,2,{progress:Prefs.shake?(ARTUI.t-noteAt)*2.2:Infinity,wet:col});
-  smallText(m.swapped&&delta?'Cambio con '+m.swapped:m.level==='equip'?'< > cambiar material':battleKey('ok')+' elegir material',111,170,UI_MUTED);
-  g.restore();
+  // la pieza recién elegida vuela del estuche al retrato y salpica al llegar
+  if (m.fly && m.t - m.fly.at < 16) { const q = (m.t - m.fly.at) / 16, e = q * q * (3 - 2 * q), x = lerp(m.fly.from[0], 44, e), y = lerp(m.fly.from[1], 66, e) - Math.sin(q * Math.PI) * 30;
+    for (let k = 1; k <= 3; k++) { const q2 = Math.max(0, q - k * .06), e2 = q2 * q2 * (3 - 2 * q2); g.fillStyle = rp.hi; g.globalAlpha = .5 - k * .12; g.fillRect(Math.round(lerp(m.fly.from[0], 44, e2)), Math.round(lerp(m.fly.from[1], 66, e2) - Math.sin(q2 * Math.PI) * 30), 3, 3); } g.globalAlpha = 1;
+    if (m.fly.row === 0) drawProp(propSprite(m.fly.key, col), x, y, -1.57 + q * 6.28, 1, PROP[m.fly.key].tip[0], PROP[m.fly.key].tip[1], .8); else menuAccIcon(m.fly.key, x - 8, y - 8, col); }
+  if (m.fly && m.t - m.fly.at === 16) artBurst(44, 66, col);
+  if (m.fly && m.t - m.fly.at >= 16 && m.t - m.fly.at < 34) paintRing(44, 66, (m.t - m.fly.at - 16) / 18, col, 30);
+  if (m.swapped && m.changedAt && m.t - m.changedAt < 90) { const q = (m.t - m.changedAt) / 90, label = 'Cambio con ' + m.swapped, w = textWidth(label) + 16; g.save(); g.globalAlpha *= Math.min(1, (1 - q) * 3); maskingLabel(Math.round(44 - w / 2), 84, w, 13, '#fff3d2'); smallText(label, Math.round(44 - w / 2 + 8), 87, UI_INK); g.restore(); }
 }
 
 // =====================================================================
