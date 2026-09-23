@@ -451,6 +451,7 @@ function updateOverworld() {
     return;
   }
   const J = OW.jar;
+  for (const f of OW.prints || []) f.t++; if (OW.prints) OW.prints = OW.prints.filter(f => f.t < 150);
   for (const f of OW.floats || []) f.t++; OW.floats = (OW.floats || []).filter(f => f.t < 50);
   if (OW.heal) { if (OW.heal.next().done) OW.heal = null; for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life); return; }
   if (OW.act) { if (OW.act.next().done) OW.act = null; for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life); return; }
@@ -478,6 +479,7 @@ function updateOverworld() {
       const tx = OW.x / TILE | 0, ty = (OW.y + 3) / TILE | 0, ch = tileAt(tx, ty); const wood = ch === '=' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tileAt(tx + a, ty + b) === '~');
       Audio.sfx(wood ? 'step_wood' : ch === '=' ? 'step_path' : 'step_grass', { pan: (Math.floor(OW.bob) & 1) ? .15 : -.15 });
       for (let i = 0; i < 2; i++) OW.dust.push({ x: OW.x + R(-2, 2), y: OW.y + 1, vx: R(-.5, .5), vy: -R(.4, .9), col: C(Party[0].color), t: 0, life: RI(10, 16) });
+      (OW.prints ||= []).push({ x: OW.x + ((Math.floor(OW.bob) & 1) ? 2 : -2), y: OW.y + 2, col: C(Party[0].color), t: 0 }); if (OW.prints.length > 40) OW.prints.shift();
     }
   } else { OW.bob = 0; }
   for (const d of OW.dust) { d.x += d.vx; d.y += d.vy; d.vy += .12; d.t++; } OW.dust = OW.dust.filter(d => d.t < d.life);
@@ -547,9 +549,10 @@ function drawOverworld() {
   for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
     const ch = tileAt(tx, ty); if (pageEdgeAt(tx, ty)) { g.drawImage(pageEdgeTile(tx, ty), tx * TILE - cx, ty * TILE - cy); continue; } // el borde de la hoja
     g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
-    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => g.drawImage(treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7, Game.page === 1 ? null : worldRegion(tx, ty)), tx * TILE - cx, ty * TILE - 8 - cy) });
+    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => { const spr = treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7, Game.page === 1 ? null : worldRegion(tx, ty)), X = tx * TILE - cx, Y = ty * TILE - 8 - cy, sw = Prefs.shake ? Math.sin(OW.t * .025 + tx * .6 + ty * .4) : 0; // el viento mece las cerdas: la punta más que el mango
+      g.drawImage(spr, 0, 0, 16, 6, X + Math.round(sw * 1.4), Y, 16, 6); g.drawImage(spr, 0, 6, 16, 7, X + Math.round(sw * .6), Y + 6, 16, 7); g.drawImage(spr, 0, 13, 16, 11, X, Y + 13, 16, 11); } });
   }
-  drawRegionDetails(cx, cy); drawWorldGround(g, cx, cy, pal);
+  drawRegionDetails(cx, cy); drawWorldGround(g, cx, cy, pal); drawFootprints(cx, cy);
   drawRinseGround(cx, cy, pal);
   drawWorldObjects(ents, cx, cy, pal);
   if (typeof drawChapterLandmarks === 'function') drawChapterLandmarks(ents,cx,cy);

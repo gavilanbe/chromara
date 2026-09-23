@@ -304,7 +304,27 @@ function drawWorldLabel() {
   g.restore();
   uiHit(x,155,w,24,()=>{OW.msg={lines:[nearby.title,...nearby.lines],t:0};Audio.sfx('page');});
 }
+// Huellas de pintura: el líder deja la suya al posarse en cada bote, del color de su gota, y se secan despacio.
+function drawFootprints(cx,cy){
+  for(const f of OW.prints||[]){const x=Math.round(f.x-cx),y=Math.round(f.y-cy);if(x<-6||x>W+6||y<-6||y>H+6)continue;const a=Math.min(.55,(150-f.t)/150*.55);if(a<=0)continue;
+    g.globalAlpha=a;g.fillStyle=f.col;g.fillRect(x-2,y,4,2);g.fillRect(x-1,y-1,2,1);g.fillStyle=ramp(f.col).hi;g.fillRect(x-1,y,1,1);g.globalAlpha=1;}
+}
+// Motas de pigmento en el aire: suben despacio y toman el color de la región por la que pasan. Son función de OW.t.
+function drawPigmentMotes(cx,cy,pal){
+  if(!Prefs.shake||Game.page===1)return;
+  for(let i=0;i<18;i++){const sp=.12+(i%5)*.04,life=H+40,ph=(OW.t*sp+i*47)%life,x=Math.round(((i*73+Math.sin(OW.t*.01+i)*14)%W+W)%W),y=Math.round(H+10-ph);
+    const r=worldRegion((x+cx)/TILE|0,(y+cy)/TILE|0),col=worldPigment(r.color,pal,r.drained);g.globalAlpha=.45*Math.sin(ph/life*Math.PI);g.fillStyle=i%3?col:'#fff6e2';g.fillRect(x,y,i%4===0?2:1,i%4===0?2:1);}
+  g.globalAlpha=1;
+}
+// Humo de chimenea: las casas-bote echan bocanadas de su color que suben y se deshacen.
+function drawChimneys(cx,cy,pal){
+  if(!Prefs.shake)return;
+  for(const o of worldObjects()){if(o.kind!=='house')continue;const bx=o.wx-cx+9,by=o.wy-cy-50;if(bx<-20||bx>W+20||by<-40||by>H+20)continue;const col=worldPigment(o.color,pal);
+    for(let k=0;k<4;k++){const q=((OW.t*.012+k/4+o.id*.13)%1),x=bx+Math.sin(q*6+k)*3+q*6,y=by-q*26,r=1.5+q*3.5;g.globalAlpha=.55*(1-q);g.fillStyle=k%2?col:worldMix(col,'#fff6e2',.5);g.beginPath();g.ellipse(x,y,r,r*.8,0,0,6.29);g.fill();}}
+  g.globalAlpha=1;
+}
 function drawWorldAtmosphere(cx,cy,pal) {
+  drawChimneys(cx,cy,pal);drawPigmentMotes(cx,cy,pal);
   // Paper butterflies visit a few flowers; the walking route stays visually quiet.
   for(const o of worldObjects()){
     if(o.kind!=='flower'||o.id%4!==0)continue;
