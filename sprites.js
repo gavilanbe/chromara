@@ -700,8 +700,8 @@ const pigmentFade = (mp, maxmp) => { const r = maxmp ? mp / maxmp : 1; return r 
 const HERO_FORMS = {
   // Carmín: gota ancha y robusta, boina de pintor ladeada con su rabillo, ceño decidido y rubor
   carmin: { size: { battle: [30, 24], mini: [15, 13], title: [36, 32] }, width: .94, top: .8, bottom: .3, brow: 'angry', eyeY: .44, eyeGap: .33, beret: true, blush: true, pal: { b: '#3a2440', c: '#5a3a62', d: '#241428', e: '#7a5484', p: '#ff9d9d' } },
-  // Ámbar: gota esbelta afilada como un lápiz recién sacado: cono de madera, mina de grafito y facetas
-  ambar: { size: { battle: [22, 30], mini: [11, 15], title: [26, 38] }, width: .7, top: .95, bottom: .25, brow: 'sharp', eyeY: .4, eyeGap: .36, pencil: true, freckles: true, pal: { m: '#2a2438', n: '#b0702a', o: '#e8cf9a', q: '#c9a86a' } },
+  // Ámbar: la gota clásica, redonda abajo y afilada arriba en una punta que se riza, viva y ligera
+  ambar: { size: { battle: [24, 30], mini: [12, 15], title: [28, 38] }, width: .84, top: .95, bottom: .25, brow: 'sharp', eyeY: .34, eyeGap: .34, tear: true, freckles: true, pal: {} },
   // Añil: salpicadura ancha con tres crestas, brillo de agua y un goterón que le cae por un lado
   anil: { size: { battle: [34, 20], mini: [17, 10], title: [40, 26] }, width: 1, top: .62, bottom: .4, brow: 'calm', eyeY: .44, eyeGap: .26, splash: true, drip: true, pal: {} },
 };
@@ -712,11 +712,12 @@ function heroDef(id, view, kind) {
   // alto útil del cuerpo (lo de arriba queda para boina, cono o crestas)
   const bodyTop = F.beret ? Math.round(Ht * .24) : F.pencil ? Math.round(Ht * .06) : Math.round(Ht * .12), bodyH = groundY - bodyTop, A = (Wd / 2 - 1) * F.width * (side ? .93 : 1);
   const half = v => { // medio ancho del cuerpo a la altura v (0 abajo, 1 arriba)
+    if (F.tear) { if (v < .5) { const k = (v - .34) / .34; return A * Math.sqrt(Math.max(0, 1 - k * k * (v < .34 ? .95 : .2))); } const q = (v - .5) / .5; return A * .98 * Math.pow(1 - q, 1.35); } // gota: la punta se afila
     if (F.pencil) { if (v > .62) return A * .98 * (1 - (v - .62) / .38); const k = (v - .34) / .34; return A * Math.sqrt(Math.max(0, 1 - k * k * (v < .34 ? .9 : .15))); }
     if (F.splash) { const k = (v - .38) / (v > .38 ? .62 : .42); return A * Math.sqrt(Math.max(0, 1 - k * k)); }
     const k = (v - .42) / (v > .42 ? .58 : .45); return A * Math.sqrt(Math.max(0, 1 - k * k)) * (v > .86 ? 1 - (v - .86) * 1.6 : 1);
   };
-  const inside = (x, y) => { const v = (groundY - y) / bodyH, u = x + .5 - cx; if (v < 0 || v > 1) return false; let w = half(v);
+  const inside = (x, y) => { const v = (groundY - y) / bodyH; let u = x + .5 - cx; if (v < 0 || v > 1) return false; if (F.tear && v > .6) u += (side ? -1 : 1) * Math.pow((v - .6) / .4, 2) * A * .45; let w = half(v); // la punta se riza
     if (F.splash && v > .5) { const n = u / A + (side ? .15 : 0), crest = Math.max(...[-.62, 0, .62].map((c, i) => Math.exp(-((n - c) ** 2) / .07) * (i === 1 ? 1 : .85))); w = Math.abs(n) < .98 ? A * (1 - Math.max(0, v - .5) * .12) : 0; if (v > .52 + .46 * crest) return false; } // tres crestas redondas en lo alto
     return Math.abs(u) <= w; };
   for (let y = 0; y < Ht; y++) for (let x = 0; x < Wd; x++) if (inside(x, y)) {

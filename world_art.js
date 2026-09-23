@@ -145,6 +145,7 @@ function worldSprite(o, pal, frame = 0) {
       rect(ink, 23, 43, 9, 2); rect(woodHi, 23, 42, 9); rect(wood, 22, 45, 12, 2);
       rect(r.sh, 37, 31, 3, 11); rect(r.hi, 38, 33, 1, 6); oval(r.base, 38, 43, 2, 1);
       gleam(30, 22);
+      rect(ink, 29, 0, 5, 9); rect('#8a8a96', 30, 1, 3, 7); rect('#c9c4d4', 30, 1, 1, 7); rect(ink, 28, 0, 7, 2); rect('#6a6480', 29, 0, 5, 1); // la chimenea: un tubo de latón en la tapa
     } else if (o.kind === 'palette') {
       oval(ink, 22, 17, 22, 11); oval(woodDk, 22, 18, 21, 9); oval(wood, 22, 14, 21, 11); oval(woodHi, 21, 12, 19, 8);
       rect(wood, 5, 13, 27); rect(wood, 9, 19, 19); oval(ink, 32, 17, 4, 3); oval('#c4b499', 32, 16, 3, 2);
@@ -153,13 +154,14 @@ function worldSprite(o, pal, frame = 0) {
       });
       rect(woodDk, 16, 12, 9); rect(wood, 20, 14, 6);
     } else if (o.kind === 'tube') {
-      oval(r.sh, 8, 17, 7, 2); oval(r.base, 7, 16, 5, 2); rect(r.hi, 4, 15, 3);
-      poly(ink, [[7,13],[14,3],[27,8],[22,18],[12,16]]);
-      poly('#d9d5cb', [[9,12],[15,5],[25,9],[21,16],[12,14]]);
-      poly(paper, [[10,11],[15,5],[24,9],[19,11]]);
-      poly(r.sh, [[14,9],[18,5],[24,8],[21,13]]); poly(r.base, [[14,9],[17,6],[23,9],[20,12]]);
-      rect(ink, 23, 6, 5, 2); rect('#a09aa1', 24, 5, 5); rect('#67616d', 7, 11, 4, 4); rect('#e5dfd2', 7, 11, 3); rect(r.base, 6, 14, 2, 2);
-      rect('#9b9294', 15, 12, 3); rect(paper, 18, 8, 2);
+      // Un tubo de óleo tumbado y medio exprimido: cuerpo de aluminio con arrugas, etiqueta de su color, tapón y un churro de pintura.
+      oval('rgba(40,30,40,.25)', 15, 17, 13, 2);
+      poly(ink, [[2,10],[5,6],[20,4],[24,6],[24,13],[20,15],[5,15]]);
+      poly('#cfd0cc', [[3,10],[6,7],[20,5],[23,7],[23,12],[20,14],[6,14]]);
+      rect('#f2f2ea', 7, 7, 13, 1); rect('#9a9aa0', 6, 13, 15, 1); for (let a = 4; a < 9; a += 2) { rect('#9a9aa0', a, 8, 1, 5); rect('#f2f2ea', a + 1, 8, 1, 4); } // el culo, doblado y arrugado
+      rect(ink, 10, 6, 9, 9); rect(r.base, 11, 7, 7, 7); rect(r.hi, 11, 7, 7, 2); rect(r.sh, 11, 12, 7, 2); rect(paper, 13, 9, 3, 2); // etiqueta
+      rect(ink, 24, 7, 2, 5); rect('#8c8ab0', 24, 8, 1, 3); rect(ink, 26, 6, 3, 7); rect('#6a6480', 26, 7, 2, 5); rect('#b8b6cc', 26, 7, 1, 2); // cuello y tapón
+      poly(r.out, [[24,14],[27,13],[29,16],[26,19],[21,18]]); poly(r.base, [[24,15],[27,14],[28,16],[26,18],[22,17]]); rect(r.hi, 24, 15, 2, 1); rect(paper, 25, 15); // el churro
     } else if (o.kind === 'jar') {
       oval(ink, 11, 27, 10, 3); rect(ink, 1, 8, 21, 19); oval(ink, 11, 8, 10, 4);
       rect('#aebbc1', 3, 9, 17, 17); rect(r.sh, 3, 17, 17, 9); oval(r.base,11,18,8,3); oval(r.sh,11,26,8,2);
@@ -205,11 +207,13 @@ function worldSprite(o, pal, frame = 0) {
       oval(ink,21,19,4,4); oval(woodHi,21,19,2,2); rect(paper,20,18);
       rect(ink,23,36,8,7); rect(paper,24,37,6,5); rect(r.base,25,38,4,2);
     } else if (o.kind === 'flower') {
-      const stem=pal==='vivo'?'#638250':'#85816a';
-      const sway = frame === 1 ? 1 : frame === 3 ? -1 : 0, head=8+sway;
-      rect(ink,8,10,2,13); rect(stem,8,10,1,12); rect(stem,4,16,4,2); rect(stem,10,13,4,2); rect('#b4bc7d',4,15,2);
-      if(variant===1) { oval(r.dk,head,8,7,5); oval(r.base,head,6,7,4); rect(r.hi,head-4,3,4); rect(paper,head-3,4); rect(paper,head+2,6,2); }
-      else { [[0,-4],[4,-1],[3,3],[-3,3],[-4,-1]].forEach(([dx,dy])=>{oval(r.sh,head+dx,8+dy,3,3);oval(r.base,head+dx,7+dy,2,2);}); oval(woodDk,head,7,2,2); rect('#ffe6a0',head-1,6,2,2); }
+      // Flor de pigmento: tallo con dos hojas, cinco pétalos redondos con sombra y el centro de polen; se mece.
+      const stem = pal === 'vivo' ? '#5f8a4c' : '#86836c', leaf = pal === 'vivo' ? '#7fae5c' : '#9a9a7c', sway = frame === 1 ? 1 : frame === 3 ? -1 : 0, hx = 9 + sway, hy = 7;
+      rect(ink, 8, 11, 3, 13); rect(stem, 9, 11, 1, 12); rect(pal === 'vivo' ? '#8fbf6a' : '#a8a88c', 9, 12, 1, 5);
+      poly(ink, [[9,18],[3,14],[2,17],[8,20]]); poly(leaf, [[9,18],[4,15],[3,16],[8,19]]); poly(ink, [[10,15],[16,12],[16,15],[10,17]]); poly(leaf, [[10,15],[15,13],[15,14],[10,16]]);
+      if (variant === 1) { oval(ink, hx, hy + 1, 6, 5); oval(r.sh, hx, hy + 1, 5, 4); oval(r.base, hx, hy, 5, 3); rect(r.hi, hx - 3, hy - 2, 3); rect(paper, hx - 3, hy - 2); rect(r.dk, hx - 1, hy + 3, 3); } // capullo
+      else { [[0,-4],[4,-1],[3,3],[-3,3],[-4,-1]].forEach(([dx,dy]) => oval(ink, hx + dx, hy + dy, 3, 3)); [[0,-4],[4,-1],[3,3],[-3,3],[-4,-1]].forEach(([dx,dy]) => { oval(r.sh, hx + dx, hy + dy + 1, 2, 2); oval(r.base, hx + dx, hy + dy, 2, 2); rect(r.hi, hx + dx - 1, hy + dy - 1, 2, 1); });
+        oval(ink, hx, hy, 2, 2); oval('#e8a830', hx, hy, 2, 1); rect('#ffe6a0', hx - 1, hy - 1, 2, 1); }
     } else if(o.kind==='fan') {
       // Hinged colour-sample cards: paper edging, two tones and a brass rivet.
       for(let i=0;i<5;i++){
@@ -223,15 +227,17 @@ function worldSprite(o, pal, frame = 0) {
       [[-6,0],[-3,-4],[3,-4],[6,0],[0,-1]].forEach(([a,b])=>{oval(r.sh,14+a,11+b-lift,4,4);oval(r.base,14+a,10+b-lift,3,3);rect(r.hi,13+a,8+b-lift,2,1);});
       oval('#edd481',14,10-lift,3,2);rect(paper,13,8-lift,2,1);
     } else if(o.kind==='reeds') {
+      // Juncos de plumilla: tallos de caña con puntas de pluma metálica, y una mata de hojas a sus pies.
       for(let i=0;i<3;i++){
-        const xx=5+i*6,top=i===1?0:6;rect(woodDk,xx,top+8,2,19-top);rect(woodHi,xx,top+9,1,16-top);
-        poly(ink,[[xx-3,top+9],[xx,top],[xx+4,top+9],[xx+2,top+14],[xx-1,top+14]]);
-        poly('#b8c7bc',[[xx-2,top+9],[xx,top+2],[xx+2,top+10],[xx,top+12]]);rect('#526f73',xx,top+5,1,6);rect(paper,xx-1,top+7,1,3);
+        const xx=5+i*6,top=i===1?0:5;rect(ink,xx-1,top+9,3,19-top);rect(woodDk,xx,top+9,1,18-top);rect(woodHi,xx,top+10,1,12-top);
+        poly(ink,[[xx-3,top+10],[xx,top],[xx+4,top+10],[xx+2,top+14],[xx-1,top+14]]);
+        poly('#c8d2cc',[[xx-2,top+9],[xx,top+2],[xx+2,top+10],[xx,top+12]]);poly('#8fa3a8',[[xx,top+2],[xx+3,top+10],[xx,top+12]]);rect('#3a4a5a',xx,top+5,1,6);rect(paper,xx-1,top+6,1,3);
       }
-      poly(pal==='vivo'?'#7c9e67':'#969d77',[[10,27],[0,17],[3,16],[11,23],[20,17],[21,20],[13,27]]);rect('#c0c58e',3,18,2,1);
+      const lf=pal==='vivo'?'#7c9e67':'#969d77';poly(ink,[[11,28],[0,16],[4,15],[11,23],[21,15],[22,19],[13,28]]);poly(lf,[[11,27],[1,17],[4,16],[11,24],[20,16],[21,19],[13,27]]);rect('#c0c58e',3,17,2,1);rect('#c0c58e',19,17,1,1);
     } else if(o.kind==='boat') {
-      poly('#726978',[[0,10],[23,10],[18,15],[7,15]]); poly(paper,[[2,10],[21,10],[17,13],[7,13]]);
-      poly('#ede1c9',[[5,9],[13,0],[18,9]]); poly('#a7a4b8',[[13,0],[13,9],[18,9]]); rect(r.base,7,12,11); rect('#fff9e9',8,8,4);
+      // Barco de papel doblado: casco con sus pliegues, vela en dos caras y una franja pintada de su color.
+      poly(ink,[[0,9],[23,9],[18,15],[5,15]]); poly('#f4ecd8',[[2,10],[21,10],[17,14],[6,14]]); poly('#c9bfa8',[[11,10],[21,10],[17,14],[11,14]]); rect(r.base,5,11,14,2); rect(r.hi,5,11,6,1);
+      poly(ink,[[4,10],[12,0],[19,10]]); poly('#fbf5e6',[[6,9],[12,2],[12,9]]); poly('#d8cfbd',[[12,2],[17,9],[12,9]]); rect('#fff9e9',8,6,2,2); rect(ink,12,1,1,9);
     }
     return c;
   });
@@ -319,7 +325,7 @@ function drawPigmentMotes(cx,cy,pal){
 // Humo de chimenea: las casas-bote echan bocanadas de su color que suben y se deshacen.
 function drawChimneys(cx,cy,pal){
   if(!Prefs.shake)return;
-  for(const o of worldObjects()){if(o.kind!=='house')continue;const bx=o.wx-cx+9,by=o.wy-cy-50;if(bx<-20||bx>W+20||by<-40||by>H+20)continue;const col=worldPigment(o.color,pal);
+  for(const o of worldObjects()){if(o.kind!=='house')continue;const bx=o.wx-cx+9,by=o.wy-cy-52;if(bx<-20||bx>W+20||by<-40||by>H+20)continue;const col=worldPigment(o.color,pal);
     for(let k=0;k<4;k++){const q=((OW.t*.012+k/4+o.id*.13)%1),x=bx+Math.sin(q*6+k)*3+q*6,y=by-q*26,r=1.5+q*3.5;g.globalAlpha=.55*(1-q);g.fillStyle=k%2?col:worldMix(col,'#fff6e2',.5);g.beginPath();g.ellipse(x,y,r,r*.8,0,0,6.29);g.fill();}}
   g.globalAlpha=1;
 }
