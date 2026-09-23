@@ -39,6 +39,10 @@ const base=process.argv.find(a=>a.startsWith('http'))||'http://127.0.0.1:8765';
     assert.deepEqual(first.stages,['focus','enter','mix','clear','exit','settle','idle']);assert.deepEqual(first.fills,[0,1,2,3]);
     assert.equal(first.events.filter(e=>e.name==='splash_clean').length,6);assert.equal(first.events.filter(e=>e.name==='heal_bells').length,1);
     console.log('PASS every phase, visible immersion, six splashes, full healing including KO, original positions and camera');
+    const words=await page.evaluate(()=>{rinseTest.setup();updateOverworld();const seen=new Set();let n=0;
+      while(OW.heal){if(++n>900)break;updateOverworld();if(!OW.heal)break;UI_TEXT.length=0;render();for(const t of UI_TEXT)seen.add(t.text);}return[...seen];});
+    assert.deepEqual(words,[],'the rinse should speak only in pictures: '+words.join(' | '));
+    console.log('PASS the whole visit, recovery included, is told without a single word');
 
     const repeat=await page.evaluate(()=>{
       for(let i=0;i<180;i++)updateOverworld();const noLoop=!OW.heal&&OW.jar.visits===1;

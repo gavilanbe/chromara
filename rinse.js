@@ -4,7 +4,7 @@ const RINSE = { w: 52, h: 68, ox: -10, oy: -30, surface: 32, floor: 63 };
 function rinseState() {
   return { phase: 'idle', clock: 0, visits: 0, bubbles: [], tint: [], hidden: [false,false,false],
     inside: [0,0,0], jump: [null,null,null], pos: [], squash: [0,0,0], clean: [false,false,false],
-    wob: 0, glow: 0, charge: 0, clarity: 0, zoom: 1, focus: 0, cd: 0, rings: [], spray: [], drops: [], toast: 0, gain: [null,null,null], bursts: [] };
+    wob: 0, glow: 0, charge: 0, clarity: 0, zoom: 1, focus: 0, cd: 0, rings: [], spray: [], drops: [], toast: 0, gain: [null,null,null], bursts: [], rise: 0, full: [0,0,0] };
 }
 function rinseOval(x, col, cx, cy, rx, ry) {
   cx=Math.round(cx);cy=Math.round(cy);rx=Math.max(1,Math.round(rx));ry=Math.max(1,Math.round(ry));
@@ -23,7 +23,7 @@ function rinseGlass(x,pal,J,t) {
   rect('#c1d1c7',10,21,32,30);rect('#d8e0ce',11,23,6,22);rect('#9aafb7',39,24,4,30);
   // Water is clipped to the inside of the glass, including floating characters.
   x.save();rinseClip(x);
-  const wave=Math.sin(t*.04)*.4+J.wob*Math.sin(t*.21)*1.5, surface=RINSE.surface+wave;
+  const wave=Math.sin(t*.04)*.4+J.wob*Math.sin(t*.21)*1.5, surface=RINSE.surface+wave-(J.rise||0); // cada gota que entra sube el agua
   const water=worldMix(p.wash,'#86d9d5',J.clarity*.45);
   for(let row=Math.round(surface);row<62;row++){
     rect(worldMix(water,p.washDk,(row-surface)/45),9,row,34,1);
@@ -75,6 +75,7 @@ function rinseSprite(pal) {
 function rinseTick() {
   const J=OW.jar;if(!J||!MAP.jar)return;
   J.clock++;J.wob*=.91;J.glow*=.94;if(J.toast>0)J.toast--;
+  J.rise=(J.rise||0)+(J.inside.reduce((a,b)=>a+b,0)*2.4-(J.rise||0))*.14;
   for(const b of J.bubbles){b.y-=b.v;b.x+=Math.sin(b.t*.17)*.08;b.t++;}J.bubbles=J.bubbles.filter(b=>b.y>RINSE.surface+1&&b.t<110);
   if(J.clock%(OW.heal?7:70)===0)J.bubbles.push({x:16+(J.clock*7%21),y:56,v:OW.heal?.35:.16,r:OW.heal&&J.clock%3===0?2:1,t:0});
   for(const r of J.rings)r.t++;J.rings=J.rings.filter(r=>r.t<r.life);
@@ -85,10 +86,12 @@ function rinseTick() {
   for(const b of J.bursts||[])b.t++;J.bursts=(J.bursts||[]).filter(b=>b.t<40);
 }
 function rinseSplash(i,power=1) {
-  const J=OW.jar,cx=MAP.jar.x*TILE+16,sy=MAP.jar.y*TILE+RINSE.oy+RINSE.surface;
+  const J=OW.jar,cx=MAP.jar.x*TILE+16,sy=MAP.jar.y*TILE+RINSE.oy+RINSE.surface-Math.round(J.rise||0);
   J.wob=power;J.rings.push({x:(i-1)*4,t:0,life:30,col:C(Party[i].color)});
   const rng=seeded(i*101+J.clock);
   for(let n=0;n<14;n++){const a=(n/13)*Math.PI, speed=1+rng()*1.7;J.spray.push({x:cx+(i-1)*3,y:sy+1,vx:Math.cos(a)*speed*power,vy:-Math.sin(a)*speed-1,col:n%3?C(Party[i].color):'#d7f4e1',r:n%4===0?2:1,t:0,life:65});}
+  // columna de agua que salta por encima del borde
+  for(let n=0;n<10;n++)J.spray.push({x:cx+(i-1)*3+(rng()-.5)*4,y:sy,vx:(rng()-.5)*.5,vy:-(2.6+rng()*2.2)*power,col:n%3?'#e8f8f0':C(Party[i].color),r:n%3?2:1,t:0,life:70});
   Audio.sfx('splash_clean',{semi:[0,4,7][i],vol:.55*power,pan:(i-1)*.25});
 }
 function drawRinseGround(cx,cy,pal) {
@@ -137,35 +140,62 @@ function drawRinseSpotlight(){
   if(Prefs.flash&&(J.phase==='clear'||J.phase==='exit')){const a=(J.phase==='clear'?J.clarity:1)*Prefs.flash;g.save();g.globalAlpha=.22*a;
     for(let i=0;i<7;i++){const ang=-Math.PI/2+(i-3)*.28+Math.sin(J.clock*.02+i)*.04,len=(70+i%3*16)*z;g.fillStyle=i%2?'#fff3c0':'#e8f6f2';g.beginPath();g.moveTo(jx,jy-10*z);g.lineTo(jx+Math.cos(ang-.05)*len,jy+Math.sin(ang-.05)*len);g.lineTo(jx+Math.cos(ang+.05)*len,jy+Math.sin(ang+.05)*len);g.fill();}g.restore();}
 }
-// La ficha de la cura: las tres gotas con su pintura (HP) y su pigmento (MP); al salir del agua, cada una se rellena
-// con un chorro que corre de izquierda a derecha y los números cuentan hasta el máximo.
+// Sin texto: tres frascos con forma de gota (son las tres gotas, con su color y su cara). El nivel de pintura es su
+// vida; las cinco chispas de debajo, su pigmento. Al salir del agua, un chorro de su color va del vaso a su frasco, que se
+// llena con burbujas y oleaje; las chispas se encienden una a una y, lleno, el frasco salta de alegría.
+function rinseScreen(wx,wy){const J=OW.jar,z=J.zoom||1;return [(wx-OW.cam.x-W/2)*z+W/2,(wy-OW.cam.y-H/2)*z+H/2];}
+function rinseVialPath(x,y){g.beginPath();g.moveTo(x,y-34);g.bezierCurveTo(x+3,y-27,x+12,y-23,x+12,y-13);g.arc(x,y-13,12,0,Math.PI);g.bezierCurveTo(x-12,y-23,x-3,y-27,x,y-34);g.closePath();}
+function drawRinseVial(i,x,y,hp,mp,t,filling,full){
+  const p=Party[i],col=C(p.color),r=ramp(col),f=clamp(hp,0,1),sh=Prefs.shake;
+  g.save();
+  if(full>0&&full<1&&sh){const s=1+Math.sin(full*Math.PI)*.18;g.translate(x,y);g.scale(s,2-s);g.translate(-x,-y);}
+  if(f<.3&&!filling&&sh)g.translate(Math.round(Math.sin(t*.9+i)*.6),0); // tiembla, vacío
+  // sombra y cristal
+  g.fillStyle='rgba(11,9,18,.35)';g.beginPath();g.ellipse(x,y+1,11,3,0,0,6.29);g.fill();
+  rinseVialPath(x,y);g.fillStyle='rgba(90,86,112,.45)';g.fill();
+  // pintura dentro, con la superficie ondulada (más oleaje mientras se llena)
+  g.save();rinseVialPath(x,y);g.clip();
+  const top=y-1-f*33,amp=filling&&sh?1.6:.6;
+  for(let xx=-12;xx<=12;xx++){const wy=Math.round(top+Math.sin(xx*.5+t*(filling?.35:.08))*amp);g.fillStyle=r.base;g.fillRect(x+xx,wy,1,y-wy+1);g.fillStyle=r.hi;g.fillRect(x+xx,wy,1,1);}
+  g.fillStyle=r.sh;g.fillRect(x-12,y-5,25,6);g.fillStyle=r.sh;g.globalAlpha=.5;g.fillRect(x+6,top,6,y-top);g.globalAlpha=1;
+  if(filling&&sh)for(let n=0;n<5;n++){const q=((t*.05+n*.21)%1),bx=x-7+n*3.5+Math.sin(t*.2+n)*1.2,by=y-2-q*(y-2-top);g.fillStyle='rgba(255,255,255,.75)';g.fillRect(Math.round(bx),Math.round(by),1,1);}
+  g.restore();
+  // contorno, brillo del cristal
+  rinseVialPath(x,y);g.strokeStyle='#1e1a2c';g.lineWidth=2;g.stroke();rinseVialPath(x,y);g.strokeStyle=f>.99?r.hi:'#6a6480';g.lineWidth=1;g.globalAlpha=.6;g.stroke();g.globalAlpha=1;
+  g.fillStyle='rgba(255,255,255,.7)';g.fillRect(x-8,y-18,1,6);g.fillRect(x-7,y-20,1,1);
+  // su cara: ojos en X sin pintura, tristes si queda poca, contentos llenos
+  const ey=y-13;g.fillStyle='#1e1a2c';
+  if(f<=0){for(const d of [-4,4]){g.fillRect(x+d-1,ey-1,1,1);g.fillRect(x+d+1,ey-1,1,1);g.fillRect(x+d,ey,1,1);g.fillRect(x+d-1,ey+1,1,1);g.fillRect(x+d+1,ey+1,1,1);}}
+  else if(f>.99){for(const d of [-4,4]){g.fillRect(x+d-1,ey,1,1);g.fillRect(x+d,ey-1,1,1);g.fillRect(x+d+1,ey,1,1);}g.fillRect(x-1,ey+4,3,1);g.fillStyle='#ff9d9d';g.fillRect(x-8,ey+2,2,1);g.fillRect(x+7,ey+2,2,1);}
+  else if(f<.4){for(const d of [-4,4]){g.fillRect(x+d,ey-1,1,2);g.fillRect(x+d+(d<0?1:-1),ey-2,1,1);}g.fillRect(x-1,ey+4,3,1);g.fillRect(x-2,ey+5,1,1);g.fillRect(x+2,ey+5,1,1);}
+  else{for(const d of [-4,4])g.fillRect(x+d,ey-1,1,2);g.fillRect(x,ey+4,1,1);}
+  // chispas de pigmento
+  const lit=Math.round(clamp(mp,0,1)*5);
+  for(let n=0;n<5;n++){const px2=x-8+n*4,py2=y+5,on=n<lit;g.fillStyle=on?'#8ec8e8':'#3a3652';g.fillRect(px2,py2-1,1,3);g.fillRect(px2-1,py2,3,1);if(on){g.fillStyle='#ffffff';g.fillRect(px2,py2,1,1);}}
+  g.restore();
+  // lleno: anillo y estrellitas
+  if(full>0&&full<1){paintRing(x,y-14,full,col,24);if(sh)for(let n=0;n<6;n++){const a=n/6*6.283+i,d=12+full*14;g.globalAlpha=1-full;g.fillStyle=n%2?col:'#fff8e6';const sx=Math.round(x+Math.cos(a)*d),sy=Math.round(y-14+Math.sin(a)*d);g.fillRect(sx-1,sy,3,1);g.fillRect(sx,sy-1,1,3);}g.globalAlpha=1;}
+}
 function drawRinseUI() {
-  const J=OW.jar;if(!J)return;
-  if(OW.heal){
-    drawRinseSpotlight();
-    const labels={focus:'Un respiro junto al agua',enter:'Al agua, gota a gota',mix:'Tres colores en un remolino',clear:'El agua devuelve el color',exit:'Como recién pintados',settle:'Listos para seguir'};
-    const label=labels[J.phase]||labels.focus,at=artObserve('rinse-phase',J.phase),w=rotuloWidth(label.toUpperCase())+26,k=clamp((J.focus||0)*1.4,0,1);
-    g.save();g.translate(0,Math.round((1-k)*-30));brushBand(Math.round((W-w)/2),4,w,17,KIT_INK);bigText(label,Math.round((W-w)/2)+13,8,'#b8e0f0',{outline:'#0b0912',progress:Prefs.shake?(ARTUI.t-at)*1.4:null});g.restore();
-    g.save();g.translate(0,Math.round((1-k)*50));
-    Party.forEach((p,i)=>{
-      const x=8+i*104,y=150,s=effStats(p),gn=J.gain[i],q=gn?clamp((J.clock-gn.at)/34,0,1):0,e=1-(1-q)**3,hp=gn?lerp(gn.hp0,gn.hp,e):p.cur.hp,mp=gn?lerp(gn.mp0,gn.mp,e):p.cur.mp,col=C(p.color),inside=J.inside[i],clean=J.clean[i];
-      maskingLabel(x,y,96,26,clean?'#fff3d2':'#e8dcc4');
-      const bob=inside&&Prefs.shake?Math.round(Math.sin(J.clock*.2+i)*1.5):0;
-      sticker(x+11,y+12+bob,{...p,alive:p.cur.hp>0,hp:p.cur.hp,maxhp:s.hp,mp:p.cur.mp,maxmp:s.mp},8);
-      if(inside){g.fillStyle='#8ec8e8';g.globalAlpha=.5;g.beginPath();g.ellipse(x+11,y+14,10,5,0,0,6.29);g.fill();g.globalAlpha=1;} // en el agua
-      smallText(p.name,x+23,y+2,UI_INK);
-      g.fillStyle='#cfc1a9';g.fillRect(x+23,y+12,62,3);g.fillStyle=col;g.fillRect(x+23,y+12,Math.round(62*hp/s.hp),3);g.fillStyle=ramp(col).hi;g.fillRect(x+23,y+12,Math.round(62*hp/s.hp),1);
-      g.fillStyle='#cfc1a9';g.fillRect(x+23,y+18,62,2);g.fillStyle='#6fa6d8';g.fillRect(x+23,y+18,Math.round(62*mp/s.mp),2);
-      if(gn&&q<1&&Prefs.shake){const fx=x+23+Math.round(62*hp/s.hp);g.fillStyle='#fff8e6';g.fillRect(fx-1,y+11,2,5);} // la punta del chorro
-      textRight(Math.round(hp),x+93,y+2,clean?'#34733e':UI_MUTED);
-      if(gn&&J.clock-gn.at<70&&(gn.dh||gn.dm)){const r=(J.clock-gn.at)/70;g.save();g.globalAlpha=1-r*r;const t2='+'+gn.dh;smallText(t2,x+60-textWidth(t2),y-9-Math.round(r*6),'#34733e');g.restore();}
-    });
-    g.restore();
-  }else if(J.toast>0&&!OW.msg&&!OW.menu&&!OW.ring){
-    const label='Como recién pintados: HP y MP al máximo',w=textWidth(label)+34,age=150-J.toast;
-    g.save();g.globalAlpha=Math.min(1,J.toast/20);g.translate(0,Math.round((1-(Prefs.shake?easeBack(clamp(age/14,0,1)):1))*26));maskingLabel((W-w)/2,H-24,w,17);
-    g.drawImage(iconSprite('item',C('azul')),(W-w)/2+5,H-22);smallText(label,(W-w)/2+24,H-19,UI_INK,{progress:Prefs.shake?age*1.4:Infinity,wet:C('azul')});g.restore();
-  }
+  const J=OW.jar;if(!J||!MAP.jar)return;
+  const after=!OW.heal&&J.toast>0&&!OW.msg&&!OW.menu&&!OW.ring;if(!OW.heal&&!after)return;
+  if(OW.heal)drawRinseSpotlight();
+  const k=OW.heal?clamp((J.focus||0)*1.4,0,1):clamp((J.toast-95)/25,0,1),t=J.clock,e=Prefs.shake?easeBack(k):k;
+  const [gx,gy]=rinseScreen(MAP.jar.x*TILE+16,MAP.jar.y*TILE+RINSE.oy+RINSE.surface+30);
+  // una balda de madera abajo a la izquierda, fuera del vaso y del grupo
+  { const y=Math.round(H-5+(1-e)*60);g.fillStyle='#3a2a22';g.fillRect(4,y-1,122,6);g.fillStyle='#8a6440';g.fillRect(4,y-2,122,4);g.fillStyle='#b88a5a';g.fillRect(4,y-2,122,1);g.fillStyle='#5a3e2a';g.fillRect(8,y+2,3,5);g.fillRect(119,y+2,3,5); }
+  Party.forEach((p,i)=>{
+    const s=effStats(p),gn=J.gain[i],q=gn?clamp((J.clock-gn.at)/40,0,1):1,ez=1-(1-q)**3,hp=gn?lerp(gn.hp0,gn.hp,ez):p.cur.hp,mp=gn?lerp(gn.mp0,gn.mp,clamp((J.clock-gn.at-8)/40,0,1)):p.cur.mp;
+    const x=26+i*39,y=Math.round(H-12+(1-e)*60),filling=!!gn&&q<1;
+    // el chorro: gotas de su color que saltan del vaso a su frasco
+    if(gn&&J.clock-gn.at<44)for(let n=0;n<14;n++){const u=(J.clock-gn.at-n*2)/22;if(u<0||u>1)continue;const cx2=lerp(gx,x,u),cy2=lerp(gy,y-18,u)-Math.sin(u*Math.PI)*34,rr=n%3?1:2;g.fillStyle=n%4?C(p.color):'#fff8e6';g.fillRect(Math.round(cx2),Math.round(cy2),rr,rr+1);}
+    if(gn&&q>=1&&!J.full[i])J.full[i]=J.clock;
+    const full=J.full[i]?clamp((J.clock-J.full[i])/24,0,1):0;
+    drawRinseVial(i,x,y,hp/s.hp,mp/s.mp,t,filling,full>0&&full<1?full:0);
+  });
+  // al terminar: el grupo da un saltito con chispas (el mapa ya ha vuelto)
+  if(after&&J.toast>110&&Prefs.shake){const q=(150-J.toast)/40;Party.forEach((p,i)=>{const h=OW.hist[Math.min(OW.hist.length-1,i*12)],wx=i?h?.[0]??OW.x:OW.x,wy=i?h?.[1]??OW.y:OW.y,x=wx-OW.cam.x,y=wy-OW.cam.y-14-Math.sin(q*Math.PI)*6;
+    for(let n=0;n<4;n++){const a=n/4*6.283+q*3+i,d=6+q*8;g.globalAlpha=1-q;g.fillStyle=n%2?C(p.color):'#fff8e6';const sx=Math.round(x+Math.cos(a)*d),sy=Math.round(y+Math.sin(a)*d*.6);g.fillRect(sx-1,sy,3,1);g.fillRect(sx,sy-1,1,3);}g.globalAlpha=1;});}
 }
 function rinseFocus(k,start) {
   const J=OW.jar;J.focus=k;
@@ -178,7 +208,7 @@ function rinseFocus(k,start) {
 function* rinseSequence() {
   const J=OW.jar,cam={...OW.cam},hist=OW.hist.map(h=>[...h]),cx=MAP.jar.x*TILE+16,sy=MAP.jar.y*TILE+RINSE.oy+RINSE.surface;
   const repeat=J.visits>0,focusFrames=repeat?12:24,entryFrames=repeat?23:30,mixFrames=repeat?40:78;
-  J.phase='focus';J.gain=[null,null,null];J.bursts=[];J.tint=[];J.inside=[0,0,0];J.hidden=[false,false,false];J.clean=[false,false,false];J.charge=0;J.clarity=0;J.toast=0;
+  J.phase='focus';J.gain=[null,null,null];J.full=[0,0,0];J.bursts=[];J.tint=[];J.inside=[0,0,0];J.hidden=[false,false,false];J.clean=[false,false,false];J.charge=0;J.clarity=0;J.toast=0;
   Audio.sfx('glass',{vol:.4});
   try {
     for(let n=1;n<=focusFrames;n++){rinseFocus(n/focusFrames,cam);yield;}
@@ -202,16 +232,17 @@ function* rinseSequence() {
     for(let i=0;i<Party.length;i++){
       const p=Party[i],to=J.pos[i],s=effStats(p),dh=s.hp-p.cur.hp,dm=s.mp-p.cur.mp;
       J.hidden[i]=false;J.inside[i]=0;J.clean[i]=true;p.cur.hp=s.hp;p.cur.mp=s.mp;rinseSplash(i,.65);
+      J.gain[i]={hp0:s.hp-dh,mp0:s.mp-dm,hp:s.hp,mp:s.mp,dh,dm,at:J.clock};Audio.sfx('tinkle',{semi:[0,4,7][i]+12,vol:.3,when:.35});
       for(let n=1;n<=24;n++){
         const q=n/24;J.jump[i]=[lerp(cx+(i-1)*4,to[0],q),lerp(sy+6,to[1],q),Math.sin(q*Math.PI)*(30+i*3),Math.sin(q*Math.PI*2)*(1-i)*.12,.93,1.08];yield;
       }
       J.jump[i]=null;Audio.sfx('plop',{semi:[0,4,7][i],vol:.28});Audio.sfx('tinkle',{semi:[0,4,7][i],vol:.35});
-      J.gain[i]={hp0:s.hp-dh,mp0:s.mp-dm,hp:s.hp,mp:s.mp,dh,dm,at:J.clock};rinseBurst(i,to);
+      rinseBurst(i,to);
       for(let n=0;n<8;n++){J.squash[i]=Math.sin((n+1)/8*Math.PI)*.65;yield;}J.squash[i]=0;
     }
     J.phase='settle';
     for(let n=0;n<24;n++){rinseFocus(1-(n+1)/24,cam);J.clarity=1;yield;}
-    J.visits++;J.toast=150;J.gain=[null,null,null];
+    J.visits++;J.toast=150;J.gain=[null,null,null];J.full=[0,0,0];
   } finally {
     J.phase='idle';J.zoom=1;J.focus=0;J.glow=0;J.charge=0;J.clarity=0;J.inside=[0,0,0];J.hidden=[false,false,false];J.jump=[null,null,null];J.squash=[0,0,0];J.tint=[];J.cd=1;
     OW.hist=hist;OW.cam.x=cam.x;OW.cam.y=cam.y;OW.vx=OW.vy=0;OW.moving=false;
