@@ -1,483 +1,269 @@
-// Magias de campo: una misma regla de pigmentos, desde la puerta hasta el circuito.
+// Magias de campo: las herramientas del pintor actúan sobre la página. Colorear da cuerpo a un boceto (si recibe el color que
+// pide; los colores se mezclan sobre el propio objeto), Trazar dibuja una línea de grafito entre dos chinchetas, Borrar quita lo
+// que es lápiz (y el color mal puesto) y Aguada diluye la Tinta. Se abre el anillo con C, se elige con ←/→ y la magia sale
+// hacia donde mira el líder, sobre lo primero que haya delante. Gastan pintura (MP), que vuelve al caminar.
 'use strict';
-const FIELD = [
-  { id: 'rojo', name: 'Rojo', owner: 'carmin', tool: 'brocha', detail: 'Carmín / brocha' },
-  { id: 'amarillo', name: 'Amarillo', owner: 'ambar', tool: 'lapiz', detail: 'Ámbar / lápiz' },
-  { id: 'azul', name: 'Azul', owner: 'anil', tool: 'pincel', detail: 'Añil / pincel' },
-  { id: 'agua', name: 'Aclarar', owner: 'anil', tool: 'pincel', detail: 'Añil / agua' },
-];
-const FIELD_MIXES = [
-  { pair: ['rojo', 'amarillo'], color: 'naranja', effect: 'Calor' },
-  { pair: ['amarillo', 'azul'], color: 'verde', effect: 'Brote' },
-  { pair: ['rojo', 'azul'], color: 'violeta', effect: 'Revelar' },
-];
-function fieldPuzzleState() {
-  return { bowls: { wax: [], seed: [], lens: [] }, nodes: { a: null, b: null, c: null },
-    painted: 0, sun: 0, sunBend: 0, revealed: false, opened: false, opening: false };
-}
-function fieldMix(colors) {
-  const unique = [...new Set(colors.filter(Boolean))];
-  if (!unique.length) return null;
-  if (unique.length === 1) return unique[0];
-  return FIELD_MIXES.find(m => unique.length === 2 && m.pair.every(c => unique.includes(c)))?.color || 'barro';
-}
-function fieldColor(color) { return color === 'agua' ? '#99dce4' : color === 'barro' ? '#78644d' : color ? C(color) : '#b6ac99'; }
-function fieldOwner(f) { return Party.find(p => p.id === f.owner); }
-function fieldOk(f) { return fieldOwner(f)?.cur.hp > 0; }
+const FIELD = DATA.fieldArts;
+const FIELD_DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const FIELD_MIX = { 'amarillo+rojo': 'naranja', 'amarillo+azul': 'verde', 'azul+rojo': 'violeta' };
+function fieldPuzzleState() { return { erased: 0, line: 0, sketch: [], real: 0, washed: 0, opened: false, opening: false }; }
+function fieldMixOf(colors) { const u = [...new Set(colors)].sort(); return u.length === 0 ? null : u.length === 1 ? u[0] : u.length === 2 ? FIELD_MIX[u.join('+')] : 'barro'; }
+function fieldArt(id) { return FIELD.find(a => a.id === id); }
+function fieldOwners(art) { return art.users.map(id => Party.find(p => p.id === id)).filter(Boolean); }
+function fieldOk(art) { return fieldOwners(art).every(p => p.cur.hp > 0); }
+function fieldAfford(art) { return fieldOwners(art).every(p => p.cur.mp >= art.mp); }
+function fieldNotice(text) { OW.fieldToast = { text, t: 200 }; }
+// ---- El taller: sus piezas salen del mapa (MAP.pz) y de Game.puzzle; posiciones en casillas y en píxeles de mundo.
 function fieldTargets() {
-  return Game.page === 1 ? [] : DATA.puzzle.targets;
+  const p = MAP.pz, z = Game.puzzle; if (!p || !z || Game.page === 1) return [];
+  const T = DATA.puzzle.things, at = (id, kind, [tx, ty], w = 1, h = 1, extra = {}) => ({ id, kind, name: T[kind].name, tx, ty, tw: w, th: h, x: (tx + w / 2) * TILE, y: (ty + h / 2) * TILE, ...extra });
+  const list = [];
+  if (p.torn.length && z.erased < 1) { const xs = p.torn.map(t => t[0]), ys = p.torn.map(t => t[1]); list.push(at('scribble', 'scribble', [Math.min(...xs), Math.min(...ys)], Math.max(...xs) - Math.min(...xs) + 1, Math.max(...ys) - Math.min(...ys) + 1)); }
+  p.pins.forEach((q, i) => list.push(at('pin' + i, z.line >= 1 ? 'line' : 'pin', q)));
+  if (z.line >= 1 && p.pins.length === 2) { const [a, b] = p.pins; for (let x = Math.min(a[0], b[0]) + 1; x < Math.max(a[0], b[0]); x++) list.push(at('line' + x, 'line', [x, a[1]])); }
+  if (p.sketch) list.push(at('sketch', 'sketch', p.sketch, 1, 1, { real: z.real >= 1 }));
+  for (const q of p.pit) if (!(p.sketch && q[0] === p.sketch[0] && q[1] === p.sketch[1])) list.push(at('pit' + q[0], 'pit', q));
+  if (z.washed < 1) for (const q of p.puddle) list.push(at('puddle' + q[0] + '_' + q[1], 'puddle', q));
+  if (p.estuche) list.push(at('chest', 'chest', p.estuche));
+  return list;
 }
-function fieldContents(target) {
-  const z = Game.puzzle;
-  return target.kind === 'node' ? [z.nodes[target.id]].filter(Boolean) : z.bowls[target.id] || [];
-}
-function fieldSolved(target) {
-  const z = Game.puzzle;
-  return target.id === 'wax' ? z.painted === 1 : target.id === 'seed' ? z.sunBend === 1 : target.id === 'lens' ? z.revealed : target.kind === 'press' ? z.opened : false;
-}
-function fieldEdges(nodes = Game.puzzle.nodes) {
-  return DATA.puzzle.edges.map(e => ({ ...e, actual: nodes[e.from] && nodes[e.to] ? fieldMix([nodes[e.from], nodes[e.to]]) : null }));
-}
-function fieldCircuitReady() { return Game.puzzle.revealed && fieldEdges().every(e => e.actual === e.color); }
 function fieldPuzzleSolid(tx, ty) {
   const p = MAP.pz, z = Game.puzzle; if (!p || !z) return false;
-  if (p.torn.some(([x, y]) => x === tx && y === ty)) return z.painted < 1;
-  if (p.river.some(([x, y]) => x === tx && y === ty)) return !(z.sunBend === 1 && ty === p.seed[1]);
-  return fieldTargets().some(t => t.kind !== 'wax' && t.kind !== 'seed' && (t.x / TILE | 0) === tx && (t.y / TILE | 0) === ty);
+  const on = list => list.some(([x, y]) => x === tx && y === ty);
+  if (on(p.torn)) return z.erased < 1;
+  if (on(p.river)) return !(z.line >= 1 && p.pins.length === 2 && ty === p.pins[0][1] && tx > Math.min(p.pins[0][0], p.pins[1][0]) && tx < Math.max(p.pins[0][0], p.pins[1][0]));
+  if (p.sketch && p.sketch[0] === tx && p.sketch[1] === ty) return z.real < 1;
+  if (on(p.pit)) return true;
+  if (on(p.puddle)) return z.washed < 1;
+  if (p.estuche && p.estuche[0] === tx && p.estuche[1] === ty) return true;
+  return false;
 }
-// A short unobstructed ray to one of the object's usable sides. This prevents
-// casting through walls or across the ink, without requiring pixel-perfect facing.
-function fieldReachable(target) {
-  if (!target || Math.hypot(OW.x - target.x, OW.y - target.y) > 48) return false;
-  return [[0, 13], [-13, 3], [13, 3], [0, -12]].some(([dx, dy]) => {
-    const x = target.x + dx, y = target.y + dy;
-    if (!walkable(x, y)) return false;
-    const steps = Math.ceil(Math.hypot(x - OW.x, y - OW.y) / 3);
-    for (let i = 1; i <= steps; i++) if (!walkable(lerp(OW.x, x, i / steps), lerp(OW.y, y, i / steps))) return false;
-    return true;
-  });
-}
-function fieldNearby() {
-  return fieldTargets().filter(fieldReachable).sort((a, b) => Math.hypot(a.x - OW.x, a.y - OW.y) - Math.hypot(b.x - OW.x, b.y - OW.y));
-}
-function fieldReason(f, target) {
-  if (!target || !fieldReachable(target)) return 'Acércate a un pocillo del taller.';
-  if (target.kind === 'press') return fieldCircuitReady() ? 'Cierra la paleta y abre con Z.' : 'El estuche espera los tres canales.';
-  if (Game.puzzle.opened && target.kind === 'node') return 'El circuito ya entregó la Pluma.';
-  if (fieldSolved(target)) return target.done;
-  if (!fieldOk(f)) return fieldOwner(f).name + ' necesita descansar en el vaso.';
-  const contents = fieldContents(target);
-  if (f.id === 'agua') return contents.length ? null : 'El pocillo ya está limpio.';
-  if (contents.includes(f.id)) return 'Ese pigmento ya está en el pocillo.';
-  if (target.kind !== 'node' && contents.length >= 3) return 'Aclara el barro antes de mezclar.';
+// Lo primero que hay delante del líder, en su dirección, hasta tres casillas.
+function fieldFacing(dir = OW.dir) {
+  const [dx, dy] = FIELD_DIRS[dir] || FIELD_DIRS.down, things = fieldTargets(), ox = OW.x, oy = OW.y - 3;
+  for (let d = 6; d <= 52; d += 3) {
+    const px = ox + dx * d, py = oy + dy * d, tx = px / TILE | 0, ty = py / TILE | 0;
+    const hit = things.filter(t => tx >= t.tx && tx < t.tx + t.tw && ty >= t.ty && ty < t.ty + t.th).sort((a, b) => (a.kind === 'line') - (b.kind === 'line'))[0];
+    if (hit && !(hit.kind === 'line' && d < 12)) return hit;
+    if (solid(tileAt(tx, ty)) && tileAt(tx, ty) !== '~') return null; // una pared corta el trazo; el agua no
+  }
   return null;
 }
-function fieldPreview(f, target) {
-  if (!target || target.kind === 'press') return 'Elige un pocillo cercano.';
-  if (f.id === 'agua') return 'Agua > pocillo vacío';
-  const before = fieldContents(target), after = target.kind === 'node' ? [f.id] : [...before, f.id];
-  const mixed = fieldMix(after);
-  if (target.kind === 'node') return before.length ? f.name + ' sustituye ' + before[0] : f.name + ' > dos canales';
-  return before.length ? fieldMix(before) + ' + ' + f.name + ' = ' + mixed : f.name + ' > primer pigmento';
-}
-function fieldDescription(target) {
-  if (!target) return 'Busca los pocillos de cerámica.';
-  if (fieldSolved(target)) return target.done;
-  if (target.kind === 'press') return fieldCircuitReady() ? 'Tres mezclas correctas. Sello abierto.' : Game.puzzle.revealed ? 'Haz coincidir los tres canales.' : 'El plano está escrito con tinta oculta.';
-  if (target.kind === 'node') return Game.puzzle.revealed ? 'Iguala cada mezcla a su etiqueta.' : 'La lente revela las etiquetas.';
-  const colors = fieldContents(target), mixed = fieldMix(colors);
-  if (!colors.length) return target.clue;
-  if (colors.length === 1) return 'Añade otro pigmento para mezclar.';
-  return mixed === 'barro' ? 'Hay barro. Usa Aclarar.' : 'Sin efecto. Aclara y prueba.';
-}
-function fieldNotice(text) { OW.fieldToast = { text, t: 180 }; }
-function fieldInteract() {
-  const target = fieldNearby()[0]; if (!target) return false;
-  if (target.kind === 'press') {
-    if (Game.puzzle.opened) fieldNotice('La Pluma está en tu equipo.');
-    else if (fieldCircuitReady()) OW.act = openEstucheGen();
-    else openRing(target.id);
-  } else openRing(target.id);
-  return true;
-}
-function openRing(targetId) {
-  ARTUI.tracks.delete('field');
-  const targets = fieldNearby();
-  OW.ring = { idx: OW.fieldSelection || 0, targetId: targets.some(t => t.id === targetId) ? targetId : targets.find(t => !fieldSolved(t))?.id || targets[0]?.id, t: 0, notice: null };
-  OW.moving = false; OW.vx = OW.vy = 0;
-  const target = fieldTargets().find(t => t.id === OW.ring.targetId);
-  // Reframe the workbench beside the palette; no zoom, nudge or camera shake.
-  if (target) {
-    OW.cam.x = target.id === 'wax' || target.id === 'seed' ? clamp(target.x - 242, 0, MAP.w * TILE - W) : 320;
-    OW.cam.y = target.id === 'wax' || target.id === 'seed' ? target.y - 90 : 216;
+// ¿Qué haría esta magia sobre esto? { ok, why, ... } sin tocar nada.
+function fieldCheck(art, target) {
+  if (!art) return { ok: false, why: '' };
+  if (!fieldOk(art)) return { ok: false, why: fieldOwners(art).filter(p => p.cur.hp <= 0).map(p => p.name).join(' y ') + ' necesita descansar en el vaso.' };
+  if (!fieldAfford(art)) return { ok: false, why: 'Falta pintura. Camina un poco y volverá.' };
+  if (!target) return { ok: false, why: 'No hay nada delante. Mira hacia algo.' };
+  const z = Game.puzzle, T = DATA.puzzle.things, k = target.kind;
+  if (art.kind === 'color') {
+    if (k === 'sketch') { if (z.real >= 1) return { ok: false, why: T.sketch.done }; if (z.sketch.includes(art.color)) return { ok: false, why: 'Ya tiene ' + art.color + '.' }; if (z.sketch.length >= 2) return { ok: false, why: 'Hay demasiado color encima. Bórralo y prueba otra vez.' }; const mix = fieldMixOf([...z.sketch, art.color]); return { ok: true, mix }; }
+    if (k === 'puddle') return { ok: false, why: T.puddle.hint };
+    if (k === 'scribble') return { ok: false, why: 'Pintar encima no lo quita: es grafito.' };
+    return { ok: false, why: T[k]?.hint || 'Ahí no hay nada que colorear.' };
   }
-  Audio.sfx('book_open', { vol: .5 });
+  if (art.kind === 'trazar') { if (k === 'pin') return { ok: true }; if (k === 'line') return { ok: false, why: 'La línea ya está trazada.' }; return { ok: false, why: 'Trazar necesita una chincheta delante.' }; }
+  if (art.kind === 'borrar') {
+    if (k === 'scribble') return { ok: true };
+    if (k === 'line') return { ok: true, erase: 'line' };
+    if (k === 'sketch') return z.sketch.length && z.real < 1 ? { ok: true, erase: 'paint' } : { ok: false, why: z.real >= 1 ? 'La pintura ya se secó: no se borra.' : 'Es un boceto sin color: no hay nada que borrar.' };
+    if (k === 'puddle') return { ok: false, why: 'La goma no puede con la Tinta.' };
+    return { ok: false, why: 'Aquí no hay lápiz que borrar.' };
+  }
+  if (art.kind === 'aguada') { if (k === 'puddle') return { ok: true }; if (k === 'sketch') return { ok: false, why: 'El agua sola no da color.' }; return { ok: false, why: 'El agua no le hace nada.' }; }
+  return { ok: false, why: '' };
 }
-function fieldSelectTarget(delta) {
-  const targets = fieldNearby(), r = OW.ring; if (!r || !targets.length) return;
-  const index = targets.findIndex(t => t.id === r.targetId);
-  r.targetId = targets[(index + delta + targets.length) % targets.length].id; r.notice = null;
-  Audio.sfx('cursor');
+function fieldNearby() { const t = fieldFacing(); return t && t.kind === 'chest' && !Game.puzzle.opened && Math.hypot(t.x - OW.x, t.y - OW.y) < 30 ? [t] : []; }
+function fieldReachable(target) { return !!target && fieldFacing()?.id === target.id; }
+function fieldInteract() { const t = fieldNearby()[0]; if (!t) return false; OW.act = openEstucheGen(); return true; }
+// ---- El anillo de magias: giran alrededor del líder; la elegida queda arriba.
+function openRing() {
+  ARTUI.tracks.delete('field');
+  OW.ring = { idx: OW.fieldSelection || 0, t: 0, notice: null, spin: OW.fieldSelection || 0 };
+  OW.moving = false; OW.vx = OW.vy = 0; Audio.sfx('book_open', { vol: .4 });
 }
-function fieldApply() {
+function fieldCast() {
   const r = OW.ring; if (!r || OW.act) return;
-  const target = fieldTargets().find(t => t.id === r.targetId), f = FIELD[r.idx], reason = fieldReason(f, target);
-  if (target?.kind === 'press' && fieldReachable(target) && fieldCircuitReady() && !Game.puzzle.opened) { OW.ring = null; OW.act = openEstucheGen(); return; }
-  if (reason) { r.notice = reason; Audio.sfx('nope', { vol: .3 }); return; }
-  OW.fieldSelection = r.idx; OW.ring = null; OW.act = fieldGen(f, target.id, true);
+  const art = FIELD[r.idx], target = fieldFacing(), check = fieldCheck(art, target);
+  if (!check.ok) { r.notice = check.why; Audio.sfx('nope', { vol: .3 }); return; }
+  OW.fieldSelection = r.idx; OW.ring = null; OW.act = fieldGen(art, target, check);
 }
 function updateRing() {
   const r = OW.ring; r.t++;
   if (hit('back') || hit('ring')) { OW.ring = null; Audio.sfx('cancel'); return; }
-  if (hit('up')) { r.idx = (r.idx + FIELD.length - 1) % FIELD.length; r.notice = null; Audio.sfx('cursor'); }
-  if (hit('down')) { r.idx = (r.idx + 1) % FIELD.length; r.notice = null; Audio.sfx('cursor'); }
-  if (hit('left')) fieldSelectTarget(-1);
-  if (hit('right')) fieldSelectTarget(1);
-  if (hit('ok')) fieldApply();
+  const step = hit('right') || hit('down') ? 1 : hit('left') || hit('up') ? -1 : 0;
+  if (step) { r.idx = (r.idx + step + FIELD.length) % FIELD.length; r.notice = null; Audio.sfx('cursor', { semi: [0, 4, 7, 2, 5, 9][r.idx] }); }
+  if (hit('ok')) fieldCast();
+}
+function fieldArtIcon(art, x, y, r, dim) {
+  const col = dim ? '#8d8276' : C(art.color);
+  if (art.kind === 'color') { paintDab(x, y, r, col); g.drawImage(iconSprite(art.tool, dim ? '#bdb3a4' : ramp(col).hi), Math.round(x - 6), Math.round(y - 6), 12, 12); return; }
+  paintDab(x, y, r, dim ? '#8d8276' : '#e8dcc0');
+  if (art.kind === 'borrar') { const s = r / 9; g.fillStyle = '#241e32'; g.fillRect(Math.round(x - 6 * s), Math.round(y - 3 * s), Math.round(12 * s), Math.round(7 * s)); g.fillStyle = dim ? '#bdb3a4' : '#f0b8b5'; g.fillRect(Math.round(x - 5 * s), Math.round(y - 2 * s), Math.round(6 * s), Math.round(5 * s)); g.fillStyle = dim ? '#a89c8c' : '#8ab0d8'; g.fillRect(Math.round(x + 1 * s), Math.round(y - 2 * s), Math.round(4 * s), Math.round(5 * s)); }
+  else if (art.kind === 'trazar') { const s = r / 9; g.fillStyle = dim ? '#9a8f83' : '#4a4460'; g.fillRect(Math.round(x - 7 * s), Math.round(y + 3 * s), Math.round(14 * s), 1); g.fillStyle = dim ? '#9a8f83' : '#c5848b'; g.fillRect(Math.round(x - 8 * s), Math.round(y + 1 * s), 2, 3); g.fillRect(Math.round(x + 7 * s), Math.round(y + 1 * s), 2, 3); g.drawImage(iconSprite('lapiz', dim ? '#bdb3a4' : C('amarillo')), Math.round(x - 5), Math.round(y - 8), 10, 10); }
+  else { g.fillStyle = dim ? '#9a8f83' : '#6fb4d8'; g.beginPath(); g.moveTo(x, y - r * .7); g.lineTo(x + r * .45, y + r * .1); g.arc(x, y + r * .15, r * .45, 0, Math.PI); g.closePath(); g.fill(); g.fillStyle = '#e8f6fb'; g.fillRect(Math.round(x - r * .2), Math.round(y - r * .05), 1, 2); }
 }
 function drawRing() {
-  UI_HITS.length=0;UI_TEXT.length=0;
-  const r=OW.ring,target=fieldTargets().find(t=>t.id===r.targetId),f=FIELD[r.idx],targets=fieldNearby();
-  const col=fieldColor(f.id),at=artObserve('field',r.idx+':'+r.targetId+':'+r.notice),openedAt=artObserve('field-open',r),intro=artIn(openedAt,20);
-  const canOpen=target?.kind==='press'&&fieldCircuitReady()&&!Game.puzzle.opened,reason=fieldReason(f,target),enabled=canOpen||!reason;
-  g.save();g.translate(Math.round((1-intro)*-120),0);
-  artTag('MAGIAS',5,8,col);maskingLabel(5,25,92,14);smallText('Sin coste MP',10,29,UI_MUTED);
-  // Four paint wells on an actual wooden palette, leaving the workbench open.
-  g.translate(50,88);g.rotate((1-intro)*-.4);g.translate(-50,-88);
-  g.fillStyle='#553d2b';g.beginPath();g.ellipse(50,88,46,41,-.12,0,6.29);g.fill();
-  g.fillStyle='#bf955e';g.beginPath();g.ellipse(49,86,46,40,-.12,0,6.29);g.fill();
-  g.strokeStyle='#a37a4a';g.lineWidth=1;
-  for(let i=0;i<4;i++){g.beginPath();g.ellipse(49,86,39-i*5,34-i*5,-.12,0,6.29);g.stroke();}
-  g.fillStyle='#553d2b';g.beginPath();g.ellipse(50,88,5,8,-.3,0,6.29);g.fill();
-  const sx=26+(r.idx%2)*44,sy=67+Math.floor(r.idx/2)*39;
-  if(!r.cursor||!Prefs.shake)r.cursor={x:sx,y:sy};else{r.cursor.x+=(sx-r.cursor.x)*.4;r.cursor.y+=(sy-r.cursor.y)*.4;}
-  const wells=[];
-  FIELD.forEach((spell,i)=>{
-    const x=26+(i%2)*44,y=67+Math.floor(i/2)*39,c=fieldColor(spell.id),sel=i===r.idx,grow=Math.min(1.1,artIn(openedAt,14,6+i*3)),ok=fieldOk(spell);
-    if(sel){g.fillStyle='#553d2b';g.beginPath();g.ellipse(x,y+2,16,13,0,0,6.29);g.fill();g.fillStyle='#fff3d8';g.beginPath();g.ellipse(r.cursor.x,r.cursor.y,15+artPop(at)*2,12.5+artPop(at)*2,0,0,6.29);g.fill();}
-    // The chosen well sits proud of the wood with a glint on the wet paint; the rest rest in shadow.
-    if(sel)g.save(),g.translate(0,-2);
-    paintDab(x,y,13*grow,ok?c:'#897d72',sel?artPop(at):0);
-    if(grow>.5)g.drawImage(iconSprite(spell.id==='agua'?'item':spell.tool,c),x-8,y-8,16,16);
-    if(sel&&Prefs.shake){const a=ARTUI.t*.08,gx=Math.round(x+Math.cos(a)*7),gy=Math.round(y-2+Math.sin(a)*3);g.fillStyle='#fff8e6';g.fillRect(gx,gy,2,1);}
-    if(sel)g.restore();else{g.fillStyle='#553d2b';g.globalAlpha*=.16;g.beginPath();g.ellipse(x,y,13*grow,10*grow,-.12,0,6.29);g.fill();g.globalAlpha/=.16;}
-    const focus=()=>{if(r.idx!==i){artFocus(r,i);OW.fieldSelection=i;}};
-    uiHit(x-16,y-16,32,32,focus,focus);
-    wells.push({spell,x,y,sel,grow});
+  UI_HITS.length = 0; UI_TEXT.length = 0;
+  const r = OW.ring, art = FIELD[r.idx], col = C(art.color), target = fieldFacing(), check = fieldCheck(art, target);
+  const intro = Prefs.shake ? Math.max(0, easeBack(clamp(r.t / 14, 0, 1))) : 1, at = artObserve('field', r.idx + ':' + r.notice); // entra con el propio reloj del anillo
+  g.fillStyle = 'rgba(28,20,36,' + (.35 * intro).toFixed(2) + ')'; g.fillRect(0, 0, W, H); // el tiempo se detiene mientras eliges
+  if (!Prefs.shake) r.spin = r.idx; else { let d = r.idx - r.spin; if (d > FIELD.length / 2) d -= FIELD.length; if (d < -FIELD.length / 2) d += FIELD.length; r.spin += d * .3; if (Math.abs(d) < .01) r.spin = r.idx; }
+  const cx = clamp(Math.round(OW.x - OW.cam.x), 48, W - 48), cy = clamp(Math.round(OW.y - OW.cam.y - 12), 44, 104), R0 = 34 * intro; // cerca del líder, pero siempre entero en pantalla
+  g.save(); g.globalAlpha = .5 * intro; g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.ellipse(cx, cy, R0, R0 * .78, 0, 0, 6.29); g.stroke(); g.restore();
+  FIELD.forEach((a, i) => {
+    const ang = -Math.PI / 2 + (i - r.spin) / FIELD.length * 6.283, x = Math.round(cx + Math.cos(ang) * R0), y = Math.round(cy + Math.sin(ang) * R0 * .78), sel = i === r.idx, dim = !fieldOk(a) || !fieldAfford(a);
+    fieldArtIcon(a, x, y, sel ? 9 + artPop(at) : 6, dim);
+    if (sel) { g.strokeStyle = '#fff3d8'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, 12, 10, 0, 0, 6.29); g.stroke(); }
+    uiHit(x - 11, y - 11, 22, 22, () => { if (r.idx === i) fieldCast(); else { r.idx = i; r.notice = null; Audio.sfx('cursor'); } }, () => { if (r.idx !== i) { r.idx = i; r.notice = null; Audio.sfx('cursor', { vol: .3 }); } });
   });
-  // Names pencilled on the wood; the chosen one becomes a paper tag.
-  for(const w of wells){const lw=textWidth(w.spell.name)+8,lx=Math.round(w.x-lw/2),ly=w.y+15;g.save();g.globalAlpha*=clamp(w.grow,0,1);
-    if(w.sel){maskingLabel(lx,ly-1,lw,10,'#fff1ca');textCenter(w.spell.name,w.x,ly,UI_INK);g.fillStyle=col;g.fillRect(lx+3,ly+7,lw-6,1);}
-    else{textCenter(w.spell.name,w.x+1,ly+1,'#e2c58f');UI_TEXT.pop();textCenter(w.spell.name,w.x,ly,'#4b3320');}
-    g.restore();}
-  g.restore();
-  g.save();g.translate(Math.round((1-artIn(openedAt,16,8))*-120),0);
-  maskingLabel(5,133,92,28);smallText(f.name,12,137);smallText(fieldOwner(f).name,12,149,UI_MUTED);
-  // The owner's sticker keeps the spell tied to its painter.
-  const owner=fieldOwner(f),os=effStats(owner);sticker(84,146,{id:owner.id,color:owner.color,alive:owner.cur.hp>0,hp:owner.cur.hp,maxhp:os.hp,mp:owner.cur.mp,maxmp:os.mp},8);
-  artButton('field-close',battleKey('back')+' cerrar',5,165,92,13,'#d2bc95',()=>{OW.ring=null;Audio.sfx('cancel');});
-  g.restore();
-  g.save();g.translate(Math.round((1-artIn(openedAt,18,6))*230),0);
-  const name=target?.name||'Sin objetivo';artTag(name,109,7,col,166);
-  if(targets.length>1){
-    artButton('target-prev','<',275,6,19,19,'#d2bc95',()=>fieldSelectTarget(-1));
-    artButton('target-next','>',296,6,19,19,'#d2bc95',()=>fieldSelectTarget(1));
+  // arriba: el nombre, quién la hace y cuánta pintura cuesta
+  const owners = fieldOwners(art), head = art.name, hw = rotuloWidth(head) + 28 + owners.length * 16 + 34, hx = Math.round((W - hw) / 2), hy = Math.round(4 - (1 - intro) * 30);
+  brushBand(hx, hy, hw, 17, KIT_INK); paintDab(hx + 10, hy + 9, 4, col, artPop(at)); bigText(head, hx + 19, hy + 4, col, { outline: '#0b0912' });
+  let ox = hx + 25 + rotuloWidth(head);
+  owners.forEach(p => { const s = effStats(p); sticker(ox + 6, hy + 9, { id: p.id, color: p.color, alive: p.cur.hp > 0, hp: p.cur.hp, maxhp: s.hp, mp: p.cur.mp, maxmp: s.mp }, 6); ox += 16; });
+  const enough = fieldAfford(art); miniTube(ox + 2, hy + 5, col, !enough); smallText(art.mp + ' MP', ox + 9, hy + 5, enough ? '#f4f0ea' : '#e58a8a');
+  // el objetivo: esquinas de lápiz que laten y un reguero de pintura desde el líder; si es un boceto, la mezcla que quedaría
+  if (target) {
+    const tx = target.x - OW.cam.x, ty = target.y - OW.cam.y, w = target.tw * 8 + 3, h = target.th * 8 + 3, pulse = Prefs.shake ? Math.round(Math.sin(r.t * .2) * 1.5) : 0, c2 = check.ok ? col : '#9a8f83';
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const X = tx + a * (w + pulse), Y = ty + b * (h + pulse); pstroke(X, Y, X - a * 5, Y, 2, c2, 1, 0, false); pstroke(X, Y, X, Y - b * 5, 2, c2, 1, 0, false); }
+    for (let i = 1; i < 8; i++) { const k = ((i + r.t * .08) % 8) / 8; g.fillStyle = c2; g.globalAlpha = .3 + k * .6; g.fillRect(Math.round(lerp(cx, tx, k)), Math.round(lerp(cy + 10, ty, k)), 2, 2); } g.globalAlpha = 1;
+    if (target.kind === 'sketch' && art.kind === 'color' && check.ok) { const z = Game.puzzle; let x = tx - 16; [...z.sketch, art.color].forEach((c, i, all) => { paintDab(x, ty - h - 10, 3, C(c)); x += 8; if (i < all.length - 1) { smallText('+', x - 4, ty - h - 13, '#f4f0ea'); } }); smallText('=', x - 2, ty - h - 13, '#f4f0ea'); paintDab(x + 7, ty - h - 10, 4, check.mix === 'barro' ? '#78644d' : C(check.mix)); }
   }
-  // Pigment samples show the recipe on the object, including the resulting mix.
-  const contents=target?fieldContents(target):[],mixed=fieldMix(contents),preview=target?.kind==='node'?f.id:fieldMix([...contents,f.id]);
-  const samples=target?.kind==='press'?fieldEdges().map(e=>e.actual):target?.kind==='node'||f.id==='agua'?[mixed]:[...contents.slice(0,3),f.id];
-  if(target){
-    maskingLabel(109,28,Math.min(199,45+samples.length*27),19);
-    let dx=121;
-    samples.forEach((c,i)=>{paintDab(dx,37,5,fieldColor(c));if(i<samples.length-1&&target.kind!=='press')smallText('+',dx+10,34,UI_MUTED);dx+=27;});
-    if(target.kind!=='press'){smallText(target.kind==='node'||f.id==='agua'?'→':'=',dx-14,34);paintDab(dx+8,37,6+(Prefs.shake?Math.sin(ARTUI.t*.15)*.6:0),fieldColor(f.id==='agua'?null:preview),artPop(at));}
-  }
-  const label=target?.kind==='press'?'Circuito cromático':f.id==='agua'?'El agua limpia el pocillo':mixed?mixed+' → '+(preview||f.name):'Primer pigmento';
-  artTag(target?label:'Acércate a un pocillo',109,50,col,204);
+  const aim = target ? 'Delante: ' + target.name : 'Delante: nada', note = r.notice || (check.ok ? art.desc : check.why || art.desc), noteAt = artObserve('field-note', note);
+  g.save(); g.translate(0, Math.round((1 - intro) * 40));
+  maskingLabel(6, 136, 308, 38); smallText(aim, 14, 140, check.ok ? UI_INK : UI_MUTED); if (target && check.ok) paintDab(9, 144, 2, col);
+  paragraph(note, 14, 151, 292, r.notice || !check.ok ? '#9c4539' : UI_MUTED, 2, { progress: Prefs.shake ? (ARTUI.t - noteAt) * 2.2 : Infinity, wet: r.notice ? '#c4384a' : col });
+  artButton('field-cast', battleKey('ok') + ' usar', 244, 118, 70, 15, col, fieldCast, { disabled: !check.ok, selected: check.ok });
+  artButton('field-close', battleKey('back'), 6, 118, 26, 15, '#d2bc95', () => { OW.ring = null; Audio.sfx('cancel'); });
   g.restore();
-  // A trail of pigment drops runs from the chosen well to the object it would touch.
-  if(target&&Prefs.shake){
-    const tx=target.x-OW.cam.x,ty=target.y-OW.cam.y;
-    if(tx>112&&tx<310&&ty>26&&ty<150){
-      const x0=sx+Math.round((1-intro)*-120),y0=sy,cx=(x0+tx)/2,cy=Math.min(y0,ty)-26,n=14;
-      for(let i=0;i<n;i++){const k=((i+ARTUI.t*.03)%n)/n,q=1-k,px=q*q*x0+2*q*k*cx+k*k*tx,py=q*q*y0+2*q*k*cy+k*k*ty;
-        if(px<100)continue;g.fillStyle=enabled?col:'#9a8f83';g.globalAlpha=.35+k*.55;g.fillRect(Math.round(px),Math.round(py),k>.5?2:1,k>.5?2:1);}
-      g.globalAlpha=1;
-      const pulse=(ARTUI.t%40)/40;g.strokeStyle=enabled?col:'#9a8f83';g.lineWidth=1;g.globalAlpha=(1-pulse)*.8;g.beginPath();g.ellipse(tx,ty+4,6+pulse*14,3+pulse*6,0,0,6.29);g.stroke();g.globalAlpha=1;
-    }
-  }
-  const lift=enabled&&Prefs.shake?Math.round(Math.sin(ARTUI.t*.12)):0;
-  g.save();g.translate(0,-lift);
-  artButton('field-apply',battleKey('ok')+(canOpen?' abrir':' aplicar'),222,120,91,21,col,fieldApply,{disabled:!enabled,selected:enabled});
-  g.restore();
-  artButton('field-recipe','?',109,120,24,21,'#d2bc95',()=>{r.legend=!r.legend;Audio.sfx('page');});
-  if(r.legend){
-    artSheet(110,69,109,48,col);
-    FIELD_MIXES.forEach((mix,i)=>{const y=74+i*13;paintDab(119,y+3,3,fieldColor(mix.pair[0]));smallText('+',125,y);paintDab(137,y+3,3,fieldColor(mix.pair[1]));smallText('=',143,y);paintDab(155,y+3,3,fieldColor(mix.color));smallText(mix.effect,163,y,UI_INK);});
-  }
-  g.save();g.translate(0,Math.round((1-artIn(openedAt,16,10))*50));
-  maskingLabel(106,148,208,29);
-  const note=r.notice||fieldDescription(target),noteAt=artObserve('field-note',note);
-  paragraph(note,113,153,193,r.notice?'#9c4539':UI_INK,2,{progress:Prefs.shake?(ARTUI.t-noteAt)*2.2:Infinity,wet:r.notice?'#c4384a':col});
-  g.restore();
-  // Hit areas follow the visible objects instead of a hidden rectangular menu.
-  for(const t of targets){const x=t.x-OW.cam.x,y=t.y-OW.cam.y;if(x<119||x>305||y<75||y>107)continue;
-    uiHit(x-12,y-12,24,24,()=>{r.targetId=t.id;r.notice=null;Audio.sfx('cursor');});}
 }
-function fieldCasterPosition(owner) {
-  const i = Party.indexOf(owner), h = OW.hist[Math.min(OW.hist.length - 1, i * 12)];
-  return i === 0 ? [OW.x, OW.y] : h ? [...h] : [OW.x - i * 12, OW.y];
-}
-function* fieldGen(f, targetId, reopen = false) {
-  const target = fieldTargets().find(t => t.id === targetId), reason = fieldReason(f, target);
-  if (reason) { fieldNotice(reason); return; }
-  const z = Game.puzzle, owner = fieldOwner(f), pos = fieldCasterPosition(owner);
-  const before = [...fieldContents(target)], after = f.id === 'agua' ? [] : target.kind === 'node' ? [f.id] : [...before, f.id];
-  const mixed = fieldMix(after), transform = target.kind !== 'node' && mixed === target.color;
-  const state = { f, target, from: [pos[0], pos[1] - 9], before, after, mixed, t: 0, transform, committed: false };
-  OW.moving = false; OW.vx = OW.vy = 0;
-  OW.cast = { p: owner, x: pos[0], y: pos[1], col: fieldColor(f.id), aura: 1 };
-  OW.fieldCast = state;
-  Audio.sfx(f.id === 'agua' ? 'glass' : 'charge', { semi: SEMI[owner.id] || 0, vol: .45 });
+// ---- Usar una magia: la gota alza su color, la herramienta va hasta el objeto y actúa. El estado cambia al llegar.
+function fieldCasterPosition(owner) { const i = Party.indexOf(owner), h = OW.hist[Math.min(OW.hist.length - 1, i * 12)]; return i === 0 ? [OW.x, OW.y] : h ? [...h] : [OW.x - i * 12, OW.y]; }
+function* fieldGen(art, target, check) {
+  const z = Game.puzzle, owners = fieldOwners(art), col = C(art.color), p = MAP.pz, T = DATA.puzzle.things;
+  const s = { art, target, check, from: [OW.x, OW.y - 12], aim: [target.x, target.y], t: 0, col };
+  if (art.kind === 'trazar') { const other = p.pins.find(q => q[0] !== target.tx || q[1] !== target.ty); s.aim2 = [(other[0] + .5) * TILE, (other[1] + .5) * TILE]; }
+  OW.moving = false; OW.vx = OW.vy = 0; OW.fieldCast = s; OW.cast = { p: owners[0], x: OW.x, y: OW.y, col, aura: 1 };
+  owners.forEach(q => q.cur.mp -= art.mp);
+  Audio.sfx('charge', { semi: SEMI[owners[0].id] || 0, vol: .45 });
+  const dur = { color: 76, trazar: 92, borrar: 84, aguada: 96 }[art.kind];
+  let committed = false; const was = { sketch: [...z.sketch] };
+  const commit = () => {
+    if (committed) return; committed = true;
+    if (art.kind === 'color') { z.sketch = [...z.sketch, art.color]; if (fieldMixOf(z.sketch) === T.sketch.need) z.real = 1; }
+    if (art.kind === 'trazar') z.line = 1;
+    if (art.kind === 'borrar') { if (check.erase === 'line') z.line = 0; else if (check.erase === 'paint') z.sketch = []; else z.erased = 1; }
+    if (art.kind === 'aguada') z.washed = 1;
+  };
   try {
-    for (let t = 0; t < (transform ? 110 : target.kind === 'node' ? 94 : 75); t++) {
-      state.t = t; OW.cast.aura = Math.max(0, 1 - t / 64);
-      if (t === 16) Audio.sfx(f.id === 'rojo' ? 'brush_sweep' : f.id === 'amarillo' ? 'scratch' : 'brush_hiss', { vol: .6 });
-      if (t === 42) {
-        // Commit when the pigment arrives, after checking that the target and
-        // party are still valid. No MP is consumed by exploration.
-        if (Game.puzzle !== z || fieldReason(f, target)) return;
-        if (target.kind === 'node') z.nodes[target.id] = after[0] || null;
-        else z.bowls[target.id] = after;
-        state.committed = true;
-        Audio.sfx(f.id === 'agua' ? 'splash_clean' : 'plop', { semi: SEMI[owner.id] || 0, vol: .6 });
-      }
-      if (t >= 48 && transform) {
-        const k = clamp((t - 48) / 52, 0, 1);
-        if (target.id === 'wax') z.painted = k;
-        if (target.id === 'seed') { z.sun = clamp(k * 2, 0, 1); z.sunBend = clamp((k - .2) / .8, 0, 1); }
-        if (t === 50) Audio.sfx(target.id === 'seed' ? 'grow' : target.id === 'wax' ? 'brush_hiss' : 'glass', { vol: .65 });
-        if (t === 92 && target.id === 'lens') z.revealed = true;
-      }
-      if (t === 78 && target.kind === 'node' && fieldCircuitReady()) Audio.sfx('tinkle', { semi: 7 });
+    for (let t = 0; t < dur; t++) {
+      s.t = t; OW.cast.aura = Math.max(0, 1 - t / 30);
+      if (t === 16) Audio.sfx(art.kind === 'color' ? 'brush_sweep' : art.kind === 'trazar' ? 'scratch_long' : art.kind === 'borrar' ? 'rub' : 'brush_hiss', { vol: .6 });
+      if (art.kind === 'color' && t === 44) { commit(); Audio.sfx(z.real >= 1 ? 'grow' : 'plop', { semi: SEMI[owners[0].id] || 0, vol: .6 }); if (z.real >= 1) Audio.sfx('discovery', { vol: .4, when: .15 }); }
+      if (art.kind === 'trazar') { s.draw = clamp((t - 30) / 40, 0, 1); if (t % 8 === 0 && t > 30 && t < 70) Audio.sfx('scratch', { vol: .35, semi: t / 8 }); if (t === 70) { commit(); Audio.sfx('tinkle', { semi: 4, vol: .5 }); } }
+      if (art.kind === 'borrar') { if (t > 24 && t < 70 && t % 10 === 0) Audio.sfx('rub', { vol: .45 }); if (t % 12 === 6 && t > 24 && t < 70) Audio.sfx('crumbs', { vol: .3 }); s.fade = clamp((t - 30) / 40, 0, 1); if (t === 70) commit(); }
+      if (art.kind === 'aguada') { s.wash = clamp((t - 24) / 56, 0, 1); if (t === 40) Audio.sfx('splash_clean', { vol: .5 }); if (t === 64) Audio.sfx('bubbles', { vol: .4 }); if (t === 80) commit(); }
       yield;
     }
-    if (transform) {
-      if (target.id === 'wax') z.painted = 1;
-      if (target.id === 'seed') z.sun = z.sunBend = 1;
-      if (target.id === 'lens') z.revealed = true;
-      fieldNotice(target.done); Audio.sfx('discovery', { vol: .4 });
-    } else if (reopen) { openRing(target.id); OW.ring.idx = FIELD.indexOf(f); }
+    commit();
+    fieldNotice(art.kind === 'color' ? (z.real >= 1 ? T.sketch.done : fieldMixOf(z.sketch) === 'barro' ? 'Se ha hecho barro. Borra el color y vuelve a probar.' : 'El boceto se tiñe de ' + fieldMixOf(z.sketch) + '. ' + (z.sketch.length === 1 ? 'Aún no es el color que pide.' : 'No es el color que pide: bórralo.')) : art.kind === 'trazar' ? T.pin.done : art.kind === 'borrar' ? (check.erase === 'line' ? 'La línea se borra.' : check.erase === 'paint' ? 'La goma levanta el color: el boceto vuelve a estar limpio.' : T.scribble.done) : T.puddle.done);
   } finally {
-    // An interrupted transformation settles to a stable, traversable result.
-    if (state.committed && transform && Game.puzzle === z) {
-      if (target.id === 'wax') z.painted = 1;
-      if (target.id === 'seed') z.sun = z.sunBend = 1;
-      if (target.id === 'lens') z.revealed = true;
-    }
+    if (!committed && Game.puzzle === z) commit();
     OW.cast = null; OW.fieldCast = null;
   }
 }
+// La pintura vuelve al caminar: cada 64 px andados, una gota de MP para cada gota viva.
+function fieldWalk(dist) {
+  OW.walked = (OW.walked || 0) + dist; if (OW.walked < 64) return; OW.walked -= 64;
+  Party.forEach(p => { if (p.cur.hp > 0 && p.cur.mp < effStats(p).mp) p.cur.mp++; });
+}
 function* openEstucheGen() {
-  const z = Game.puzzle, target = fieldTargets().find(t => t.kind === 'press');
-  if (z.opened || z.opening || !fieldCircuitReady() || !fieldReachable(target)) { fieldNotice(fieldDescription(target)); return; }
-  z.opening = true; z.zip = 0; OW.moving = false; OW.vx = OW.vy = 0;
-  let complete = false;
+  const z = Game.puzzle; if (z.opened || z.opening) return;
+  z.opening = true; z.zip = 0; OW.moving = false; OW.vx = OW.vy = 0; let complete = false;
   try {
     for (let t = 0; t <= 88; t++) {
       z.zip = clamp(t / 26, 0, 1); z.open = clamp((t - 26) / 15, 0, 1); z.rise = clamp((t - 41) / 32, 0, 1);
-      if (t < 26 && t % 5 === 0) Audio.sfx('scratch', { vol: .3, semi: t });
-      if (t === 28) Audio.sfx('page'); if (t === 42) Audio.sfx('discovery');
+      if (t < 26 && t % 5 === 0) Audio.sfx('scratch', { vol: .3, semi: t }); if (t === 28) Audio.sfx('page'); if (t === 42) Audio.sfx('discovery');
       yield;
     }
-    if (Game.puzzle !== z || !fieldCircuitReady()) return;
     z.opened = true; Game.owned.pluma = true; complete = true;
-    OW.msg = { lines: ['¡Has conseguido la Pluma!', 'Tres pigmentos, tres mezclas.', 'El circuito vuelve a escribir.', 'Equipa la Pluma en el menú.'], t: 0 };
-  } finally {
-    z.opening = false; z.rise = 0;
-    if (!complete) { z.zip = 0; z.open = 0; }
-  }
+    OW.msg = { lines: ['¡Has conseguido la Pluma!', 'Borrar, trazar, colorear, diluir:', 'el taller está resuelto. La Pluma escribe', 'con el color de quien la empuña.'], t: 0 };
+  } finally { z.opening = false; z.rise = 0; if (!complete) { z.zip = 0; z.open = 0; } }
 }
-function fieldLine(x1, y1, x2, y2, color, width = 1) {
-  g.strokeStyle = color; g.lineWidth = width; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
-}
-function fieldBowl(target, cx, cy) {
-  const x = target.x - cx, y = target.y - cy, colors = fieldContents(target), col = fieldColor(fieldMix(colors));
-  g.fillStyle = 'rgba(34,25,46,.3)'; g.fillRect(x - 9, y + 3, 20, 5);
-  g.fillStyle = '#59435e'; g.fillRect(x - 9, y - 6, 18, 11); g.fillRect(x - 7, y + 5, 14, 2);
-  g.fillStyle = '#f7ebd0'; g.fillRect(x - 8, y - 7, 16, 10); g.fillRect(x - 6, y + 3, 12, 2);
-  g.fillStyle = '#afa18e'; g.fillRect(x - 6, y - 5, 12, 6);
-  g.fillStyle = colors.length ? col : '#d2c7b3'; g.fillRect(x - 5, y - 4, 10, 5);
-  g.fillStyle = '#fff9ed'; g.fillRect(x - 4, y - 4, 3, 1);
-  if (target.kind === 'node') {
-    const lx = target.id === 'c' ? x - 20 : x - 5, ly = target.id === 'c' ? y - 4 : y - 19;
-    g.fillStyle = '#59435e'; g.fillRect(lx, ly, 10, 9);
-    worldTinyText(target.id.toUpperCase(), lx + 4, ly + 2, '#fff4d8');
-  } else {
-    for (let i = 0; i < 2; i++) { g.fillStyle = colors[i] ? fieldColor(colors[i]) : '#b5a891'; g.fillRect(x - 5 + i * 7, y + 8, 4, 2); }
-  }
-}
+// ---- Dibujo del taller
 function drawFieldPuzzle(ents, cx, cy, pal) {
-  if (!Game.puzzle || !MAP.pz) return;
-  const z = Game.puzzle, p = MAP.pz;
-  // The room is an actual folded sheet, with an unobstructed drafting area.
+  if (!Game.puzzle || !MAP.pz || Game.page === 1) return;
+  const z = Game.puzzle, p = MAP.pz, s = OW.fieldCast;
   g.fillStyle = '#ddd1b7'; g.fillRect(28 * TILE - cx, 15 * TILE - cy, 11 * TILE, 9 * TILE);
   g.fillStyle = '#efe5cf'; g.fillRect(31 * TILE - cx, 15 * TILE - cy, 8 * TILE - 2, 9 * TILE - 2);
   g.fillStyle = '#e3d7bf'; for (let y = 246; y < 382; y += 8) g.fillRect(498 - cx, y - cy, 122, 1);
-  worldTinyText('ATELIER / TRES TINTAS', 505 - cx, 248 - cy, '#867762');
-  for (const [tx, ty] of p.river) {
-    const x = tx * TILE - cx, y = ty * TILE - cy;
-    g.fillStyle = '#282536'; g.fillRect(x, y, 16, 16); g.fillStyle = '#474157';
-    g.fillRect(x + 3, y + ((OW.t / 4 + ty * 3) % 14 | 0), 5, 1); g.fillRect(x + 10, y + ((OW.t / 5 + ty * 7) % 14 | 0), 3, 1);
-  }
-  // Wax on folded paper visibly melts; the paper then settles into a passage.
-  const wx = 26 * TILE - cx, wy = 20 * TILE - cy, wax = 1 - z.painted;
-  g.fillStyle = '#eaddbd'; g.fillRect(wx, wy, 32, 32);
-  for (let i = 0; i < 4; i++) {
-    g.fillStyle = i % 2 ? '#c3b593' : '#f8efdb'; g.fillRect(wx + i * 8, wy, 8, 32);
-    if (wax > 0) { g.fillStyle = '#9e4738'; g.fillRect(wx + i * 8, wy + 5, 8, Math.round(23 * wax)); g.fillStyle = '#d87e53'; g.fillRect(wx + i * 8, wy + 5, 7, 2); }
-  }
-  if (wax > 0) { g.fillStyle = '#f2b573'; g.fillRect(wx + 10, wy + 7, 12, 13); worldTinyText('CERA', wx + 8, wy - 8, '#f9ebd1'); }
-  else { g.fillStyle = '#ba6847'; g.fillRect(wx + 2, wy + 28, 6, 2); g.fillRect(wx + 24, wy + 1, 6, 2); }
-  // A wide woven vine spans both ink tiles. It remains after leaving the room.
-  if (z.sun > 0) {
-    const sx = 456 - cx, sy = 364 - cy, length = 47 * z.sunBend;
-    for (let strand = 0; strand < 3; strand++) {
-      g.beginPath(); g.moveTo(sx, sy - 3 + strand * 4);
-      for (let i = 1; i <= 24; i++) { const q = i / 24; g.lineTo(sx + length * q, sy - 3 + strand * 4 - Math.sin(q * Math.PI) * (1 - z.sunBend) * 23); }
-      g.strokeStyle = strand === 1 ? '#8fbf55' : '#36733a'; g.lineWidth = 3; g.stroke();
-    }
-    for (let i = 0; i < length; i += 7) { g.fillStyle = i % 2 ? '#689949' : '#9fbf61'; g.fillRect(sx + i, sy - 6, 5, 14); g.fillStyle = '#c9d781'; g.fillRect(sx + i, sy - 5, 1, 11); }
-  } else { g.fillStyle = '#55733c'; g.fillRect(455 - cx, 351 - cy, 2, 6); g.fillRect(451 - cx, 351 - cy, 5, 2); }
-  // Each primary flows down BOTH incident channels. Middle cells mix the ends.
-  for (const edge of fieldEdges()) {
-    const a = fieldTargets().find(t => t.id === edge.from), b = fieldTargets().find(t => t.id === edge.to);
-    const ax = a.x - cx, ay = a.y - cy, bx = b.x - cx, by = b.y - cy, mx = (ax + bx) / 2, my = (ay + by) / 2;
-    fieldLine(ax, ay, bx, by, '#b7a88c', 6); fieldLine(ax, ay, bx, by, '#fcf4de', 4);
-    fieldLine(ax, ay, mx, my, fieldColor(z.nodes[a.id]), 2); fieldLine(bx, by, mx, my, fieldColor(z.nodes[b.id]), 2);
-    for (const node of [a, b]) if (z.nodes[node.id]) {
-      const q = (OW.t % 56) / 56; g.fillStyle = '#fff4d5'; g.fillRect(Math.round(lerp(node.x - cx, mx, q)), Math.round(lerp(node.y - cy, my, q)), 2, 1);
-    }
-    g.fillStyle = '#59435e'; g.fillRect(mx - 6, my - 5, 12, 10); g.fillStyle = fieldColor(edge.actual); g.fillRect(mx - 4, my - 3, 8, 6);
-    if (z.revealed) {
-      const correct = edge.actual === edge.color, width = edge.color.length * 4 + 7, left = Math.round(mx - width / 2);
-      g.fillStyle = correct ? '#dce8b9' : '#f8edcf'; g.fillRect(left, my + 8, width, 8);
-      worldTinyText(edge.color.toUpperCase(), mx - edge.color.length * 2 + 1, my + 10, '#574a3f');
-      g.fillStyle = fieldColor(edge.color); g.fillRect(left, my + 8, 2, 8);
-      if (correct) { g.fillStyle = '#4a7739'; g.fillRect(mx + 13, my - 2, 1, 3); g.fillRect(mx + 14, my - 3, 1, 3); g.fillRect(mx + 15, my - 4, 1, 3); }
-    } else { g.fillStyle = '#f5e9cf'; g.fillRect(mx - 5, my + 8, 11, 8); worldTinyText('?', mx - 1, my + 10, '#897c68'); }
-  }
-  for (const target of fieldTargets()) {
-    if (target.kind === 'press') continue;
-    ents.push({ y: target.y + 5, draw: () => {
-      fieldBowl(target, cx, cy);
-      if (target.id === 'lens') {
-        const x = target.x - cx, y = target.y - cy;
-        g.fillStyle = '#83728b'; g.fillRect(x - 5, y - 18, 10, 7); g.fillStyle = z.revealed ? '#bd91d6' : '#d9d0db'; g.fillRect(x - 3, y - 17, 6, 5);
-        worldTinyText('LENTE', x - 9, y + 15, '#766651');
-      }
-    } });
-  }
-  const target = fieldTargets().find(t => t.kind === 'press'), x = target.x - cx, y = target.y - cy;
-  const ready = fieldCircuitReady(), matched = fieldEdges().filter(e => e.actual === e.color).length;
-  ents.push({ y: target.y + 12, draw: () => {
-    shadow(x, y + 10, 17); g.drawImage(pzSprite('estuche', pal), x - 12, y - 13);
-    if (!z.opened) {
-      g.fillStyle = ready ? '#9ec267' : '#a18c69'; g.fillRect(x - 6, y - 5, 12, 5);
-      for (let i = 0; i < 3; i++) { g.fillStyle = z.revealed && i < matched ? '#f9e7a0' : '#57485c'; g.fillRect(x - 5 + i * 4, y - 4, 2, 3); }
-      if (z.opening) { g.fillStyle = '#fcf2d8'; g.fillRect(x - 9 + z.zip * 18, y - 1, 2, 2); }
-    }
-    if (z.open || z.opened) { g.fillStyle = '#64536f'; g.fillRect(x - 9, y - 8 - (z.open || 1) * 6, 18, 6); g.fillStyle = '#e9dfc7'; g.fillRect(x - 9, y - 6, 18, 3); }
-    if (z.rise) { const img = propSprite('pluma', C('azul')); g.save(); g.translate(x, y - z.rise * 24); g.rotate(-1.05); g.drawImage(img, -24, -8); g.restore(); }
-    worldTinyText(z.opened ? 'PLUMA' : ready ? 'ABRIR' : 'SELLO', x - 9, y + 13, '#766651');
-  } });
+  worldTinyText('ATELIER / TRES TINTAS', 505 - cx, 360 - cy, '#867762');
+  const inkTile = (tx, ty) => { const x = tx * TILE - cx, y = ty * TILE - cy; g.fillStyle = '#282536'; g.fillRect(x, y, 16, 16); g.fillStyle = '#474157'; g.fillRect(x + 3, y + ((OW.t / 4 + ty * 3 + tx) % 14 | 0), 5, 1); g.fillRect(x + 10, y + ((OW.t / 5 + ty * 7 + tx * 2) % 14 | 0), 3, 1); };
+  for (const [tx, ty] of p.river) inkTile(tx, ty);
+  for (const [tx, ty] of p.pit) { inkTile(tx, ty); const x = tx * TILE - cx, y = ty * TILE - cy; for (let i = 0; i < 16; i += 3) { g.fillStyle = '#f2e8d2'; g.fillRect(x + i, y - 1 + (i % 2), 2, 1); g.fillRect(x + i + 1, y + 16 - (i % 2), 2, 1); } }
+  // el garabato: una maraña de grafito sobre el papel doblado; la goma lo va levantando
+  if (p.torn.length && z.erased < 1) { const xs = p.torn.map(t => t[0]), ys = p.torn.map(t => t[1]), wx = Math.min(...xs) * TILE - cx, wy = Math.min(...ys) * TILE - cy, fade = s && s.art.kind === 'borrar' && !s.check.erase ? s.fade || 0 : 0;
+    g.fillStyle = '#eaddbd'; g.fillRect(wx, wy, 32, 32); g.save(); g.globalAlpha = 1 - fade;
+    const rnd = seeded(41); let px = wx + 4, py = wy + 6; for (let i = 0; i < 46; i++) { const nx = wx + 3 + rnd() * 26, ny = wy + 3 + rnd() * 26; pstroke(px, py, nx, ny, 2, i % 3 ? '#4a4460' : '#2a2438', 1, 0, false); px = nx; py = ny; }
+    g.restore(); }
+  // las chinchetas y, entre ellas, la línea de grafito que sostiene el paso
+  const drawn = s && s.art.kind === 'trazar' ? s.draw || 0 : z.line;
+  if (p.pins.length === 2 && drawn > 0) { const [a, b] = p.pins, x0 = (a[0] + .5) * TILE - cx, x1 = (b[0] + .5) * TILE - cx, y = (a[1] + .5) * TILE - cy + 2, from = s && s.art.kind === 'trazar' && s.target.tx === b[0] ? x1 : x0, to = from === x0 ? x1 : x0, xe = lerp(from, to, drawn);
+    pstroke(from, y + 2, xe, y + 2, 4, '#2a2438', 1, 0, false); pstroke(from, y + 1, xe, y + 1, 2, '#6a6480', 1, 0, false); pstroke(from, y, xe, y, 1, '#9a98b0', 1, 0, false); }
+  for (const [tx, ty] of p.pins) { const x = tx * TILE + 8 - cx, y = ty * TILE + 10 - cy; g.fillStyle = 'rgba(34,25,46,.3)'; g.fillRect(x - 3, y + 2, 7, 2); g.fillStyle = '#8c8ab0'; g.fillRect(x, y - 4, 1, 5); g.fillStyle = '#241e32'; g.fillRect(x - 3, y - 8, 7, 5); g.fillStyle = '#c5484b'; g.fillRect(x - 2, y - 7, 5, 3); g.fillStyle = '#f08a80'; g.fillRect(x - 2, y - 7, 2, 1); }
+  // el puente en boceto: líneas grises sin cuerpo sobre el canal; se tiñe con cada color y, en verde, se vuelve de hojas
+  if (p.sketch) { const x = p.sketch[0] * TILE - cx, y = p.sketch[1] * TILE - cy, mix = fieldMixOf(z.sketch);
+    if (z.real >= 1) { g.fillStyle = '#36733a'; g.fillRect(x - 1, y, 18, 16); for (let i = 0; i < 16; i += 4) { g.fillStyle = i % 8 ? '#689949' : '#9fbf61'; g.fillRect(x + i, y + 1, 3, 14); g.fillStyle = '#c9d781'; g.fillRect(x + i, y + 2, 1, 12); } }
+    else { g.save(); g.globalAlpha = .8; for (let i = 0; i < 16; i += 4) { pstroke(x + i, y + 1, x + i, y + 15, 1, '#b8ad96', 1, 0, false); } pstroke(x, y + 1, x + 16, y + 1, 1, '#b8ad96', 1, 0, false); pstroke(x, y + 15, x + 16, y + 15, 1, '#b8ad96', 1, 0, false); g.restore();
+      if (mix) { g.save(); g.globalAlpha = .6; g.fillStyle = mix === 'barro' ? '#78644d' : C(mix); g.fillRect(x + 1, y + 3, 14, 10); g.restore(); }
+      g.fillStyle = '#f2e8d2'; g.fillRect(x + 18, y - 5, 18, 7); worldTinyText('VERDE', x + 19, y - 4, '#6b8f4a'); } } // la nota del margen
+  // el charco de Tinta: espeso y con ojos; el agua lo aclara hasta que se escurre
+  if (z.washed < 1 && p.puddle.length) { const w = s && s.art.kind === 'aguada' ? s.wash || 0 : 0;
+    for (const [tx, ty] of p.puddle) { const x = tx * TILE - cx, y = ty * TILE - cy; g.save(); g.globalAlpha = 1 - w * .9; g.fillStyle = w > .3 ? '#6a6480' : '#1e1a2c'; g.beginPath(); g.ellipse(x + 8, y + 9, 9, 7, 0, 0, 6.29); g.fill(); g.fillStyle = '#3a3652'; g.fillRect(x + 4, y + 5, 4, 1); g.restore(); }
+    if (w < .2 && OW.t % 150 > 6) { const [tx, ty] = p.puddle[0]; g.fillStyle = '#efe4bf'; g.fillRect(tx * TILE + 5 - cx, ty * TILE + 7 - cy, 2, 2); g.fillRect(tx * TILE + 10 - cx, ty * TILE + 7 - cy, 2, 2); } }
+  if (p.estuche) { const x = p.estuche[0] * TILE + 8 - cx, y = p.estuche[1] * TILE + 10 - cy;
+    ents.push({ y: p.estuche[1] * TILE + 22, draw: () => { shadow(x, y + 10, 17); g.drawImage(pzSprite('estuche', pal), x - 12, y - 13);
+      if (!z.opened) { g.fillStyle = '#9ec267'; g.fillRect(x - 6, y - 5, 12, 5); if (z.opening) { g.fillStyle = '#fcf2d8'; g.fillRect(x - 9 + z.zip * 18, y - 1, 2, 2); } }
+      if (z.open || z.opened) { g.fillStyle = '#64536f'; g.fillRect(x - 9, y - 8 - (z.open || 1) * 6, 18, 6); g.fillStyle = '#e9dfc7'; g.fillRect(x - 9, y - 6, 18, 3); }
+      if (z.rise) { const img = propSprite('pluma', C('azul')); g.save(); g.translate(x, y - z.rise * 24); g.rotate(-1.05); g.drawImage(img, -24, -8); g.restore(); } } }); }
 }
+// ---- Efectos al usar cada magia
 function drawFieldEffects(cx, cy) {
-  const s = OW.fieldCast;
-  if (s) {
-    const t = s.t, col = fieldColor(s.f.id), x = s.target.x - cx, y = s.target.y - cy - 3;
-    const fx = s.from[0] - cx, fy = s.from[1] - cy, q = clamp((t - 16) / 26, 0, 1);
-    if (t < 17) {
-      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + t * .1, r = 17 - t * .6; g.fillStyle = col; g.fillRect(fx + Math.cos(a) * r, fy + Math.sin(a) * r * .65, 2, 2); }
-    }
-    if (t >= 16 && t < 48) {
-      const sample = u => [lerp(fx, x, u), lerp(fy, y, u) - Math.sin(u * Math.PI) * (s.f.id === 'amarillo' ? 6 : 19)];
-      const tail = Math.max(0, q - (s.f.id === 'rojo' ? .34 : .5));
-      for (let u = tail; u <= q; u += .025) {
-        const [a, b] = sample(u), thick = s.f.id === 'rojo' ? 5 : s.f.id === 'amarillo' ? 1 : 3;
-        g.fillStyle = col; g.fillRect(Math.round(a), Math.round(b), thick, thick);
-        if (s.f.id === 'rojo' || s.f.id === 'azul' || s.f.id === 'agua') { g.fillStyle = '#fff2d3'; g.fillRect(Math.round(a), Math.round(b), 1, 1); }
-      }
-      const [a, b] = sample(q), img = propSprite(s.f.tool, col);
-      drawProp(img, a, b, s.f.id === 'amarillo' ? -.9 : -.45, 1, PROP[s.f.tool].tip[0], PROP[s.f.tool].tip[1], .65);
-      for (let i = 0; i < 5; i++) { const u = Math.max(0, q - i * .08), [a2, b2] = sample(u); g.fillStyle = col; g.fillRect(a2 + Math.sin(i * 3 + t) * 3, b2 + 5 + (t + i * 3) % 9, s.f.id === 'amarillo' ? 1 : 2, 2); }
-    }
-    if (t >= 42 && t < 73) {
-      const k = (t - 42) / 31, mixed = fieldColor(s.mixed || 'agua');
-      for (let i = 0; i < 10; i++) {
-        const a = i * .628 + k * 3, r = 5 + k * 13;
-        g.fillStyle = i % 2 ? mixed : fieldColor(s.before[0] || s.f.id);
-        g.globalAlpha = 1 - k; g.fillRect(x + Math.cos(a) * r, y + Math.sin(a) * r * .5 - Math.sin(k * Math.PI) * 8, 2, 2); g.globalAlpha = 1;
-      }
-      if (s.f.id === 'agua') { g.strokeStyle = '#c5f0f2'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y + 3, 6 + k * 12, 3 + k * 5, 0, 0, Math.PI * 2); g.stroke(); }
-    }
-    if (s.target.kind === 'node' && t >= 44 && t <= 88) {
-      for (const edge of DATA.puzzle.edges.filter(e => e.from === s.target.id || e.to === s.target.id)) {
-        const other = fieldTargets().find(n => n.id === (edge.from === s.target.id ? edge.to : edge.from));
-        const k = clamp((t - 44) / 32, 0, 1), mx = (s.target.x + other.x) / 2 - cx, my = (s.target.y + other.y) / 2 - cy;
-        g.fillStyle = t > 78 ? fieldColor(fieldMix([s.mixed, Game.puzzle.nodes[other.id]])) : col;
-        g.fillRect(lerp(x, mx, k) - 2, lerp(y + 3, my, k) - 2, 4, 4);
-      }
-    }
-    if (s.transform && t >= 50) {
-      const k = clamp((t - 50) / 52, 0, 1);
-      if (s.target.id === 'lens') {
-        const alpha = typeof Prefs === 'undefined' ? .4 : .4 * Prefs.flash;
-        for (const edge of fieldEdges()) {
-          const a = fieldTargets().find(n => n.id === edge.from), b = fieldTargets().find(n => n.id === edge.to);
-          const ex = (a.x + b.x) / 2 - cx, ey = (a.y + b.y) / 2 - cy;
-          g.globalAlpha = alpha * Math.sin(k * Math.PI); fieldLine(x, y - 13, lerp(x, ex, k), lerp(y - 13, ey, k), '#b482d9', 5); g.globalAlpha = 1;
-          g.fillStyle = '#c6a1dc'; g.fillRect(lerp(x, ex, k) - 1, lerp(y - 13, ey, k) - 1, 3, 3);
-        }
-      } else if (s.target.id === 'wax') {
-        for (let i = 0; i < 8; i++) { const phase = (t + i * 5) % 30 / 30; g.fillStyle = i % 2 ? '#f7b761' : '#e77b41'; g.fillRect(x - 9 + i * 4, y - 4 - phase * 18, 2, 4 * (1 - phase)); }
-      } else {
-        for (let i = 0; i < 6; i++) { g.fillStyle = i % 2 ? '#cce788' : '#80b15e'; g.fillRect(x + k * 46 + Math.sin(i * 3 + t * .15) * 7, y - 5 + Math.cos(i * 2 + t * .1) * 7, 3, 2); }
-      }
-    }
-  }
-  const r = OW.ring;
-  if (r) for (const target of fieldNearby()) {
-    const x = target.x - cx, y = target.y - cy, selected = r.targetId === target.id;
-    if (x < 196 || x > 305 || y < 59 || y > 132) continue;
-    g.strokeStyle = selected ? '#e29247' : '#9b8c75'; g.lineWidth = 1;
-    for (const [a, b] of [[-1,-1],[1,-1],[-1,1],[1,1]]) { g.beginPath(); g.moveTo(x + a * 8, y + b * 11); g.lineTo(x + a * 12, y + b * 11); g.lineTo(x + a * 12, y + b * 7); g.stroke(); }
-    uiHit(x - 12, y - 12, 24, 24, () => { r.targetId = target.id; r.notice = null; });
-  }
+  const s = OW.fieldCast; if (!s) return;
+  const t = s.t, col = s.col, fx = s.from[0] - cx, fy = s.from[1] - cy, ax = s.aim[0] - cx, ay = s.aim[1] - cy, k = s.art.kind;
+  if (t < 20) { const c0 = C(fieldOwners(s.art)[0].color); for (let i = 0; i < 8; i++) { const a = i * .785 + t * .16, rr = 18 - t * .7; g.fillStyle = c0; g.fillRect(Math.round(fx + Math.cos(a) * rr), Math.round(fy + 6 + Math.sin(a) * rr * .6), 2, 2); } }
+  const fly = q => [lerp(fx, ax, q), lerp(fy, ay - 6, q) - Math.sin(q * Math.PI) * 16];
+  if (k === 'color') { // la herramienta vuela, pinta tres pinceladas sobre el objeto y vuelve
+    const P = PROP[s.art.tool];
+    if (t >= 16 && t < 36) { const [x, y] = fly((t - 16) / 20); drawProp(propSprite(s.art.tool, col), x, y, -.6, 1, P.tip[0], P.tip[1], .7); }
+    if (t >= 36 && t < 60) { const q = (t - 36) / 24, sweep = Math.sin(q * Math.PI * 3) * 8; drawProp(propSprite(s.art.tool, col), ax + sweep, ay - 2, -.6, 1, P.tip[0], P.tip[1], .7); for (let i = 0; i < 3; i++) if (q > i / 3) pstroke(ax - 8, ay - 4 + i * 4, ax + 8, ay - 5 + i * 4, 2, col, 1, 0, false); }
+    if (t >= 44 && t < 70) { const q = (t - 44) / 26; for (let i = 0; i < 8; i++) { const a = i * .785; g.fillStyle = i % 2 ? col : ramp(col).hi; g.globalAlpha = 1 - q; g.fillRect(Math.round(ax + Math.cos(a) * q * 16), Math.round(ay + Math.sin(a) * q * 8 - Math.sin(q * Math.PI) * 6), 2, 2); } g.globalAlpha = 1; } }
+  if (k === 'trazar') { // el lápiz va a la chincheta y arrastra la línea hasta la otra; saltan virutas de grafito
+    const P = PROP.lapiz, [bx, by] = [s.aim2[0] - cx, s.aim2[1] - cy], d = s.draw || 0;
+    if (t >= 16 && t < 30) { const [x, y] = fly((t - 16) / 14); drawProp(propSprite('lapiz', col), x, y, -.95, 1, P.tip[0], P.tip[1], .8); }
+    if (t >= 30 && t < 78) { const x = lerp(ax, bx, d), y = lerp(ay + 2, by + 2, d); drawProp(propSprite('lapiz', col), x, y, -.95, 1, P.tip[0], P.tip[1], .8); if (t % 2 === 0 && d < 1) { g.fillStyle = '#6a6480'; g.fillRect(Math.round(x - 2 + (t % 5)), Math.round(y + 1 + (t % 3)), 1, 1); } } }
+  if (k === 'borrar') { // una goma enorme frota de lado a lado; las virutas rosas caen
+    if (t >= 16 && t < 76) { const q = t < 28 ? (t - 16) / 12 : 1, rub = t >= 28 ? Math.sin((t - 28) * .6) * 9 : 0, [x, y] = t < 28 ? fly(q) : [ax + rub, ay - 4], img = propSprite('goma'); drawProp(img, x, y, .25, 1, PROP.goma.tip[0], PROP.goma.tip[1], 1.4);
+      if (t >= 28) for (let i = 0; i < 5; i++) { const ph = ((t + i * 7) % 20) / 20; g.fillStyle = i % 2 ? '#e86a8a' : '#f4f0ea'; g.fillRect(Math.round(ax - 8 + i * 4 + Math.sin(i + t * .2) * 2), Math.round(ay + 2 + ph * 12), 2, 1); } } }
+  if (k === 'aguada') { // el pincel descarga agua: una mancha de acuarela se abre sobre la tinta y la aclara
+    const P = PROP.pincel, w = s.wash || 0;
+    if (t >= 16 && t < 34) { const [x, y] = fly((t - 16) / 18); drawProp(propSprite('pincel', '#8ec8e8'), x, y, -.6, 1, P.tip[0], P.tip[1], .7); }
+    if (t >= 24) { g.save(); g.globalAlpha = .5 * (1 - Math.max(0, (t - 80) / 16)); g.fillStyle = '#9fd0ea'; g.beginPath(); g.ellipse(ax, ay + 4, 6 + w * 22, 3 + w * 12, 0, 0, 6.29); g.fill(); g.fillStyle = '#e8f6fb'; g.fillRect(Math.round(ax - w * 12), Math.round(ay - w * 6), Math.round(w * 10) + 1, 1); g.restore();
+      for (let i = 0; i < 6; i++) { const ph = ((t * 2 + i * 9) % 30) / 30; g.fillStyle = '#6fb4d8'; g.fillRect(Math.round(ax - 10 + i * 4), Math.round(ay - 20 + ph * 22), 1, 2); } } }
 }
 function drawFieldUI() {
-  if(OW.ring||OW.menu||OW.msg||OW.heal||OW.landT||OW.jar?.toast>0)return;
-  const s=OW.fieldCast,toast=OW.fieldToast;
-  if(s){
-    const col=fieldColor(s.f.id),label=fieldOwner(s.f).name+' / '+s.f.name,castAt=artObserve('field-cast',s);
-    g.save();g.translate(Math.round((1-artIn(castAt,14))*-90),0);
-    artTag(label,6,151,col);
-    const message=s.t<42?'El pigmento viaja...':s.transform?s.target.done:s.f.id==='agua'?'El agua retira la mezcla.':'Mezcla: '+s.mixed,messageAt=artObserve('field-cast-message',message);
-    const w=Math.min(308,textWidth(message)+17);maskingLabel(6,167,w,12);smallText(message,14,170,UI_INK,{progress:Prefs.shake?(ARTUI.t-messageAt)*1.6:Infinity,wet:col});
-    g.restore();
-  }else if(toast?.t>0){
-    const lines=wrapSmall(toast.text,280),w=Math.max(...lines.map(textWidth))+18,y=176-lines.length*10-7,toastAt=artObserve('field-toast',toast);
-    g.save();g.translate(0,Math.round((1-artIn(toastAt,14))*30));
-    maskingLabel(Math.round((W-w)/2),y,w,7+lines.length*10);
-    writtenLines(lines,Math.round((W-w)/2)+9,y+4,UI_INK,Prefs.shake?(ARTUI.t-toastAt)*1.6:Infinity,{wet:'#9c4539'});
-    g.restore();
-  }else{
-    const target=fieldNearby()[0];if(!target)return;
-    const label=target.name+' / '+battleKey('ok')+(target.kind==='press'&&fieldCircuitReady()?' abrir':' magias');
-    const w=textWidth(label)+16,x=Math.round((W-w)/2),at=artObserve('field-nearby',target.id);
-    g.save();g.translate(0,Math.round((1-artIn(at,14))*26));
-    artTag(label,x,159-Math.round(artPop(at)*3),fieldColor(fieldMix(fieldContents(target))));
-    g.restore();
-    uiHit(x,154,w,24,()=>fieldInteract());
+  if (OW.ring || OW.menu || OW.msg || OW.heal || OW.landT || OW.jar?.toast > 0) return;
+  const s = OW.fieldCast, toast = OW.fieldToast;
+  if (s) { const label = fieldOwners(s.art).map(p => p.name).join(' + ') + ' / ' + s.art.name, castAt = artObserve('field-cast', s); g.save(); g.translate(Math.round((1 - artIn(castAt, 14)) * -90), 0); artTag(label, 6, 160, s.col); g.restore(); }
+  else if (toast?.t > 0) {
+    const lines = wrapSmall(toast.text, 280), w = Math.max(...lines.map(textWidth)) + 18, y = 176 - lines.length * 10 - 7, toastAt = artObserve('field-toast', toast);
+    g.save(); g.translate(0, Math.round((1 - artIn(toastAt, 14)) * 30)); maskingLabel(Math.round((W - w) / 2), y, w, 7 + lines.length * 10);
+    writtenLines(lines, Math.round((W - w) / 2) + 9, y + 4, UI_INK, Prefs.shake ? (ARTUI.t - toastAt) * 1.6 : Infinity, { wet: '#9c4539' }); g.restore();
+  } else {
+    const t = fieldNearby()[0]; if (!t) return;
+    const label = t.name + ' / ' + battleKey('ok') + ' abrir', w = textWidth(label) + 16, x = Math.round((W - w) / 2), at = artObserve('field-nearby', t.id);
+    g.save(); g.translate(0, Math.round((1 - artIn(at, 14)) * 26)); artTag(label, x, 159 - Math.round(artPop(at) * 3), '#9ec267'); g.restore();
+    uiHit(x, 154, w, 24, () => fieldInteract());
   }
 }

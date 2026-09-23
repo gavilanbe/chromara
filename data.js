@@ -102,7 +102,7 @@ const DATA = {
   },
 
   // ---- Mapa de Chromara (40×30, tiles de 16px)
-  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  M Sepia, la marchante  H pliegue sellado con cera  R río de tinta  E estuche del circuito  w semilla  1-6 encuentros  B jefe
+  // . hierba  , hierba tiznada  ~ agua  = camino/puente  T pincel/lápiz  r goma  x mancha decorativa  P inicio  V vaso de agua (cura, 2×2)  S letrero post-it  M Sepia, la marchante  H pliegue sellado con cera  Q canal de tinta  b puente en boceto (Colorear)  p chincheta (Trazar)  N charco de Tinta (Aguada)  H garabato (Borrar)  R río de tinta  E estuche del circuito  w semilla  1-6 encuentros  B jefe
   map: [
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
     'T........TT.............T...,,,,,,,,,,,T',
@@ -119,14 +119,14 @@ const DATA = {
     'T....~~~...=....~~~~~.....T....TT......T',
     'T..........=...~~~~..........TT........T',
     'T...1......=...~~~~....r...TTTTTTTTTTTTT',
-    'T..........=====~~~~=====..T.RR........T',
-    'T........T.....~~~~.....=..T.RR........T',
+    'T..........=====~~~~=====..T.RR......NET',
+    'T........T.....~~~~.....=..T.RR......NNT',
     'T...S...TT......~~~~....=..T.RR........T',
     'T......TT........~~~~...=..T.RR........T',
-    'T.....TT..........~~~~..=..T.RR........T',
+    'T.....TT..........~~~~..=..T.RRQQQbQQQQT',
     'T.....T.V..........~~~~.=.HH.RR........T',
-    'T..P..T.............~~~~=SHH.RR......E.T',
-    'T.....T.S............~~~=..TwRR........T',
+    'T..P..T.............~~~~=SHH.RR........T',
+    'T.....T.S............~~~=..TpRRp.......T',
     'T.....T...............~~=..T.RR........T',
     'T.....TT...............~=~~~TTTTTTTTTTTT',
     'T......TT..............~=~~~~..........T',
@@ -136,23 +136,27 @@ const DATA = {
     'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
   ],
 
-  signs: { '25,21': ['Atelier de las tres tintas', 'C abre las magias de campo.', 'Dos pigmentos, una mezcla.', 'El calor ablanda la cera.', 'El agua limpia los intentos.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
-  // Cada captador comparte su pigmento con dos canales: una única solución.
+  signs: { '25,21': ['Atelier de las tres tintas', 'C abre las magias de campo:', 'mira hacia algo y lánzala.', 'La pintura vuelve al caminar.', 'Lo que es lápiz, se borra.'], '4,17': ['Post-it:', 'Vaso de agua ↑ →', 'Sube por el hueco y', 'sigue la hilera de pinceles.'], '8,22': ['Post-it:', 'Vaso de agua ↑', 'Aclara las gotas:', 'HP y MP al máximo.'] },
+  // ---- Magias de campo: las herramientas del pintor actúan sobre la página. Se lanzan hacia donde mira el líder, sobre lo
+  // primero que haya delante; gastan pintura (MP), que vuelve al caminar.
+  fieldArts: [
+    { id: 'rojo', kind: 'color', name: 'Colorear rojo', users: ['carmin'], color: 'rojo', tool: 'brocha', mp: 1, desc: 'Pinta de rojo lo que tienes delante. Un boceto con su color se vuelve real.' },
+    { id: 'amarillo', kind: 'color', name: 'Colorear amarillo', users: ['ambar'], color: 'amarillo', tool: 'lapiz', mp: 1, desc: 'Pinta de amarillo. Sobre otro color, se mezclan en el propio objeto.' },
+    { id: 'azul', kind: 'color', name: 'Colorear azul', users: ['anil'], color: 'azul', tool: 'pincel', mp: 1, desc: 'Pinta de azul. Amarillo y azul dan verde; rojo y azul, violeta.' },
+    { id: 'trazar', kind: 'trazar', name: 'Trazar', users: ['ambar'], color: 'amarillo', tool: 'lapiz', mp: 2, desc: 'Dibuja una línea de grafito entre dos chinchetas: se puede cruzar.' },
+    { id: 'borrar', kind: 'borrar', name: 'Borrar', users: ['carmin'], color: 'rojo', tool: 'goma', mp: 1, desc: 'La goma borra lo dibujado a lápiz y el color mal puesto.' },
+    { id: 'aguada', kind: 'aguada', name: 'Aguada', users: ['anil'], color: 'azul', tool: 'pincel', mp: 2, desc: 'El agua diluye la Tinta: los charcos negros se aclaran y se escurren.' },
+  ],
   puzzle: {
-    targets: [
-      { id: 'wax', kind: 'wax', name: 'Sello de cera', x: 424, y: 332, color: 'naranja', clue: 'La cera necesita calor.', done: 'La cera se funde. El paso queda abierto.' },
-      { id: 'seed', kind: 'seed', name: 'Semilla dormida', x: 456, y: 364, color: 'verde', clue: 'La semilla necesita vida.', done: 'Las raíces tejen un puente sobre la tinta.' },
-      { id: 'lens', kind: 'lens', name: 'Lente del plano', x: 600, y: 308, color: 'violeta', clue: 'La lente busca tinta oculta.', done: 'El plano revela el color de cada canal.' },
-      { id: 'a', kind: 'node', name: 'Captador A', x: 520, y: 286 },
-      { id: 'b', kind: 'node', name: 'Captador B', x: 584, y: 286 },
-      { id: 'c', kind: 'node', name: 'Captador C', x: 552, y: 336 },
-      { id: 'press', kind: 'press', name: 'Estuche sellado', x: 600, y: 344 },
-    ],
-    edges: [
-      { from: 'a', to: 'b', color: 'violeta' },
-      { from: 'a', to: 'c', color: 'naranja' },
-      { from: 'b', to: 'c', color: 'verde' },
-    ],
+    things: {
+      scribble: { name: 'Garabato de lápiz', hint: 'Un garabato tapa el paso. Es grafito: se puede borrar.', done: 'El garabato desaparece en virutas.' },
+      pin: { name: 'Chincheta', hint: 'Hay otra chincheta al otro lado. Una línea entre las dos...', done: 'La línea de grafito cruza el río.' },
+      line: { name: 'Línea de grafito', hint: 'Es tu propia línea. Sostiene tu peso.' },
+      sketch: { name: 'Puente en boceto', need: 'verde', hint: 'Es sólo un boceto: no aguanta nada. En el margen pone «verde».', done: 'El boceto toma color y se vuelve un puente de hojas.' },
+      pit: { name: 'Canal de tinta', hint: 'Demasiado ancho para saltar.' },
+      puddle: { name: 'Charco de Tinta', hint: 'Tinta espesa. La pintura no agarra; el agua sí la diluye.', done: 'El agua diluye la tinta y se escurre por el papel.' },
+      chest: { name: 'Estuche' },
+    },
   },
   // ---- Diálogo previo a la jefa (who: tinta | carmin | ambar | anil)
   bossDialogue: [

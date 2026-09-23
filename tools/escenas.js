@@ -28,7 +28,10 @@ const ESCENAS = {
   tienda() { ESCENAS.mapa(); Game.pigmento = 40; Game.techLevels = { brote: 2 }; openShop(); },
   sepia() { ESCENAS.mapa(); OW.msg = null; OW.x = MAP.merchant.x * TILE + 8; OW.y = MAP.merchant.y * TILE + 34; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H); },
   guia() { ESCENAS.mapa(); openOverlay('guide'); },
-  magias() { ESCENAS.mapa(); const t = fieldTargets()[0]; OW.x = t.x; OW.y = t.y + 16; OW.ring = { idx: 0, targetId: t.id, t: 0, legend: false }; },
+  // ?escena=magias[&paso=0..4]: el anillo abierto frente a cada pieza del taller (garabato, chincheta, boceto, charco).
+  magias() { ESCENAS.mapa(); OW.msg = null; const paso = +(new URLSearchParams(location.search).get('paso') || 0), z = Game.puzzle, spots = [[25 * TILE + 6, 21 * TILE + 4, 'right', 4], [28 * TILE + 8, 21 * TILE + 12, 'down', 3], [34 * TILE + 8, 21 * TILE + 8, 'up', 1], [37 * TILE + 8, 18 * TILE + 8, 'up', 5], [36 * TILE + 8, 15 * TILE + 10, 'right', 0]];
+    if (paso > 0) z.erased = 1; if (paso > 1) z.line = 1; if (paso > 2) { z.real = 1; z.sketch = ['amarillo', 'azul']; } if (paso > 3) z.washed = 1;
+    const [x, y, dir, idx] = spots[paso]; OW.x = x; OW.y = y; OW.dir = dir; OW.cam.x = clamp(OW.x - W / 2, 0, MAP.w * TILE - W); OW.cam.y = clamp(OW.y - H / 2, 0, MAP.h * TILE - H); if (paso < 4) { openRing(); OW.ring.idx = idx; } },
   paleta() { escenaBattle('5'); },
   entrada() { escenaBattle('5'); B.fightStart = B.t; BUI.party = null; },
   paleta3() { escenaBattle('5'); B.menu.idx = 3; },

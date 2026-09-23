@@ -39,12 +39,11 @@ const root = path.resolve(__dirname, '..');
       targets.push(['puzzle entrance', 25 * 16 + 12, 21 * 16 + 8]);
       for (const o of worldObjects().filter(o => o.title)) targets.push([o.title, o.wx, o.wy + 8]);
       const unreachable = targets.filter(([,x,y]) => !reachable(x,y)).map(t => t[0]);
-      const before = reachable(MAP.pz.seed[0] * 16 + 8, MAP.pz.seed[1] * 16 + 8, 12);
-      Game.puzzle.painted = 1; reachable = flood();
-      const seed = reachable(MAP.pz.seed[0] * 16 + 8, MAP.pz.seed[1] * 16 + 8, 12);
-      Game.puzzle.sunBend = 1; reachable = flood();
-      const circuit = DATA.puzzle.targets.filter(t => ['node','lens','press'].includes(t.kind)).every(t => reachable(t.x, t.y, 22));
-      const chest = reachable(MAP.pz.estuche[0] * 16 + 8, MAP.pz.estuche[1] * 16 + 8, 25);
+      // The atelier opens step by step: erase the scribble, draw the line, colour the sketch green, wash the ink.
+      const z = Game.puzzle, before = reachable(28 * 16 + 8, 21 * 16 + 8, 12);
+      z.erased = 1; reachable = flood(); const seed = reachable(28 * 16 + 8, 21 * 16 + 8, 12);
+      z.line = 1; z.real = 1; reachable = flood(); const circuit = reachable(34 * 16 + 8, 17 * 16 + 8, 12);
+      z.washed = 1; reachable = flood(); const chest = reachable(37 * 16 + 8, 15 * 16 + 8, 12);
       Game.puzzle = PUZ0();
       return { unreachable, before, seed, circuit, chest,
         invalid: worldObjects().filter(o => o.size[2] && solid(tileAt(o.wx / 16 | 0, o.wy / 16 | 0))).map(o => o.kind),

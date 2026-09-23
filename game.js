@@ -351,7 +351,7 @@ DATA.map.forEach((row, y) => {
     else if (ch === 'V') { MAP.jar = { x, y }; ch = '.'; }
     else if (ch === 'M') { MAP.merchant = { x, y }; ch = '.'; }
     else if (ch === 'S') { (MAP.signs = MAP.signs || []).push({ x, y, lines: DATA.signs[x + ',' + y] || ['Post-it'] }); ch = '.'; }
-    else if ('HREw'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], torn: [] }; if (ch === 'H') P.torn.push([x, y]); else if (ch === 'R') P.river.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; else if (ch === 'w') P.seed = [x, y]; ch = ch === 'R' ? ',' : '.'; }
+    else if ('HREpQbN'.includes(ch)) { const P = MAP.pz = MAP.pz || { river: [], torn: [], pit: [], pins: [], puddle: [] }; if (ch === 'H') P.torn.push([x, y]); else if (ch === 'R') P.river.push([x, y]); else if (ch === 'Q') P.pit.push([x, y]); else if (ch === 'b') { P.pit.push([x, y]); P.sketch = [x, y]; } else if (ch === 'p') P.pins.push([x, y]); else if (ch === 'N') P.puddle.push([x, y]); else if (ch === 'E') P.estuche = [x, y]; ch = ch === 'R' ? ',' : '.'; }
     else if (DATA.encounters[ch]) { MAP.spots.push({ key: ch, x, y }); ch = ch === 'B' ? ',' : (ch === '5' ? ',' : '.'); }
     out += ch;
   }
@@ -462,7 +462,7 @@ function updateOverworld() {
   if (OW.moving) {
     const nx = OW.x + OW.vx, ny = OW.y + OW.vy;
     if (walkable(nx, OW.y)) OW.x = nx; else OW.vx = 0; if (walkable(OW.x, ny)) OW.y = ny; else OW.vy = 0;
-    OW.hist.unshift([OW.x, OW.y]); if (OW.hist.length > 40) OW.hist.pop();
+    OW.hist.unshift([OW.x, OW.y]); if (OW.hist.length > 40) OW.hist.pop(); fieldWalk(speed);
     const prev = OW.bob || 0; OW.bob = prev + speed * .11;
     if (Math.floor(OW.bob) > Math.floor(prev)) { // aterrizaje: gotitas del color del líder y paso según el terreno
       const tx = OW.x / TILE | 0, ty = (OW.y + 3) / TILE | 0, ch = tileAt(tx, ty); const wood = ch === '=' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => tileAt(tx + a, ty + b) === '~');
