@@ -302,17 +302,21 @@ function battleClockStopped() {
 }
 function menuCameraSubjects(m) {
   if(!m||Prefs.camera==='fija')return null;
-  return m.level==='target'&&m.pending?validTargets(m.pending,m.unit):[m.unit];
+  if(m.level==='target'&&m.pending)return validTargets(m.pending,m.unit);
+  // Choosing a tool looks over the painter's shoulder: the rivals stay in the back of the shot.
+  return [m.unit,...alive(B.enemies)];
 }
-// The palette stays close to its painter. Target selection frames the recipient
+// The palette frames its painter with the rivals behind. Target selection frames the recipient
 // team together, so moving the cursor never makes its neighbours disappear.
 function menuCameraPose(m) {
   const r = SCENE.rest;
   const subjects=menuCameraSubjects(m);
   if(subjects){
-    const targeting=m.level==='target',party=subjects[0]?.kind==='party';
-    return fitCameraSubjects(subjects,{home:true,yaw:party?cameraPartyYaw():r.yaw,dist:78,
-      zoom:subjects.length>1?1.35:1.8,headroom:6,box:targeting?[25,36,295,113]:[124,40,300,B.reservation?125:133]});
+    const targeting=m.level==='target',party=targeting&&subjects[0]?.kind==='party';
+    // Choosing looks from behind the painter toward the rivals, turned a little so they sit up-left.
+    const ec=targeting?null:centroid(alive(B.enemies).map(u=>({wx:u.hx,wy:u.hy}))),shoulder=ec?Math.atan2(ec[1]-m.unit.hy,ec[0]-m.unit.hx)+.5:null;
+    return fitCameraSubjects(subjects,{home:true,yaw:party?cameraPartyYaw():shoulder??r.yaw,dist:78,
+      zoom:targeting?(subjects.length>1?1.35:1.8):1.5,headroom:6,box:targeting?[25,36,295,113]:[124,40,300,B.reservation?125:133]});
   }
   if(m?.level==='target'&&m.pending){
     const targets=validTargets(m.pending,m.unit),party=targets[0]?.kind==='party';

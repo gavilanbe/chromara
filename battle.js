@@ -665,6 +665,8 @@ function drawUnit(u) {
     const glow = tintSprite(spr, u.kind === 'party' ? C(u.color) : '#8c8ab0', 1), pulse = .3 + (Prefs.shake ? .25 * Math.sin(B.t * .45) : .1), reach = Prefs.shake ? 2 : 1;
     g.save(); g.globalAlpha *= pulse; for (const [ox, oy] of [[-reach, 0], [reach, 0], [0, -reach], [0, reach]]) drawSprite(glow, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore();
   }
+  // Las Gotas Negras llevan un filo de papel húmedo: sin él se pierden sobre su propio charco de tinta.
+  if (u.kind === 'enemy' && u.alive && u.pose !== 'charge') { const rim = tintSprite(spr, '#ece3cf', 1); g.save(); g.globalAlpha *= .8; for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1]]) drawSprite(rim, u.x + ox, u.y - bob + oy, SX, flip, SY); g.restore(); }
   drawSprite(spr, u.x, u.y - bob, SX, flip, SY);
   if (u.id === 'anil' && u.alive && !info.atlas) drawSatellites(u.x, u.y, B.t + u.idx * 10, C(u.color), s);
   if (G) drawGoop(u);
@@ -692,7 +694,7 @@ function drawBattle() {
   const shake = Math.round(B.shake * Prefs.shake);
   const sx = shake ? RI(-shake, shake) : 0, sy = shake ? RI(-shake, shake) / 2 | 0 : 0;
   g.save(); g.translate(sx, sy);
-  drawSky(pal); drawFloor(pal, gris ? '#767c96' : '#9ed0f6', gris ? '#767c96' : '#9ed0f6');
+  const sky = skyStyle(pal); drawSky(pal); drawFloor(pal, sky.fog, sky.fog); drawSkyline(pal);
   g.fillStyle = '#a29b88'; g.globalAlpha = .12; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
   drawGroundLayer(); drawTacticalGround();
   // entidades por profundidad (lejos primero): unidades y props del mapa
@@ -701,7 +703,8 @@ function drawBattle() {
   for (const o of B.props) { const p = project(o.wx, o.wy, 0); if (!p || p[1] < -60 || p[0] < -60 || p[0] > W + 60) continue;
     // si un árbol queda delante de alguien, se vuelve translúcido
     const s = p[2] * B.propScale, cover = (o.kind === 'T' || o.kind === 'art') && B.units.some(u => u.z && p[3] < u.z && Math.abs(p[0] - u.x) < (o.object ? o.object.size[0] / 2 : 17) * s + 14 && p[1] > u.y - 30 && p[1] < u.y + (o.object ? o.object.size[1] : 50) * s);
-    ents.push({ z: p[3], d: () => { g.globalAlpha = cover ? .22 : .7; if (o.kind === 'art') { shadow(p[0], p[1], Math.round(o.object.size[0] * .7 * s)); drawSprite(worldSprite(o.object, pal), p[0], p[1] + 2, s); } else if (o.kind === 'T') { shadow(p[0], p[1], Math.round(22 * s)); drawSprite(bigTree(pal, o.vr), p[0], p[1] + 2, s); } else { shadow(p[0], p[1] + 1, Math.round(24 * s)); drawSprite(bigRock(pal, o.vr & 3), p[0], p[1] + 2, s); } g.globalAlpha = 1; } }); }
+    const hz = propHaze(p[3]);
+    ents.push({ z: p[3], d: () => { g.globalAlpha = cover ? .28 : 1; if (o.kind === 'art') { shadow(p[0], p[1], Math.round(o.object.size[0] * .7 * s)); drawSprite(hazeSprite(worldSprite(o.object, pal), sky.fog, hz), p[0], p[1] + 2, s); } else if (o.kind === 'T') { shadow(p[0], p[1], Math.round(22 * s)); drawSprite(hazeSprite(bigTree(pal, o.vr), sky.fog, hz), p[0], p[1] + 2, s); } else { shadow(p[0], p[1] + 1, Math.round(24 * s)); drawSprite(hazeSprite(bigRock(pal, o.vr & 3), sky.fog, hz), p[0], p[1] + 2, s); } g.globalAlpha = 1; } }); }
   ents.sort((a, b) => b.z - a.z).forEach(e => e.d());
   drawMarks(false); for (const f of B.fx) if (!f.under) f.draw();
   for (const p of B.particles) { if (p.t < 0) continue; const c = project(p.wx, p.wy, p.wz); if (!c) continue; g.fillStyle = p.pal ? p.pal[Math.min(p.pal.length - 1, Math.floor(p.t / p.life * p.pal.length))] : p.col; const s = Math.max(1, Math.round((p.stream ? 2 : (p.t > p.life * .7 ? 1 : (p.size || 2))) * c[2])); g.fillRect(Math.round(c[0]), Math.round(c[1]), s, s); }

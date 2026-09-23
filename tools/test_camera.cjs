@@ -84,13 +84,15 @@ test('paused options freeze the orbit and closing actions do not reset to the wi
 test('orbit ticks are deterministic and do not consume combat RNG',()=>{
  start({type:'attack'});run('updateBattle();Math.random=()=>{throw Error("camera consumed RNG")};for(let i=0;i<20;i++){B.t++;camTick();projectUnits()}');run('Math.random=()=>.5');
 });
-test('the palette gives its painter a close shot and browsing does not restart the camera',()=>{
- for(const who of [0,1,2]){
-  scenario();run(`Prefs.camera='suave';openCmd(B.party[${who}]);updateMenuCamera();for(let i=0;i<46;i++)camTick();projectUnits()`);
-  assert(run('B.menu.unit.sc')>1.5,'Painter too far from palette');
+test('the palette looks over its painter\'s shoulder at every rival and browsing does not restart the camera',()=>{
+ for(const group of ['1','3','5','B'])for(const who of [0,1,2]){
+  scenario(group);run(`Prefs.camera='suave';openCmd(B.party[${who}]);updateMenuCamera();for(let i=0;i<46;i++)camTick();projectUnits()`);
+  assert(run('B.menu.unit.sc')>.75,'Painter too far from palette');
   assert(contained(run('cameraBounds(B.menu.unit,SCENE.cam)')));
-  run("var heldMenuPose=JSON.stringify(SCENE.cam);B.menu.idx=1;updateMenuCamera();B.menu.level='tech';updateMenuCamera();for(let i=0;i<60;i++)camTick()");
-  assert.equal(run('JSON.stringify(SCENE.cam)===heldMenuPose'),true,'Browsing moved the camera');
+  for(const box of run('alive(B.enemies).map(u=>cameraBounds(u,SCENE.cam))'))assert(contained(box),'Rival left the palette shot '+JSON.stringify({group,who,box}));
+  assert(run('B.menu.unit.z<Math.min(...alive(B.enemies).map(u=>u.z))'),'The painter should stand in front of the rivals');
+  run("var poseKey=c=>JSON.stringify(c,(k,v)=>typeof v==='number'?+v.toFixed(6):v);var heldMenuPose=poseKey(SCENE.cam);B.menu.idx=1;updateMenuCamera();B.menu.level='tech';updateMenuCamera();for(let i=0;i<60;i++)camTick()");
+  assert.equal(run('poseKey(SCENE.cam)===heldMenuPose'),true,'Browsing moved the camera '+group+who);
  }
 });
 test('menu travel eases in, holds its destination and keeps the same duration at 2x',()=>{

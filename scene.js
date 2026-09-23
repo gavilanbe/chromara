@@ -42,6 +42,21 @@ function bigTree(pal, vr) {
     return c;
   });
 }
+// Perspectiva atmosférica: el decorado se apaga y se funde con la niebla según la
+// distancia, opaco, para que sólo las gotas lleven el color pleno. Cuantizado a octavos.
+const HAZE = new WeakMap();
+function hazeSprite(spr, fog, k) {
+  const q = Math.round(clamp(k, 0, 1) * 8) / 8; if (q <= 0) return spr;
+  let m = HAZE.get(spr); if (!m) HAZE.set(spr, m = new Map());
+  const key = fog + q; if (m.has(key)) return m.get(key);
+  const c = document.createElement('canvas'); c.width = spr.width; c.height = spr.height; const x = c.getContext('2d');
+  x.drawImage(spr, 0, 0);
+  x.globalCompositeOperation = 'saturation'; x.globalAlpha = Math.min(1, q * 1.1); x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'source-atop'; x.globalAlpha = q * .75; x.fillStyle = fog; x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'destination-in'; x.globalAlpha = 1; x.drawImage(spr, 0, 0); // la saturación no debe teñir lo transparente
+  m.set(key, c); return c;
+}
+function propHaze(z) { return clamp(.32 + (z - 110) / 420, .32, .7); }
 function bigRock(pal, vr) { // goma de borrar bicolor con funda
   return cached(`bigrock|${pal}|${vr}`, () => {
     const p = PAL[pal], c = document.createElement('canvas'); c.width = 26; c.height = 18; const x = c.getContext('2d');
@@ -80,19 +95,64 @@ function drawFloor(pal, skyCol, fogCol) {
       d[i] = r * inv + fr * fog; d[i + 1] = gg * inv + fg * fog; d[i + 2] = bb * inv + fb * fog; d[i + 3] = 255;
     }
   }
-  g.fillStyle = skyCol; g.fillRect(0, 0, W, H);
-  g.putImageData(SCENE.img, 0, 0); // las filas de cielo son transparentes: putImageData las pisa; repintamos el cielo encima de lo transparente
+  // Las filas de cielo quedan transparentes: el suelo se compone encima del cielo ya pintado.
+  if (!SCENE.floorCanvas) { SCENE.floorCanvas = document.createElement('canvas'); SCENE.floorCanvas.width = W; SCENE.floorCanvas.height = H; }
+  SCENE.floorCanvas.getContext('2d').putImageData(SCENE.img, 0, 0);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(SCENE.floorCanvas, 0, 0); g.restore(); // como antes, el suelo no tiembla con el marco
 }
-// Cielo y horizonte: bandas de color, silueta lejana de árboles y un sol/luna de pintura
+// Cielo y horizonte: la página por encima del suelo. En gris es papel con una aguada
+// fría y el sol sólo está esbozado a lápiz; con el color devuelto la aguada se vuelve
+// azul y el sol se rellena. Nubes a lápiz y un horizonte de lápices y pinceles lejanos
+// giran con la cámara a distinta velocidad. Se pinta antes que el suelo, que deja
+// transparentes sus filas de cielo.
+const SKY = {
+  gris: { bands: ['#aaa3b4', '#b8b1bd', '#c6bec3', '#d2cac7'], fog: '#cdc5bf', cloud: '#e4ddd6', line: '#8d8698', sun: '#ece5d8', far: ['#b1aab7', '#bdb6bf'] },
+  vivo: { bands: ['#79a9dc', '#93bce4', '#b0cfe9', '#cbe0ec'], fog: '#cfe0ea', cloud: '#f6f3ee', line: '#6f8fb8', sun: '#f2c93a', far: ['#9fbccd', '#b3cdd9'] },
+};
+function skyStyle(pal) { return SKY[pal] || SKY.gris; }
+function skyHorizon() { const cam = SCENE.cam; return Math.round(cam.hy - cam.f * Math.tan(cam.pitch)); }
 function drawSky(pal) {
-  const cam = SCENE.cam, gris = pal === 'gris', hz = Math.round(cam.hy - cam.f * Math.tan(cam.pitch));
-  const bands = gris ? ['#3a3d55', '#4a4f6a', '#5f6680', '#767c96'] : ['#2f6fc4', '#3a8fe0', '#62b0f2', '#9ed0f6'];
-  const top = Math.min(hz, H); bands.forEach((c, i) => { g.fillStyle = c; const y0 = Math.round(top * i / bands.length); g.fillRect(0, y0, W, Math.round(top * (i + 1) / bands.length) - y0 + 1); });
-  // sol de pintura (gris: disco pálido; vivo: amarillo con brillo)
-  g.fillStyle = gris ? '#8b91a8' : '#f2c93a'; g.beginPath(); g.arc(250 - cam.yaw * 40, Math.max(8, top - 30), 9, 0, 6.29); g.fill(); if (!gris) { g.fillStyle = '#fbe28a'; g.fillRect(246 - cam.yaw * 40 | 0, Math.max(8, top - 30) - 4, 3, 2); }
-  // silueta de bosque lejano que gira con la cámara
-  const sil = gris ? '#4a5449' : '#2a6f3a', sil2 = gris ? '#3f4840' : '#215a2e';
-  for (let x = -20; x < W + 20; x += 9) { const ph = (x + cam.yaw * 120) * .11; const hh = 6 + Math.abs(Math.sin(ph * 1.7) * 6 + Math.sin(ph * .6) * 4); g.fillStyle = sil; g.fillRect(x, top - hh, 9, hh + 2); g.fillStyle = sil2; g.fillRect(x + 4, top - hh + 3, 5, hh); }
+  const cam = SCENE.cam, st = skyStyle(pal), top = Math.min(skyHorizon(), H), vivid = pal === 'vivo';
+  if (top <= 0) return;
+  // Bandas de aguada con borde mordido: cada banda muerde la siguiente con un diente de papel.
+  st.bands.forEach((c, i) => { g.fillStyle = c; const y0 = Math.round(top * i / st.bands.length), y1 = Math.round(top * (i + 1) / st.bands.length); g.fillRect(0, y0, W, y1 - y0 + 1);
+    if (i) { g.fillStyle = st.bands[i - 1]; for (let x = (i * 7) % 5; x < W; x += 5) g.fillRect(x, y0, 2 + ((x * 13 + i) % 3), 1); } });
+  // Grano del papel: puntos fijos al mundo, no al marco.
+  g.fillStyle = mixHex(st.bands[1], '#ffffff', .25);
+  for (let i = 0; i < 70; i++) { const x = ((i * 97 + Math.round(cam.yaw * 90)) % (W + 40) + W + 40) % (W + 40) - 20, y = (i * 53) % Math.max(1, top - 2); g.fillRect(x, y, 1, 1); }
+  // Sol: disco de pintura (vivo) o círculo a lápiz con un rayado tenue (gris).
+  const sx = Math.round(250 - cam.yaw * 40), sy = Math.max(10, top - 30);
+  if (vivid) { g.fillStyle = mixHex(st.sun, '#ffffff', .35); g.beginPath(); g.arc(sx, sy, 12, 0, 6.29); g.fill(); g.fillStyle = st.sun; g.beginPath(); g.arc(sx, sy, 10, 0, 6.29); g.fill(); g.fillStyle = '#fbe28a'; g.fillRect(sx - 5, sy - 5, 4, 2); g.fillRect(sx - 6, sy - 3, 2, 2); }
+  else {
+    g.fillStyle = st.sun; g.beginPath(); g.arc(sx, sy, 9, 0, 6.29); g.fill();
+    g.strokeStyle = st.line; g.lineWidth = 1; g.beginPath(); g.arc(sx + .5, sy + .5, 9, .3, 6.1); g.stroke();
+    g.fillStyle = mixHex(st.line, st.sun, .5); for (let k = -6; k <= 6; k += 3) g.fillRect(sx + k, sy + 2 - Math.abs(k) / 3 | 0, 2, 1); // rayado de sombra
+  }
+  // Nubes: tres óvalos de papel y un trazo de lápiz por arriba; las altas se mueven menos.
+  for (let i = 0; i < 5; i++) {
+    const depth = .45 + (i % 3) * .25, span = W + 120, x = (((i * 83 + 20) - cam.yaw * 70 * depth) % span + span) % span - 60, y = Math.round(top * (.18 + ((i * 37) % 50) / 100));
+    if (y > top - 10) continue;
+    const w = 16 + (i * 7) % 12, cx = Math.round(x);
+    g.fillStyle = st.cloud; [[0, 0, w, 5], [-w * .45, 2, w * .6, 4], [w * .5, 2, w * .55, 3.5]].forEach(([dx, dy, rx, ry]) => { g.beginPath(); g.ellipse(cx + dx, y + dy, rx, ry, 0, 0, 6.29); g.fill(); });
+    g.fillStyle = mixHex(st.cloud, st.bands[3], .5); g.fillRect(cx - w, y + 5, w * 2, 1); // base plana, a la sombra
+    g.strokeStyle = st.line; g.globalAlpha *= .55; g.beginPath(); g.ellipse(cx + .5, y + .5, w, 5, 0, 3.5, 5.9); g.stroke(); g.globalAlpha /= .55;
+  }
+}
+// Horizonte: utensilios lejanos (puntas de lápiz y cabezas de pincel) en el tono de la
+// niebla; se dibuja ENCIMA del suelo, apoyado en la línea del horizonte.
+function drawSkyline(pal) {
+  const cam = SCENE.cam, st = skyStyle(pal), top = skyHorizon();
+  if (top <= 4 || top > H) return;
+  for (let row = 0; row < 2; row++) {
+    const col = st.far[row], step = row ? 11 : 15, par = row ? 150 : 110, span = W + 60;
+    for (let i = 0; i * step < span; i++) {
+      const x = ((i * step - cam.yaw * par) % span + span) % span - 30, seed = (i * 7 + row * 3) % 5, h = (row ? 7 : 11) + seed * 2 - row * 2, base = top + 1;
+      g.fillStyle = col;
+      if ((i + row) % 3 === 0) { g.fillRect(x + 2, base - h, 4, h); g.fillRect(x + 3, base - h - 3, 2, 3); g.fillRect(x + 3.5 | 0, base - h - 5, 1, 2); } // lápiz afilado
+      else { g.fillRect(x + 3, base - h + 4, 2, h - 4); g.beginPath(); g.ellipse(x + 4, base - h + 2, 4 + seed % 2, 3.5, 0, 0, 6.29); g.fill(); } // pincel
+    }
+  }
+  g.fillStyle = st.fog; g.fillRect(0, top, W, 1);
 }
 // Cámara: pose de reposo calculada para que el grupo quede abajo-derecha y los enemigos arriba-izquierda
 function camRest(pc, ec) {
@@ -131,7 +191,7 @@ function camTick() {
       const p=SCENE.orbit;for(const key of ['x','y','dist'])p[key]=lerp(move.pivot[key],SCENE.orbitGoal[key],k);
       c.x=p.x-Math.cos(c.yaw)*p.dist;c.y=p.y-Math.sin(c.yaw)*p.dist;
     }else{c.x=lerp(from.x,gl.x,k);c.y=lerp(from.y,gl.y,k);}
-    if(t===1)SCENE.menuMove=null;
+    if(t===1){SCENE.menuMove=null;c.yaw=gl.yaw;if(!move.pivot){c.x=gl.x;c.y=gl.y;}} // land exactly: later ticks must not creep by rounding
     return;
   }
   for(const k of ['pitch','h','f','hy','cx','uiScale'])c[k]=lerp(c[k],gl[k],SCENE.ease);
