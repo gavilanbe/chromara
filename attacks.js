@@ -466,8 +466,8 @@ function* techLlamarada(users, targets, tech, col) {
   Audio.sfx('whip'); Audio.sfx('drop_fall', { when: .1 });
   for (let i = 1; i <= 5; i++) { st.swing = -.55 + 2.2 * (i / 5) ** 1.6; st.lift = 4 - 6 * i / 5; red.gesture = Prefs.shake ? { sx: 1.12 - .12 * i / 5, sy: .88 + .12 * i / 5 } : null; if (i === 3) { st.fire = 0; red.wz = 6; } yield; }
   red.gesture = null; red.wz = 0; B.hitstop = 2;
-  // La cámara abre para que quepan la bola en su ápice y la fila de enemigos que la espera.
-  camFocus(ec[0], ec[1], { dist: 112, turn: -.2, h: 58, pitch: .58, ease: .07, subjects: targets, points: [[lerp(red.wx, ec[0], .5), lerp(red.wy, ec[1], .5), 62, 18]] });
+  // La cámara espera en la fila de enemigos, cerca: la bola sale por arriba del cuadro y cae en picado sobre ellos.
+  camFocus(ec[0], ec[1], { dist: 96, turn: -.2, h: 52, pitch: .58, ease: .09, subjects: targets, headroom: 30, solo: true });
   const ball = { wx: red.wx, wy: red.wy, wz: red.def.h + 8, trail: [] }, sh = shadowFx(ball.wx, ball.wy, 4, 999);
   const bf = fx(999, () => {
     // cola de cometa: las posiciones anteriores arden cada vez más pequeñas; delante, la bola con halo
@@ -801,7 +801,7 @@ function* techArcoiris(users, targets, tech, col) {
   for (let i = 1; i <= 16; i++) { pr.spin += .35; pr.k = i / 16; yield; }
   for (let i = 1; i <= 24; i++) { pr.spin += .12; pr.beams = i / 20; if (i % 4 === 0) Audio.sfx('cursor', { semi: [0, 2, 4, 5, 7, 9][(i / 4 - 1) % 6], vol: .5 }); yield; }
   // 4) los enemigos se pintan de arriba abajo con todos los colores y estallan en anillos de color; la pintura llega hasta la cámara
-  B.slowmo = 12; const blasts = [];
+  B.slowmo = 12; const blasts = []; camFocus(ec[0], ec[1], { dist: 100, turn: -.15, h: 54, pitch: .56, ease: .14, subjects: targets, headroom: 24, solo: true }); // corte cercano: el estallido se ve de cerca, el prisma ya ha hecho su trabajo
   const bf = fx(999, () => { for (const b of blasts) { const q = (bf.t - b.at) / 22; if (q < 0 || q > 1) continue; const c = PJ([b.t.wx, b.t.wy, b.t.def.h * .6]); g.globalAlpha = q > .5 ? (1 - q) * 2 : 1; drawColorBlast(c[0], c[1], (6 + (1 - (1 - q) ** 3) * 34) * c[2], q, bf.t, RB); g.globalAlpha = 1; } });
   for (let i = 0; i < 30; i++) { for (const t of targets) { t.goop = null; goop(t, RB[i % 6], 30); if (i === 12) { B.shake = 6; B.hitstop = 5; impactFrame(t, INK, 1.3); blasts.push({ t, at: bf.t }); damage(t, baseDmg(users.reduce((s, u) => s + u.atk * statusMult(u, 'tiznado'), 0) / users.length, t.dfn, tech.power), col, 'Arcoíris'); } if (i % 3 === 0) burst(t.wx, t.wy, t.def.h * .6, RB[i % 6], 6, 1.6, 22, .05); } if (i === 13) { lensSplatter(RB[0], 3, 5); lensSplatter(RB[2], 3, 6); lensSplatter(RB[4], 3, 7); } pr.spin += .2; yield; }
   // 5) el arco cruza el cielo columna a columna y llueve color; charcos de seis colores
