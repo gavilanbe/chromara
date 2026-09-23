@@ -158,21 +158,16 @@ function previewAction(u, p, t) {
     effect: reaction ? 'Reacción ' + DATA.colors[reaction].name + ': ' + ({ naranja: 'salpica al vecino', verde: 'raíces + cura al grupo', violeta: 'interrumpe y debilita' }[reaction]) : p.type === 'role' ? ROLE_ACTIONS[u.id].desc : tech ? TECH_RULES[p.techId] : DATA.weapons[u.data.weapon].desc };
 }
 function openCmd(u) { B.menu = { unit: u, level: 'cmd', idx: u.lastCmd || 0, opened: B.t }; }
-// A cross: attack in the middle, then techniques up, objects right, the role down and reloading left.
-const PALETTE_TOOLS = [[57,38],[57,13],[92,38],[57,63],[22,38]];
+// The palette is a kidney of wood; its wells run down the far rim, one per row, each with its name written beside it.
+const PALETTE_SHAPE = { cx:68, cy:54, rx:66, ry:49, n:3.6 }, PALETTE_ROWS = 5;
+function paletteEdge(dy) { const k = 1 - Math.abs(dy / PALETTE_SHAPE.ry) ** PALETTE_SHAPE.n; return k > 0 ? PALETTE_SHAPE.rx * k ** (1 / PALETTE_SHAPE.n) : 0; } // a squarish oval, like a real studio palette
+const PALETTE_TOOLS = Array.from({ length:PALETTE_ROWS }, (_, i) => { const y = 22 + i * 17; return [Math.round(PALETTE_SHAPE.cx - paletteEdge(y - PALETTE_SHAPE.cy) + 11), y]; });
 function focusPaletteTool(m,idx) {
   if(B.menu!==m||m.level!=='cmd'||idx===m.idx)return false;
   m.idx=idx;m.unit.lastCmd=idx;Audio.sfx('cursor',semiOf(m.unit));return true;
 }
-function paletteNeighbor(idx,dx,dy) {
-  const origin=PALETTE_TOOLS[idx];let best=idx,score=Infinity;
-  PALETTE_TOOLS.forEach(([x,y],i)=>{
-    const vx=x-origin[0],vy=y-origin[1],forward=vx*dx+vy*dy,cross=Math.abs(vx*dy-vy*dx);
-    if(forward<=0||cross>forward*2)return;
-    const distance=Math.hypot(vx,vy)+cross*1.5;
-    if(distance<score){best=i;score=distance;}
-  });return best;
-}
+// Up and down walk the rim in order and wrap around; left and right leave the choice where it is.
+function paletteNeighbor(idx,dx,dy) { return dy ? (idx + Math.sign(dy) + PALETTE_TOOLS.length) % PALETTE_TOOLS.length : idx; }
 function readyPainters() { return B.party.filter(u=>u.alive&&u.atb>=100&&!u.acting&&!isReserved(u)); }
 function canChangeBattlePainter() { return B.phase==='fight'&&!Game.overlay&&!B.currentAction&&!B.actions.length&&!B.actQueue.length&&readyPainters().some(u=>u!==B.menu?.unit); }
 function selectBattlePainter(u) {
@@ -198,9 +193,9 @@ function updateBattleMenu() {
   if(hit('swap')){cycleBattlePainter();return;}
   const down=hit('down'),up=hit('up'),step=down?1:up?-1:0;
   if (m.level === 'cmd') {
-    const rows=commandRows(u),right=hit('right'),left=hit('left');
+    const rows=commandRows(u);hit('right');hit('left');
     if(hit('back'))return;
-    if(step||left||right)focusPaletteTool(m,paletteNeighbor(m.idx,right?1:left?-1:0,step));
+    if(step)focusPaletteTool(m,paletteNeighbor(m.idx,0,step));
     if (!hit('ok')) return;
     const type = rows[m.idx][0];
     if (type === 'tech' || type === 'item') { m.level = type; m.idx = 0; }

@@ -29,7 +29,7 @@ test('hover focuses a tool without committing and exit animation has no hit targ
 test('hovering the last visible sample does not move the row under the pointer',()=>{
  run(`B.party[1].atb=100;openCmd(B.party[1]);B.menu.level='tech';B.menu.idx=0;UI_HITS.length=0;drawBattleUI();const rowsBeforeHover=battleListLayout(B.menu).top;UI_HITS.filter(h=>h.hover)[2].hover();drawBattleUI();`);
  assert.equal(run(`B.menu.idx`),2);assert.equal(run(`battleListLayout(B.menu).top===rowsBeforeHover`),true);
- run(`B.menu.idx=3`);assert.equal(run(`battleListLayout(B.menu).top`),1);
+ run(`B.menu.idx=3`);assert.equal(run(`battleListLayout(B.menu).top`),0); // five wells fit every technique on the palette
 });
 test('the target name cycles close-up recipients without confirming or spending',()=>{
  run(`B.party[0].atb=100;openCmd(B.party[0]);beginTarget(B.menu,{type:'attack'});UI_HITS.length=0;drawBattleUI();const mpBeforeTag=B.party[0].mp;UI_HITS.find(h=>h.y===2&&h.h===17).run();`);

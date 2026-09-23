@@ -6,21 +6,22 @@ function test(name,fn){scenario();run("releaseInputs();Prefs.camera='suave';Pref
 function press(action){run(`pressed.${action}=true;updateBattleMenu()`);}
 function draw(){run('UI_HITS.length=0;UI_TEXT.length=0;drawBattleUI()');}
 function tapTool(i){run(`{const [x,y]=PALETTE_TOOLS[${i}],px=PALETTE_ORIGIN.x+x,py=PALETTE_ORIGIN.y+y;UI_HITS.slice().reverse().find(h=>px>=h.x&&px<=h.x+h.w&&py>=h.y&&py<=h.y+h.h).run();updateBattleMenu();}`);}
-test('the cross: each direction leaves the middle for its arm and the opposite one returns, without switching painters or moving the camera',()=>{
+test('the rim: up and down walk the wells in order and wrap, left and right stay put, without switching painters or moving the camera',()=>{
  run('updateMenuCamera();for(let i=0;i<46;i++)camTick();var palettePose=JSON.stringify(SCENE.cam),paletteResources=JSON.stringify(B.party.map(u=>[u.mp,u.atb]));');
- for(const [key,expected] of [['right',2],['up',1],['down',0],['down',3],['left',4],['right',0],['up',1]]){
+ for(const [key,expected] of [['down',1],['down',2],['up',1],['up',0],['up',4],['down',0],['right',0],['left',0]]){
   press(key);assert.equal(run('B.menu.idx'),expected,key);assert.equal(run('B.menu.unit.id'),'carmin');
   run('updateMenuCamera();camTick()');assert.equal(run('JSON.stringify(SCENE.cam)===palettePose'),true);
  }
  assert.equal(run('JSON.stringify(B.party.map(u=>[u.mp,u.atb]))===paletteResources'),true);
 });
-test('every tool is reachable with directions, and pressing beyond an edge holds selection',()=>{
+test('every well is reachable with directions and every name is written on the palette',()=>{
  for(let start=0;start<5;start++){
   const reached=new Set([start]),queue=[start];
   while(queue.length){const i=queue.shift();for(const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]){const next=run(`paletteNeighbor(${i},${dx},${dy})`);if(!reached.has(next)){reached.add(next);queue.push(next);}}}
   assert.equal(reached.size,5,'Unreachable well from '+start);
  }
- run('B.menu.idx=2');press('right');assert.equal(run('B.menu.idx'),2);
+ run("var written=[];var keepText=smallText;smallText=(s,...a)=>{written.push(s);return keepText(s,...a)};");draw();run('smallText=keepText');
+ for(const name of run('JSON.stringify(commandRows(B.party[0]).map(r=>r[1]))').replace(/[\[\]"]/g,'').split(','))assert(run('written').includes(name),'Missing label '+name);
 });
 test('a touch selects another well before opening, with no premature resource spend',()=>{
  draw();tapTool(4);assert.equal(run('B.menu.level'),'cmd');assert.equal(run('B.menu.idx'),4);

@@ -58,7 +58,8 @@ function kitBar(x, y, w, f, col, trail) {
 }
 // Visual events never alter the combat clock, input, RNG or resource values.
 const BUI = { party:null, cards:new Map(), motes:[], serial:0, selection:'', selectedAt:-99, openedAt:-99, action:null, actionAt:-99, closing:null, cursor:null, reticle:null, listY:null, resultAt:-99, showResult:false };
-const PALETTE_ORIGIN = {x:4,y:52};
+const PALETTE_ORIGIN = {x:3,y:36};
+const onPalette = m => ['cmd','tech','item'].includes(m?.level);
 function uiAge(at, duration) { return clamp((B.t - (at ?? -999)) / duration, 0, 1); }
 function uiPop(at, duration = 14) { return Prefs.shake ? Math.sin(uiAge(at, duration) * Math.PI) * (1 - uiAge(at, duration)) * Prefs.shake : 0; }
 // Entrances: 0 → 1 with a small overshoot, and a plain fade. "Sin sacudidas" skips both.
@@ -80,7 +81,7 @@ function paintMotes(x, y, col, count = 5) {
 }
 function observeBattleFeedback() {
   if (BUI.party !== B.party) {
-    BUI.party = B.party; BUI.cards.clear(); BUI.motes.length = 0; BUI.selection = ''; BUI.lastMenu = null; BUI.action = null; BUI.closing = null; BUI.message = null; BUI.selectedAt = BUI.openedAt = BUI.actionAt = BUI.deniedAt = BUI.resultAt = -99; BUI.serial = 0; BUI.cursor = null; BUI.reticle = null; BUI.listY = null; BUI.showResult = false; BUI.brushAngle = null; BUI.boss = null;
+    BUI.party = B.party; BUI.cards.clear(); BUI.motes.length = 0; BUI.selection = ''; BUI.lastMenu = null; BUI.action = null; BUI.closing = null; BUI.message = null; BUI.selectedAt = BUI.openedAt = BUI.paletteAt = BUI.actionAt = BUI.deniedAt = BUI.resultAt = -99; BUI.serial = 0; BUI.cursor = null; BUI.reticle = null; BUI.listY = null; BUI.showResult = false; BUI.brushAngle = null; BUI.boss = null;
     B.party.forEach(u => BUI.cards.set(u, { hp:u.hp, mp:u.mp, trail:u.hp, ready:u.atb>=100, step:B.t, hit:-99, heal:-99, squeeze:-99, readyAt:-99, koAt:-99 }));
   }
   B.party.forEach((u, i) => {
@@ -99,13 +100,13 @@ function observeBattleFeedback() {
   });
   const m = B.currentAction ? null : B.menu, selection = m ? [m.unit.id,m.level,m.idx,m.tidx].join(':') : '';
   if (selection !== BUI.selection) {
-    if (!BUI.lastMenu || !m || BUI.lastMenu.level !== m.level || BUI.lastMenu.unit !== m.unit) { BUI.openedAt = B.t; BUI.listY = null; if (m?.level === 'cmd') { const pos = PALETTE_TOOLS[m.idx]; BUI.cursor = { x: pos[0], y: pos[1] }; BUI.brushAngle = null; } }
-    if (m?.level !== 'cmd' && BUI.lastMenu?.level === 'cmd') BUI.closing = {...BUI.lastMenu,at:B.t};
+    if (!BUI.lastMenu || !m || BUI.lastMenu.level !== m.level || BUI.lastMenu.unit !== m.unit) { BUI.openedAt = B.t; BUI.listY = null; if (onPalette(m) && (!onPalette(BUI.lastMenu) || BUI.lastMenu.unit !== m.unit)) BUI.paletteAt = B.t; if (onPalette(m)) { const pos = PALETTE_TOOLS[paletteSlot(m)]; BUI.cursor = { x: pos[0], y: pos[1] }; BUI.brushAngle = null; } }
+    if (!onPalette(m) && onPalette(BUI.lastMenu)) BUI.closing = {...BUI.lastMenu,at:B.t};
     if (m?.level === 'target' && BUI.lastMenu?.level !== 'target') BUI.reticle = null;
     BUI.selection = selection; BUI.selectedAt = B.t;
-    if (m?.level === 'cmd') { const pos = PALETTE_TOOLS[m.idx]; paintMotes(PALETTE_ORIGIN.x+pos[0],PALETTE_ORIGIN.y+pos[1],C(m.unit.color),4); }
+    if (onPalette(m)) { const pos = PALETTE_TOOLS[paletteSlot(m)]; paintMotes(PALETTE_ORIGIN.x+pos[0],PALETTE_ORIGIN.y+pos[1],C(m.unit.color),4); }
   }
-  BUI.lastMenu = m ? {unit:m.unit,level:m.level,idx:m.idx} : null;
+  BUI.lastMenu = m ? {unit:m.unit,level:m.level,idx:m.idx,scroll:m.scroll} : null;
   if (B.currentAction !== BUI.action) { BUI.action = B.currentAction; BUI.actionAt = B.t; }
   if (B.msg !== BUI.message) {
     BUI.message = B.msg; BUI.messageAt = B.t;
@@ -298,113 +299,127 @@ function activatePaletteTool(m,i) {
   if(B.menu!==m||m.level!=='cmd'||B.currentAction)return;
   if(!focusPaletteTool(m,i))pressed.ok=true;
 }
-function drawPaletteOwner(m) {
-  const col=C(m.unit.color),canChange=readyPainters().length>1,slide=Math.round((1-uiIn(BUI.openedAt,12))*-60);
-  g.save();g.translate(slide,0);
-  maskingLabel(4,34,112,16);paintDab(14,42,8,col);sticker(14,42,m.unit,7);
-  smallText(m.unit.name,27,39);
-  brushBand(83,35,32,14,canChange?col:'#d3c5ac');textCenter(battleKey('swap'),96,39,canChange?accentInk(col):UI_MUTED);
-  g.fillStyle=canChange?accentInk(col):UI_MUTED;g.beginPath();g.moveTo(109,39);g.lineTo(113,42);g.lineTo(109,45);g.fill();
-  g.restore();
-  if(canChange)uiHit(4,33,113,16,cycleBattlePainter);
-}
-// The painter's palette: a kidney of walnut with a real thumb hole. Attacking is the big
-// well in the middle; the other four sit in a cross, one per direction, so the hand
-// learns them. Only the chosen well is named, on the tape below.
+// The painter's palette is the whole menu. A kidney of walnut with a thumb hole; the wells run down the far rim
+// and each one has its name written beside it on the wood, so every choice reads at a glance. The painter's own
+// brush dips into the chosen well and leaves a wet stroke of their colour under its name. Techniques and objects
+// do not open another window: the palette is wiped and refilled with one well per technique or object.
 const PALETTE_WELL_COLORS = ['#b46756','#748c59','#688daa','#98749e','#c49a52'];
+const ITEM_WELL = { heal:'azul', mp:'amarillo', erase:'violeta', revive:'verde' };
+// Small pictograms pressed into each object's well: a drop of water, a tube, an eraser, a leaf of sap.
+function itemIcon(kind, x, y, col) {
+  const F=(c,a,b,w=1,h=1)=>{g.fillStyle=c;g.fillRect(x+a,y+b,w,h);};
+  if(kind==='heal'){F(KIT_INK,5,1,2,1);F(KIT_INK,4,2,4,1);F(KIT_INK,3,3,6,5);F(KIT_INK,4,8,4,1);F('#e8f2fb',5,2,2,1);F('#e8f2fb',4,3,4,4);F('#9fc3e6',4,6,4,2);F('#ffffff',4,3,1,2);}
+  else if(kind==='mp'){F(KIT_INK,4,0,4,2);F(KIT_INK,3,2,6,8);F(KIT_INK,4,10,4,1);F('#dfd5bd',4,3,4,6);F(col,4,5,4,3);F(ramp(col).hi,4,5,1,3);F('#8c8ab0',5,1,2,1);}
+  else if(kind==='erase'){F(KIT_INK,1,3,10,6);F('#f4f0ea',2,4,5,4);F('#e86a8a',7,4,3,4);F('#ffffff',2,4,4,1);}
+  else{F(KIT_INK,5,1,3,1);F(KIT_INK,3,2,6,6);F(KIT_INK,2,5,3,4);F('#9fd07a',4,3,4,4);F('#b8e68a',5,3,2,1);F('#5f8f45',4,6,2,1);F('#6b4a33',2,8,2,2);}
+}
 function palettePath(x, y, grow = 0) {
-  const cx = x + 57, cy = y + 38;
+  const {cx,cy,rx,ry,n}=PALETTE_SHAPE,sq=v=>Math.sign(v)*Math.abs(v)**(2/n);
   g.beginPath();
-  for (let i = 0; i <= 72; i++) {
-    const a = i / 72 * 6.283, bite = 1 - .15 * Math.exp(-((a - 2.25) ** 2) / .07), wob = 1 + .018 * Math.sin(a * 5 + 1.3);
-    const px = cx + Math.cos(a) * (58 + grow) * bite * wob, py = cy + Math.sin(a) * (40 + grow) * bite * wob;
+  for (let i = 0; i <= 80; i++) {
+    const a = i / 80 * 6.283, dent = 1 - .07 * Math.exp(-((a - 5.75) ** 2) / .05), wob = 1 + .012 * Math.sin(a * 5 + 1.3);
+    const px = x + cx + sq(Math.cos(a)) * (rx + grow) * dent * wob, py = y + cy + sq(Math.sin(a)) * (ry + grow) * dent * wob;
     if (i) g.lineTo(px, py); else g.moveTo(px, py);
   }
   g.closePath();
-  g.moveTo(x + 45, y + 54); g.ellipse(x + 39, y + 54, 6 - grow * .3, 4.5 - grow * .3, -.4, 0, 6.283); // thumb hole (evenodd cuts it)
+  g.moveTo(x + 128 - grow * .3, y + 52); g.ellipse(x + 122, y + 52, 6 - grow * .3, 4.5 - grow * .3, -.2, 0, 6.283); // thumb hole (evenodd cuts it)
 }
-function drawCommandPalette(m, ghost = false) {
-  const {x,y}=PALETTE_ORIGIN,col=C(m.unit.color),rows=commandRows(m.unit),intro=ghost?1:uiIn(BUI.openedAt,14),wobble=ghost?0:uiPop(BUI.deniedAt,18)*3;
-  if(!ghost)drawPaletteOwner(m);
-  g.save();
-  // The palette swings in from the painter's side and settles with a small overshoot.
-  g.translate(Math.round(wobble-(1-intro)*70),Math.round((1-intro)*34));g.translate(x+57,y+38);g.rotate((1-intro)*-.35);g.translate(-(x+57),-(y+38));
+function battleListRows(m) { return m.level==='tech'?techsFor(m.unit):Object.entries(Game.inventory).filter(([,n])=>n>0).map(([id,n])=>({id,n,it:DATA.items[id]})); }
+function battleListLayout(m) {
+  const rows=battleListRows(m),count=Math.min(PALETTE_ROWS,rows.length);
+  let top=m.scroll||0;if(m.idx<top)top=m.idx;else if(m.idx>=top+PALETTE_ROWS)top=m.idx-PALETTE_ROWS+1;
+  m.scroll=clamp(top,0,Math.max(0,rows.length-PALETTE_ROWS));return{rows,count,top:m.scroll};
+}
+// Which rim slot holds the chosen entry.
+function paletteSlot(m) { return m.level==='cmd'?m.idx:clamp(m.idx-(m.scroll||0),0,PALETTE_ROWS-1); }
+// Every row of the palette, whatever it holds: a well of paint, a name and, on the right, what it costs.
+function paletteEntries(m) {
+  const u=m.unit;
+  if(m.level==='cmd')return commandRows(u).map((row,i)=>{
+    const role=row[0]==='role'?ROLE_ACTIONS[u.id]:null,cost=role?.mp?{text:String(role.mp),tube:true,short:u.mp<role.mp}:row[0]==='reload'?{text:'+6',tube:true}:null;
+    return{name:row[1],col:PALETTE_WELL_COLORS[i],icon:(x,y)=>commandTool(row,u,x,y),cost,dim:!!cost?.short};
+  });
+  return battleListRows(m).map(row=>m.level==='tech'
+    ?{name:row.t.name,col:C(row.col),mix:row.combo?row.users.map(p=>C(p.color)):null,cost:{text:String(row.cost),tube:true,short:!row.mpOk},dim:!(row.avail||row.reservable)}
+    :{name:row.it.short,col:C(ITEM_WELL[row.it.kind]||'verde'),icon:(x,y)=>itemIcon(row.it.kind,x,y,C(m.unit.color)),cost:{text:'x'+row.n}});
+}
+function miniTube(x,y,col,dry) {
+  g.fillStyle=KIT_INK;g.fillRect(x+1,y,3,1);g.fillRect(x,y+1,5,6);g.fillStyle=dry?'#b9aa9a':col;g.fillRect(x+1,y+2,3,4);g.fillStyle=dry?'#d5c9bb':ramp(col).hi;g.fillRect(x+1,y+2,1,3);
+}
+function drawPaletteWood(x, y) {
   // Shadow, dark rim, a light bevel on the upper edge and the oiled face; the hole goes all the way through.
   g.save();g.translate(1,3);palettePath(x,y,1);g.fillStyle='rgba(20,16,28,.45)';g.fill('evenodd');g.restore();
   palettePath(x,y,1);g.fillStyle='#201926';g.fill('evenodd');
   palettePath(x,y);g.fillStyle='#77492f';g.fill('evenodd');
   g.save();g.translate(-1,-1);palettePath(x,y,-1.5);g.fillStyle='#e6be83';g.fill('evenodd');g.restore();
   palettePath(x,y,-2.5);g.fillStyle='#c39660';g.fill('evenodd');
-  // Grain follows the wood around the hole, and old pigment is caught in it.
+  // Grain rings the hole, and old pigment is caught in it where the painter mixes.
   g.save();palettePath(x,y,-2.5);g.clip('evenodd');
-  for(let i=0;i<6;i++){g.strokeStyle=i%2?'#d4a86e':'#ad7c4d';g.lineWidth=1;g.beginPath();g.ellipse(x+40,y+52,20+i*9,12+i*6,-.25,3.5,6.1);g.stroke();}
-  [['#ac554b',38,24],['#6a8d85',80,58],['#967287',74,18],['#e8cc94',96,54],['#5c7fa6',40,48]].forEach(([c,px,py])=>{g.fillStyle=c;g.fillRect(x+px,y+py,3,2);g.fillRect(x+px+3,y+py+1,1,1);g.fillRect(x+px+1,y+py-1,1,1);});
+  for(let i=0;i<7;i++){g.strokeStyle=i%2?'#cda266':'#b3834f';g.lineWidth=1;g.beginPath();g.ellipse(x+122,y+52,18+i*13,10+i*8,-.1,1.9,4.4);g.stroke();}
+  [['#ac554b',96,16,5],['#6a8d85',104,84,4],['#967287',118,32,3],['#e8cc94',84,94,4],['#5c7fa6',114,72,3]].forEach(([c,px,py,r])=>{g.globalAlpha=.55;g.fillStyle=c;g.beginPath();g.ellipse(x+px,y+py,r,r*.55,.3,0,6.29);g.fill();g.globalAlpha=1;g.fillStyle=ramp(c).hi;g.fillRect(x+px-1,y+py-1,2,1);});
   g.restore();
-  g.strokeStyle='#4a2e20';g.lineWidth=1;g.beginPath();g.ellipse(x+39.5,y+54.5,6.5,5,-.4,3.4,6.2);g.stroke();g.strokeStyle='#e6be83';g.beginPath();g.ellipse(x+39,y+54,7.5,5.5,-.4,.3,2.6);g.stroke(); // lip and worn edge of the hole
-  // A carved cross joins the middle well to its four arms; the groove to the chosen arm holds wet paint.
-  const C0=PALETTE_TOOLS[0];
-  for(let i=1;i<5;i++){const [px,py]=PALETTE_TOOLS[i],on=i===m.idx,x0=Math.min(C0[0],px),y0=Math.min(C0[1],py),w=Math.abs(px-C0[0]),h=Math.abs(py-C0[1]);
-    if(w){g.fillStyle='#8a5a38';g.fillRect(x+x0,y+C0[1]-1,w,3);g.fillStyle='#e0b57b';g.fillRect(x+x0,y+C0[1]+2,w,1);if(on){g.fillStyle=col;g.fillRect(x+x0,y+C0[1],w,1);}}
-    else{g.fillStyle='#8a5a38';g.fillRect(x+C0[0]-1,y+y0,3,h);g.fillStyle='#e0b57b';g.fillRect(x+C0[0]+2,y+y0,1,h);if(on){g.fillStyle=col;g.fillRect(x+C0[0],y+y0,1,h);}}}
-  const [sx,sy]=PALETTE_TOOLS[m.idx];
-  // The selection ring glides between wells.
-  const cur=ghost?{x:sx,y:sy}:glide(BUI.cursor||(BUI.cursor={x:sx,y:sy}),sx,sy),big=m.idx===0?3:0;
-  if(!ghost){g.fillStyle=KIT_INK;g.beginPath();g.ellipse(x+cur.x,y+cur.y+2,15+big,12.5+big,0,0,6.29);g.fill();g.fillStyle='#fff1cf';g.beginPath();g.ellipse(x+cur.x,y+cur.y,14+big,11.5+big,0,0,6.29);g.fill();}
-  rows.forEach((row,i)=>{const [px,py]=PALETTE_TOOLS[i],selected=i===m.idx,pop=selected&&!ghost?uiPop(BUI.selectedAt,20)*2:0,grow=ghost?1:Math.min(1.08,uiIn(BUI.openedAt,9,5+i*3)),lift=selected?2:0,r=(i===0?13:10)+(selected?1:0);
-    // The chosen well sits proud of the wood; the others rest deeper, in their own shadow.
-    if(!selected&&!ghost){g.fillStyle=KIT_INK;g.globalAlpha*=.18;g.beginPath();g.ellipse(x+px+1,y+py+2,r*grow,r*.8*grow,-.12,0,6.29);g.fill();g.globalAlpha/=.18;}
-    if(selected)g.save(),g.translate(0,-lift);
-    paintDab(x+px,y+py,r*grow,selected?col:PALETTE_WELL_COLORS[i],pop);
-    if(grow>.55){if(i===0){g.save();g.translate(x+px,y+py);g.scale(1.3,1.3);commandTool(row,m.unit,-6,-6-Math.round(pop));g.restore();}else commandTool(row,m.unit,x+px-6,y+py-6-Math.round(pop));}
-    if(selected&&Prefs.shake&&grow>.55){const a=B.t*.09,gx=Math.round(x+px+Math.cos(a)*(r-4)),gy=Math.round(y+py-1+Math.sin(a)*(r*.4));g.fillStyle='#fff8e6';g.fillRect(gx,gy,2,1);g.fillStyle=ramp(col).hi;g.fillRect(gx-1,gy+1,1,1);}
-    if(selected)g.restore();
-    const hr=i===0?13:10;if(!ghost)uiHit(x+px-hr-3,y+py-hr-2,hr*2+6,hr*2+4,()=>activatePaletteTool(m,i),()=>focusPaletteTool(m,i)); // fixed boxes: hovering never moves them
-  });
-  g.restore();
-  if(!ghost){
-    // The tape names the chosen well with its key; a dab of the well's own colour ties them.
-    const name=rows[m.idx][1],key=battleKey('ok'),kw=Math.max(13,textWidth(key)+6),w=Math.max(70,kw+textWidth(name)+22),drop=Math.round((1-uiIn(BUI.openedAt,11,4))*18),at=BUI.selectedAt,slide=Prefs.shake?Math.round((1-clamp((B.t-at)/6,0,1))*3):0;
-    g.save();g.translate(0,drop);
-    maskingLabel(3,135,w,12);brushBand(4,135,kw,12,col);textCenter(key,4+kw/2,138,accentInk(col));smallText(name,kw+9+slide,138);
+  g.strokeStyle='#4a2e20';g.lineWidth=1;g.beginPath();g.ellipse(x+122.5,y+52.5,6.5,5,-.2,3.4,6.2);g.stroke();g.strokeStyle='#e6be83';g.beginPath();g.ellipse(x+122,y+52,7.5,5.5,-.2,.3,2.6);g.stroke(); // lip and worn edge of the hole
+}
+// The masking tape stuck across the top edge says whose palette it is and, inside a list, which one.
+function drawPaletteTape(m, x, y) {
+  const col=C(m.unit.color),canChange=readyPainters().length>1,title=m.level==='tech'?'Técnicas':m.level==='item'?'Objetos':'';
+  const nameW=textWidth(m.unit.name),titleW=title?textWidth(title)+12:0,key=battleKey('swap'),kw=textWidth(key)+14,w=nameW+titleW+30+(canChange?kw+4:0),tx=x+8,ty=y-2;
+  maskingLabel(tx,ty,w,14);paintDab(tx+10,ty+7,7,col);sticker(tx+10,ty+7,m.unit,6);
+  smallText(m.unit.name,tx+21,ty+4);
+  if(title){const sx=tx+24+nameW;g.fillStyle=UI_MUTED;g.fillRect(sx,ty+4,1,1);g.fillRect(sx+1,ty+5,1,1);g.fillRect(sx+2,ty+6,1,1);g.fillRect(sx+1,ty+7,1,1);g.fillRect(sx,ty+8,1,1);smallText(title,sx+6,ty+4,UI_INK);}
+  if(canChange){const bx=tx+w-kw-2;brushBand(bx,ty+1,kw,12,col);textCenter(key,bx+kw/2-2,ty+4,accentInk(col));g.fillStyle=accentInk(col);g.beginPath();g.moveTo(bx+kw-5,ty+4);g.lineTo(bx+kw-2,ty+7);g.lineTo(bx+kw-5,ty+10);g.fill();uiHit(tx,ty-1,w,16,cycleBattlePainter);}
+}
+// The keys live on a scrap of tape under the rim: what confirms and, inside a list, what goes back.
+function drawPaletteKeys(m, x, y) {
+  const col=C(m.unit.color),ok=battleKey('ok'),back=battleKey('back'),inList=m.level!=='cmd';
+  const kw=Math.max(13,textWidth(ok)+6),bw=Math.max(13,textWidth(back)+6),w=kw+textWidth('elegir')+12+(inList?bw+textWidth('volver')+10:0),tx=x+PALETTE_SHAPE.cx-w/2,ty=y+PALETTE_SHAPE.cy+PALETTE_SHAPE.ry-6;
+  maskingLabel(tx,ty,w,12);brushBand(tx+1,ty,kw,12,col);textCenter(ok,tx+1+kw/2,ty+3,accentInk(col));smallText('elegir',tx+kw+5,ty+3,UI_INK);
+  uiHit(tx,ty-1,kw+textWidth('elegir')+8,14,()=>pressed.ok=true);
+  if(inList){const bx=tx+kw+textWidth('elegir')+10;brushBand(bx,ty,bw,12,'#d3c5ac');textCenter(back,bx+bw/2,ty+3,UI_INK);smallText('volver',bx+bw+4,ty+3,UI_MUTED);uiHit(bx-1,ty-1,bw+textWidth('volver')+8,14,()=>pressed.back=true);}
+}
+function drawCommandPalette(m, ghost = false) {
+  const {x,y}=PALETTE_ORIGIN,col=C(m.unit.color),list=m.level!=='cmd',entries=paletteEntries(m),top=list?(ghost?(m.scroll||0):battleListLayout(m).top):0,slot=paletteSlot(m);
+  const intro=ghost?1:uiIn(BUI.paletteAt,14),wobble=ghost?0:uiPop(BUI.deniedAt,18)*3;
+  if(!ghost&&list)m.list=battleListRows(m);
+  g.save();
+  // The palette swings in from the painter's side and settles with a small overshoot.
+  g.translate(Math.round(wobble-(1-intro)*80),Math.round((1-intro)*34));g.translate(x+PALETTE_SHAPE.cx,y+PALETTE_SHAPE.cy);g.rotate((1-intro)*-.3);g.translate(-(x+PALETTE_SHAPE.cx),-(y+PALETTE_SHAPE.cy));
+  drawPaletteWood(x,y);
+  const cursor=PALETTE_TOOLS[slot],cur=ghost?{x:cursor[0],y:cursor[1]}:glide(BUI.cursor||(BUI.cursor={x:cursor[0],y:cursor[1]}),cursor[0],cursor[1]);
+  if(!entries.length)smallText('Estuche vacío',x+PALETTE_TOOLS[0][0]+13,y+PALETTE_TOOLS[0][1]-4,'#6b4a33');
+  entries.slice(top,top+PALETTE_ROWS).forEach((e,j)=>{
+    const idx=top+j,[px,py]=PALETTE_TOOLS[j],X=x+px,Y=y+py,sel=idx===m.idx,pop=sel&&!ghost?uiPop(BUI.selectedAt,20)*2:0;
+    const grow=ghost?1:Math.min(1.08,uiIn(BUI.openedAt,9,3+j*3)),r=(8+(sel?1:0))*grow,right=Math.min(108,Math.round(PALETTE_SHAPE.cx+paletteEdge(py-PALETTE_SHAPE.cy)-10));
+    // The well: a raised blob of its own paint, sunk into its shadow unless it is the one in use.
+    if(!sel){g.fillStyle=KIT_INK;g.globalAlpha*=.2;g.beginPath();g.ellipse(X+1,Y+2,r,r*.8,-.12,0,6.29);g.fill();g.globalAlpha/=.2;}
+    paintDab(X,Y-(sel?1:0),r,e.dim?'#a2978a':e.col,pop);
+    if(e.mix&&grow>.55)e.mix.forEach((c,k)=>paintDab(X-5+k*5,Y+7,2.5,e.dim?'#a2978a':c));
+    if(e.icon&&grow>.55)e.icon(X-6,Y-7-(sel?1:0)-Math.round(pop));
+    if(sel&&Prefs.shake&&grow>.55&&!e.icon){const a=B.t*.09,gx=Math.round(X+Math.cos(a)*(r-3)),gy=Math.round(Y-2+Math.sin(a)*(r*.35));g.fillStyle='#fff8e6';g.fillRect(gx,gy,2,1);}
+    // The name is written on the wood; the chosen one sits on a wet stroke of the painter's colour.
+    const fade=ghost?1:uiFade(BUI.openedAt,8,4+j*3),lx=X+13,tw=textWidth(e.name);
+    g.save();g.globalAlpha*=fade;
+    if(sel){const reach=Math.round((ghost?1:uiIn(BUI.selectedAt,8))*(tw+10));if(reach>2)brushBand(lx-5,Y-6,reach,12,e.dim?'#b3a898':col);}
+    smallText(e.name,lx+(sel?1:0),Y-4,sel?(e.dim?UI_INK:accentInk(col)):e.dim?'#8d6d52':'#3a2518');
+    if(e.cost){const cw=textWidth(e.cost.text);textRight(e.cost.text,x+right,Y-4,e.cost.short?'#9b2f35':'#4a2e20');if(e.cost.tube)miniTube(x+right-cw-8,Y-4,col,e.cost.short);}
     g.restore();
-    uiHit(3,135,w,13,()=>pressed.ok=true);
-  }
-}
-function battleListRows(m) { return m.level==='tech'?techsFor(m.unit):Object.entries(Game.inventory).filter(([,n])=>n>0).map(([id,n])=>({id,n,it:DATA.items[id]})); }
-function battleListLayout(m) {
-  const rows=battleListRows(m),count=Math.min(3,rows.length),h=16+Math.max(count,1)*17;
-  let top=m.scroll||0;if(m.idx<top)top=m.idx;else if(m.idx>=top+3)top=m.idx-2;
-  m.scroll=clamp(top,0,Math.max(0,rows.length-3));return{rows,count,top:m.scroll,x:3,y:144-h,w:109,h};
-}
-function miniTube(x,y,col,dry) {
-  g.fillStyle=KIT_INK;g.fillRect(x+1,y,3,1);g.fillRect(x,y+1,5,6);g.fillStyle=dry?'#b9aa9a':col;g.fillRect(x+1,y+2,3,4);g.fillStyle=dry?'#d5c9bb':ramp(col).hi;g.fillRect(x+1,y+2,1,3);
+    if(!ghost){
+      const hx=X-11,hw=x+right+4-hx; // fixed boxes: hovering never moves them
+      if(list)uiHit(hx,Y-8,hw,17,()=>{if(B.menu!==m||m.level==='cmd')return;m.idx=idx;pressed.ok=true;},()=>{if(m.idx!==idx){m.idx=idx;Audio.sfx('cursor',{vol:.35});}});
+      else uiHit(hx,Y-8,hw,17,()=>activatePaletteTool(m,idx),()=>focusPaletteTool(m,idx));
+    }
+  });
+  // More wells than fit: small arrows scratched into the rim.
+  if(list&&entries.length>PALETTE_ROWS){g.fillStyle='#4a2e20';if(top>0){g.fillRect(x+20,y+10,5,1);g.fillRect(x+21,y+9,3,1);g.fillRect(x+22,y+8,1,1);}if(top+PALETTE_ROWS<entries.length){g.fillRect(x+36,y+100,5,1);g.fillRect(x+37,y+101,3,1);g.fillRect(x+38,y+102,1,1);}}
+  // The painter's brush dips into the chosen well: the handle rests up and to the left, the tip bobs in the paint.
+  if(!ghost&&entries.length){const dip=Prefs.shake?Math.round(Math.sin(B.t*.12)):0;drawProp(propSprite('pincel',col),x+cur.x-4,y+cur.y-3+dip,.8,1,PROP.pincel.tip[0],PROP.pincel.tip[1],.6);}
+  if(!ghost)drawPaletteTape(m,x,y);
+  g.restore();
+  if(!ghost){g.save();g.globalAlpha*=uiFade(BUI.paletteAt,8,10);g.translate(0,Math.round((1-uiIn(BUI.paletteAt,10,8))*10));drawPaletteKeys(m,x,y);g.restore();}
 }
 function drawCommandSheet(m) {
-  if(m.level==='cmd'){drawCommandPalette(m);return;}
-  const col=C(m.unit.color),{rows,count,top,x,y,w,h}=battleListLayout(m);m.list=rows;
-  // A short fan of paper samples replaces the full-height rectangular menu.
-  const intro=uiIn(BUI.openedAt,11);
-  g.save();g.translate(Math.round((1-intro)*-40),0);
-  maskingLabel(x+2,y+2,w-2,h-2,'#ceba97');maskingLabel(x,y,w,13,col);
-  smallText(m.level==='tech'?'Técnicas':'Objetos',x+8,y+3,accentInk(col));textRight((rows.length?m.idx+1:0)+'/'+rows.length,x+w-5,y+3,accentInk(col));
-  g.restore();
-  if(rows.length>3)uiHit(x+w-33,y,33,14,()=>{m.idx=(m.idx+1)%rows.length;Audio.sfx('cursor');});
-  if(!rows.length)smallText('Estuche vacío',x+10,y+21,UI_MUTED);
-  const selY=y+16+(m.idx-top)*17;if(BUI.listY==null||!Prefs.shake)BUI.listY=selY;else BUI.listY+=(selY-BUI.listY)*.45;if(Math.abs(BUI.listY-selY)<.4)BUI.listY=selY;
-  rows.slice(top,top+count).forEach((row,j)=>{const idx=top+j,ry=y+16+j*17,sel=idx===m.idx,offset=sel?Math.round(uiPop(BUI.selectedAt,10)*2):0,fan=uiIn(BUI.openedAt,9,3+j*3);
-    g.save();g.translate(Math.round((1-fan)*-46),0);
-    maskingLabel(x+offset,ry,w-offset,15,sel?KIT_LIGHT:'#e0d3b8');
-    const available=m.level!=='tech'||row.avail||row.reservable,rowCol=m.level==='tech'?C(row.col):C(row.it.kind==='heal'?'azul':row.it.kind==='mp'?'amarillo':row.it.kind==='erase'?'violeta':'verde');
-    if(sel)brushBand(x+3,ry+2,4,11,col);
-    paintDab(x+12,ry+7,3,available?rowCol:'#a2978a');
-    smallText(m.level==='tech'?row.t.name:row.it.short,x+20,ry+4,available?UI_INK:UI_MUTED);
-    if(m.level==='tech'){miniTube(x+w-19,ry+4,C(m.unit.color),!row.mpOk);textRight(row.cost,x+w-5,ry+4,!row.mpOk?'#a12f42':UI_MUTED);}
-    else textRight('x'+row.n,x+w-5,ry+4,UI_MUTED);
-    g.restore();
-    uiHit(x,ry,w,17,()=>{m.idx=idx;pressed.ok=true;},()=>{if(m.idx!==idx){m.idx=idx;Audio.sfx('cursor',{vol:.35});}});
-  });
-  if(rows.length)g.drawImage(iconSprite('pincel',col),x+2,Math.round(BUI.listY)+1);
-  if(rows[m.idx])drawListDetails(m,rows[m.idx]);
+  drawCommandPalette(m);
+  if(m.level!=='cmd'&&m.list?.[m.idx])drawListDetails(m,m.list[m.idx]);
 }
 function battleDetailLines(m,e) {return wrapSmall(m.level==='item'?e.it.desc:TECH_RULES[e.id],296).slice(0,2);}
 function drawListDetails(m,e) {
@@ -504,8 +519,8 @@ function drawBattleUI() {
     const m=B.currentAction?null:B.menu;
     if(m?.level==='target')drawTargetDetails(m);
     else{if(m)drawCommandSheet(m);if(!m||m.level==='cmd')drawBattleHeader();}
-    if(BUI.closing&&Prefs.shake&&uiAge(BUI.closing.at,7)<1){g.save();g.globalAlpha=1-uiAge(BUI.closing.at,7);g.translate(0,uiAge(BUI.closing.at,7)*8);drawCommandPalette(BUI.closing,true);g.restore();}
-    if(BUI.closing){const pos=PALETTE_TOOLS[BUI.closing.idx];paintRing(PALETTE_ORIGIN.x+pos[0],PALETTE_ORIGIN.y+pos[1],uiAge(BUI.closing.at,14),C(BUI.closing.unit.color),22);}
+    if(BUI.closing&&!onPalette(m)&&Prefs.shake&&uiAge(BUI.closing.at,7)<1){g.save();g.globalAlpha=1-uiAge(BUI.closing.at,7);g.translate(0,uiAge(BUI.closing.at,7)*8);drawCommandPalette(BUI.closing,true);g.restore();}
+    if(BUI.closing&&!onPalette(m)){const pos=PALETTE_TOOLS[paletteSlot(BUI.closing)];paintRing(PALETTE_ORIGIN.x+pos[0],PALETTE_ORIGIN.y+pos[1],uiAge(BUI.closing.at,14),C(BUI.closing.unit.color),22);}
     drawReservation();
   }
   drawPartyCards();drawPaintMotes();
