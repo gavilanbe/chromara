@@ -291,29 +291,49 @@ function drawFieldPuzzle(ents, cx, cy, pal) {
       if (z.open || z.opened) { g.fillStyle = '#64536f'; g.fillRect(x - 9, y - 8 - (z.open || 1) * 6, 18, 6); g.fillStyle = '#e9dfc7'; g.fillRect(x - 9, y - 6, 18, 3); }
       if (z.rise) { const img = propSprite('pluma', C('azul')); g.save(); g.translate(x, y - z.rise * 24); g.rotate(-1.05); g.drawImage(img, -24, -8); g.restore(); } } }); }
 }
-// ---- Efectos al usar cada magia
+// ---- Efectos al usar cada magia. Tres tiempos: la gota se carga (remolino de su color y anillo en el suelo), la herramienta
+// crece por encima de ella y viaja dejando una cinta de pintura, y actúa en grande sobre el objeto con su propio impacto.
+function fieldBand(x0, y0, x1, y1, w, col) { const rp = ramp(col), dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+  for (let k = -w / 2; k <= w / 2; k += 1) pstroke(x0 + nx * k, y0 + ny * k, x1 + nx * k, y1 + ny * k, 1, Math.abs(k) > w / 2 - 1 ? rp.out : k < -w / 4 ? rp.hi : (Math.round(k * 3) % 3 === 0 ? rp.sh : col), 1, 0, false); } // brochazo con cerdas y canto
 function drawFieldEffects(cx, cy) {
   const s = OW.fieldCast; if (!s) return;
-  const t = s.t, col = s.col, fx = s.from[0] - cx, fy = s.from[1] - cy, ax = s.aim[0] - cx, ay = s.aim[1] - cy, k = s.art.kind;
-  if (t < 20) { const c0 = C(fieldOwners(s.art)[0].color); for (let i = 0; i < 8; i++) { const a = i * .785 + t * .16, rr = 18 - t * .7; g.fillStyle = c0; g.fillRect(Math.round(fx + Math.cos(a) * rr), Math.round(fy + 6 + Math.sin(a) * rr * .6), 2, 2); } }
-  const fly = q => [lerp(fx, ax, q), lerp(fy, ay - 6, q) - Math.sin(q * Math.PI) * 16];
-  if (k === 'color') { // la herramienta vuela, pinta tres pinceladas sobre el objeto y vuelve
-    const P = PROP[s.art.tool];
-    if (t >= 16 && t < 36) { const [x, y] = fly((t - 16) / 20); drawProp(propSprite(s.art.tool, col), x, y, -.6, 1, P.tip[0], P.tip[1], .7); }
-    if (t >= 36 && t < 60) { const q = (t - 36) / 24, sweep = Math.sin(q * Math.PI * 3) * 8; drawProp(propSprite(s.art.tool, col), ax + sweep, ay - 2, -.6, 1, P.tip[0], P.tip[1], .7); for (let i = 0; i < 3; i++) if (q > i / 3) pstroke(ax - 8, ay - 4 + i * 4, ax + 8, ay - 5 + i * 4, 2, col, 1, 0, false); }
-    if (t >= 44 && t < 70) { const q = (t - 44) / 26; for (let i = 0; i < 8; i++) { const a = i * .785; g.fillStyle = i % 2 ? col : ramp(col).hi; g.globalAlpha = 1 - q; g.fillRect(Math.round(ax + Math.cos(a) * q * 16), Math.round(ay + Math.sin(a) * q * 8 - Math.sin(q * Math.PI) * 6), 2, 2); } g.globalAlpha = 1; } }
-  if (k === 'trazar') { // el lápiz va a la chincheta y arrastra la línea hasta la otra; saltan virutas de grafito
-    const P = PROP.lapiz, [bx, by] = [s.aim2[0] - cx, s.aim2[1] - cy], d = s.draw || 0;
-    if (t >= 16 && t < 30) { const [x, y] = fly((t - 16) / 14); drawProp(propSprite('lapiz', col), x, y, -.95, 1, P.tip[0], P.tip[1], .8); }
-    if (t >= 30 && t < 78) { const x = lerp(ax, bx, d), y = lerp(ay + 2, by + 2, d); drawProp(propSprite('lapiz', col), x, y, -.95, 1, P.tip[0], P.tip[1], .8); if (t % 2 === 0 && d < 1) { g.fillStyle = '#6a6480'; g.fillRect(Math.round(x - 2 + (t % 5)), Math.round(y + 1 + (t % 3)), 1, 1); } } }
-  if (k === 'borrar') { // una goma enorme frota de lado a lado; las virutas rosas caen
-    if (t >= 16 && t < 76) { const q = t < 28 ? (t - 16) / 12 : 1, rub = t >= 28 ? Math.sin((t - 28) * .6) * 9 : 0, [x, y] = t < 28 ? fly(q) : [ax + rub, ay - 4], img = propSprite('goma'); drawProp(img, x, y, .25, 1, PROP.goma.tip[0], PROP.goma.tip[1], 1.4);
-      if (t >= 28) for (let i = 0; i < 5; i++) { const ph = ((t + i * 7) % 20) / 20; g.fillStyle = i % 2 ? '#e86a8a' : '#f4f0ea'; g.fillRect(Math.round(ax - 8 + i * 4 + Math.sin(i + t * .2) * 2), Math.round(ay + 2 + ph * 12), 2, 1); } } }
-  if (k === 'aguada') { // el pincel descarga agua: una mancha de acuarela se abre sobre la tinta y la aclara
-    const P = PROP.pincel, w = s.wash || 0;
-    if (t >= 16 && t < 34) { const [x, y] = fly((t - 16) / 18); drawProp(propSprite('pincel', '#8ec8e8'), x, y, -.6, 1, P.tip[0], P.tip[1], .7); }
-    if (t >= 24) { g.save(); g.globalAlpha = .5 * (1 - Math.max(0, (t - 80) / 16)); g.fillStyle = '#9fd0ea'; g.beginPath(); g.ellipse(ax, ay + 4, 6 + w * 22, 3 + w * 12, 0, 0, 6.29); g.fill(); g.fillStyle = '#e8f6fb'; g.fillRect(Math.round(ax - w * 12), Math.round(ay - w * 6), Math.round(w * 10) + 1, 1); g.restore();
-      for (let i = 0; i < 6; i++) { const ph = ((t * 2 + i * 9) % 30) / 30; g.fillStyle = '#6fb4d8'; g.fillRect(Math.round(ax - 10 + i * 4), Math.round(ay - 20 + ph * 22), 1, 2); } } }
+  const t = s.t, col = s.col, rp = ramp(col), fx = s.from[0] - cx, fy = s.from[1] - cy, ax = s.aim[0] - cx, ay = s.aim[1] - cy, k = s.art.kind, shake = Prefs.shake, paint = fieldArtPaint(s.art), pr = ramp(paint);
+  const owner = fieldOwners(s.art)[0], oc = C(owner.color);
+  // 1) carga: anillo de pintura en el suelo, remolino que sube y un destello en la cabeza del líder
+  if (t < 24) { const q = t / 24; g.save(); g.globalAlpha = .7 * (1 - q * .5); g.strokeStyle = oc; g.lineWidth = 2; g.beginPath(); g.ellipse(fx, fy + 13, 6 + q * 14, 2 + q * 5, 0, 0, 6.29); g.stroke(); g.restore();
+    for (let i = 0; i < 12; i++) { const a = i * .52 + t * .25, rr = 16 - q * 11, h = (i * 5 + t * 2) % 22; g.fillStyle = i % 3 ? oc : '#fff8e6'; g.fillRect(Math.round(fx + Math.cos(a) * rr), Math.round(fy + 12 - h + Math.sin(a) * rr * .35), 2, 2); }
+    if (t > 16) { const r = (t - 16) * 1.5; g.fillStyle = '#fff8e6'; g.fillRect(Math.round(fx - r), Math.round(fy - 6), Math.round(r * 2) + 1, 1); g.fillRect(Math.round(fx), Math.round(fy - 6 - r), 1, Math.round(r * 2) + 1); } }
+  const arc = q => { const mx = (fx + ax) / 2, my = Math.min(fy, ay) - 30, u = 1 - q; return [u * u * fx + 2 * u * q * mx + q * q * ax, u * u * (fy - 10) + 2 * u * q * my + q * q * (ay - 8)]; };
+  const trail = (q, w, c) => { const n = 10; let prev = arc(Math.max(0, q - .35)); for (let i = 1; i <= n; i++) { const qq = Math.max(0, q - .35 + .35 * i / n), p = arc(qq); pstroke(prev[0], prev[1], p[0], p[1], Math.max(1, w * i / n), c, 1, 0, false); prev = p; } };
+  if (k === 'color') { // 2) la herramienta de la gota vuela en grande dejando su cinta; 3) tres brochazos anchos y salpicadura
+    const P = PROP[s.art.tool], img = propSprite(s.art.tool, col);
+    if (t >= 16 && t < 36) { const q = (t - 16) / 20, [x, y] = arc(q); trail(q, 4, col); drawProp(img, x, y, -.6 + q * .4, 1, P.tip[0], P.tip[1], 1.1); }
+    if (t >= 36 && t < 64) { const q = (t - 36) / 28, strokes = Math.min(3, Math.floor(q * 3.6));
+      for (let i = 0; i < 3; i++) { if (i > strokes) break; const f = i < strokes ? 1 : (q * 3.6) % 1, y = ay - 7 + i * 6, x0 = ax - 12, x1 = x0 + 24 * f; if (f > 0) fieldBand(x0, y, x1, y + (i % 2 ? 1 : -1), 5, col); if (i === strokes) drawProp(img, x1, y - 2, -.5, 1, P.tip[0], P.tip[1], 1.1); } }
+    if (t >= 44 && t < 76) { const q = (t - 44) / 32, real = Game.puzzle.real[s.target.sketch?.id]; paintRing(ax, ay, q, real ? C(s.target.sketch.color) : col, real ? 40 : 24);
+      for (let i = 0; i < 12; i++) { const a = i * .52, d = q * (real ? 30 : 18); g.globalAlpha = 1 - q; g.fillStyle = i % 3 ? col : rp.hi; g.fillRect(Math.round(ax + Math.cos(a) * d), Math.round(ay + Math.sin(a) * d * .6 - Math.sin(q * Math.PI) * 10 + q * q * 8), 2, 2); } g.globalAlpha = 1;
+      if (real && shake) for (let i = 0; i < 6; i++) { const a = i * 1.05 + t * .1, d = 10 + q * 24; g.fillStyle = '#fff8e6'; const X = Math.round(ax + Math.cos(a) * d), Y = Math.round(ay + Math.sin(a) * d * .6); g.fillRect(X - 1, Y, 3, 1); g.fillRect(X, Y - 1, 1, 3); } } }
+  if (k === 'trazar') { // el lápiz, enorme, se clava en la chincheta y arrastra la línea; saltan virutas y la línea vibra al tensarse
+    const P = PROP.lapiz, img = propSprite('lapiz', C('amarillo')), [bx, by] = [s.aim2[0] - cx, s.aim2[1] - cy], d = s.draw || 0;
+    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); trail(q, 2, '#6a6480'); drawProp(img, x, y, -.95, 1, P.tip[0], P.tip[1], 1.2); }
+    if (t >= 30 && t < 78) { const x = lerp(ax, bx, d), y = lerp(ay + 2, by + 2, d); drawProp(img, x, y, -.95 + Math.sin(t * .9) * .06, 1, P.tip[0], P.tip[1], 1.2);
+      for (let i = 0; i < 5; i++) { const ph = ((t + i * 5) % 16) / 16; g.fillStyle = i % 2 ? '#e8cf9a' : '#4a4460'; g.fillRect(Math.round(x - 4 + i * 2 - ph * 6), Math.round(y - ph * 12 + ph * ph * 16), 2, 1); } }
+    if (t >= 70 && t < 92) { const q = (t - 70) / 22, amp = Math.sin(q * Math.PI * 6) * (1 - q) * 3; for (const [px, py] of [[ax, ay], [bx, by]]) paintRing(px, py, q, '#6a6480', 14); if (shake) { g.fillStyle = '#9a98b0'; for (let i = 0; i <= 12; i++) { const f = i / 12; g.fillRect(Math.round(lerp(ax, bx, f)), Math.round(lerp(ay, by, f) + 3 + Math.sin(f * Math.PI) * amp), 1, 1); } } } }
+  if (k === 'borrar') { // una goma gigante baja y frota; se aplasta a cada pasada, las virutas rosas se amontonan y el grafito se levanta en motas
+    const img = propSprite('goma');
+    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); drawProp(img, x, y, .25, 1, PROP.goma.tip[0], PROP.goma.tip[1], 1.8); }
+    if (t >= 30 && t < 78) { const rub = Math.sin((t - 30) * .55), sq = shake ? 1 + Math.abs(rub) * .18 : 1; g.save(); g.translate(ax + rub * 12, ay - 6); g.scale(sq, 2 - sq); drawProp(img, 0, 0, .25, 1, PROP.goma.tip[0], PROP.goma.tip[1], 1.8); g.restore();
+      for (let i = 0; i < 10; i++) { const ph = ((t * 1.3 + i * 7) % 26) / 26, side = i % 2 ? 1 : -1; g.fillStyle = i % 3 ? '#e88aa0' : '#f4f0ea'; g.fillRect(Math.round(ax + side * (8 + ph * 14)), Math.round(ay - 4 + ph * 14 - Math.sin(ph * Math.PI) * 8), 2, 1); }
+      for (let i = 0; i < 4; i++) { const ph = ((t + i * 11) % 30) / 30; g.fillStyle = '#4a4460'; g.globalAlpha = 1 - ph; g.fillRect(Math.round(ax - 6 + i * 4), Math.round(ay - 6 - ph * 22), 1, 1); } g.globalAlpha = 1; }
+    if (t >= 30) { const n = Math.min(14, (t - 30) >> 2); for (let i = 0; i < n; i++) { g.fillStyle = i % 3 ? '#e88aa0' : '#c96a86'; g.fillRect(Math.round(ax - 14 + (i * 7) % 28), Math.round(ay + 7 + (i % 3)), 2, 1); } } } // montoncito de virutas
+  if (k === 'aguada') { // el pincel se carga de agua y pinta una nube de acuarela; llueve, el charco se abre en ondas y la tinta se deshace en volutas grises
+    const P = PROP.pincel, w = s.wash || 0, cloudK = clamp((t - 20) / 14, 0, 1), fade = t > 84 ? (96 - t) / 12 : 1;
+    if (t >= 14 && t < 30) { const q = (t - 14) / 16, [x, y] = arc(q); trail(q, 3, '#9fd0ea'); drawProp(propSprite('pincel', '#8ec8e8'), x, y, -.6, 1, P.tip[0], P.tip[1], 1.1); }
+    if (t >= 20) { g.save(); g.globalAlpha = fade; [[-10, 2, 8], [0, -2, 11], [11, 1, 8], [-4, 4, 7], [6, 5, 7]].forEach(([dx, dy, r]) => { g.fillStyle = '#6fa6d8'; g.beginPath(); g.ellipse(ax + dx, ay - 34 + dy + 1, r * cloudK, r * .7 * cloudK, 0, 0, 6.29); g.fill(); g.fillStyle = '#b8e0f0'; g.beginPath(); g.ellipse(ax + dx, ay - 34 + dy, r * cloudK, r * .65 * cloudK, 0, 0, 6.29); g.fill(); g.fillStyle = '#e8f6fb'; g.fillRect(Math.round(ax + dx - r * .5), Math.round(ay - 37 + dy), Math.round(r * .6 * cloudK), 1); });
+      if (t > 30 && t < 84) for (let i = 0; i < 10; i++) { const ph = ((t * 3 + i * 13) % 30) / 30; g.fillStyle = i % 3 ? '#6fb4d8' : '#e8f6fb'; g.fillRect(Math.round(ax - 16 + i * 3.4), Math.round(ay - 26 + ph * 30), 1, 3); }
+      for (let r = 0; r < 3; r++) { const q = ((t - 30 + r * 12) % 36) / 36; if (t < 30) break; g.strokeStyle = '#9fd0ea'; g.globalAlpha = (1 - q) * .8 * fade; g.beginPath(); g.ellipse(ax, ay + 5, 4 + q * 20, 1.5 + q * 7, 0, 0, 6.29); g.stroke(); }
+      g.globalAlpha = fade; for (let i = 0; i < 5; i++) { const ph = ((t * 1.2 + i * 9) % 40) / 40; if (w < .2) break; g.fillStyle = ph < .5 ? '#6a6480' : '#9a98b0'; g.globalAlpha = w * (1 - ph) * fade; g.beginPath(); g.ellipse(ax - 8 + i * 4 + Math.sin(ph * 6 + i) * 3, ay - ph * 26, 1.5 + ph * 2, 1.2 + ph * 1.5, 0, 0, 6.29); g.fill(); } // la tinta se deshace
+      g.restore(); } }
 }
 function drawFieldUI() {
   if (OW.ring || OW.menu || OW.msg || OW.heal || OW.landT || OW.jar?.toast > 0) return;

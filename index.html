@@ -69,7 +69,7 @@
   scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'font.js', 'sprites.js', 'character_sprites.js', 'world_art.js', 'rinse.js', 'field.js', 'scene.js', 'gui.js', 'battle.js', 'attacks.js', 'combat.js', 'battle_ui.js', 'settings.js', 'mobile.js', 'chapter_art.js', 'chapters.js', 'prologue.js', 'game.js');
   if (new URLSearchParams(location.search).has('spriteLab')) scripts.push('tools/sprite_lab.js');
   if (new URLSearchParams(location.search).has('escena')) scripts.push('tools/escenas.js'); // development captures only
-  const version = location.protocol === 'file:' ? Date.now() : 'mapa-4';
+  const version = location.protocol === 'file:' ? Date.now() : 'magias-3';
   for (const src of scripts) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   // Installable and playable offline once hosted; file:// and development captures skip the worker.
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !location.search.includes('escena') && !location.search.includes('spriteLab')) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
