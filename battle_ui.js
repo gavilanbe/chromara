@@ -163,22 +163,32 @@ function paintTube(x, y, u, c, cost) {
   g.fillStyle='#ded3bf';for(let k=0;k<3;k++)g.fillRect(x+8+k*3,y+20,1,2);
 }
 function drawATBBrush(x,y,u,c,reserved) {
-  const ready=u.alive&&u.atb>=100&&!u.acting,col=reserved?'#ad8dcc':u.alive?C(u.color):'#877b87';
-  // A broad swatch accumulates behind a little working brush. The metal
-  // ferrule and split bristles remain visible even at the end of the stroke.
-  brushBand(x-1,y-2,19,9,KIT_INK);smallText(reserved?'MIX':'ATB',x,y-1,reserved?'#dbc3ef':ready?'#fff0ba':'#d4c9ba');
-  const start=x+21,end=Math.round(39*clamp(u.atb/100,0,1));
-  g.fillStyle=KIT_INK;g.fillRect(start,y,52,5);
-  g.fillStyle='#635663';g.fillRect(start+1,y+1,49,3);
-  for(let i=8;i<48;i+=8){g.fillStyle='#9c8a79';g.fillRect(start+i,y+3,1,1);}
-  g.fillStyle=col;g.fillRect(start+1,y+1,end,3);g.fillStyle=ramp(col).hi;g.fillRect(start+1,y+1,end,1);
-  const tip=start+end;
-  g.fillStyle='#8d563b';g.fillRect(tip,y,6,3);g.fillStyle='#e4b774';g.fillRect(tip,y,6,1);
-  g.fillStyle='#e6dfcf';g.fillRect(tip+5,y-1,3,5);g.fillStyle='#928693';g.fillRect(tip+7,y,1,4);
-  g.fillStyle=ready?col:'#ae9775';g.fillRect(tip+8,y-1,4,5);g.fillRect(tip+12,y,1,3);
-  g.fillStyle=ready?ramp(col).hi:'#edce9b';g.fillRect(tip+8,y,4,1);g.fillRect(tip+9,y+3,2,1);
-  if(ready){g.fillStyle=reserved?'#ddc6f3':'#fff4c4';g.fillRect(start+50,y-1,2,2);if(Prefs.shake&&uiAge(c.readyAt,24)<1){g.fillRect(tip+8,y-3,1,1);g.fillRect(tip+13,y-2,1,1);}}
-  if(reserved){g.fillStyle='#e4d3f0';g.fillRect(tip+5,y,5,1);g.fillRect(tip+7,y-1,1,5);}
+  const ready=u.alive&&u.atb>=100&&!u.acting,col=reserved?'#ad8dcc':u.alive?C(u.color):'#877b87',rp=ramp(col);
+  // The turn is the widest stroke on the card: a groove the length of the card that a
+  // working brush fills with the drop's colour. Full, the brush is gone and the paint shines.
+  const len=97,end=Math.round((len-2)*clamp(u.atb/100,0,1));
+  g.fillStyle=KIT_INK;g.fillRect(x,y,len,5);g.fillRect(x+1,y-1,len-2,1);g.fillRect(x+1,y+5,len-2,1);
+  g.fillStyle='#635663';g.fillRect(x+1,y,len-2,5);
+  g.fillStyle='#57495a';for(let i=6;i<len-3;i+=12)g.fillRect(x+i,y+3,3,1); // dry grain in the groove
+  if(end>0){
+    g.fillStyle=col;g.fillRect(x+1,y,end,5);
+    // Bristle streaks: the wet edge is ragged, a little longer on the middle hairs.
+    g.fillStyle=rp.sh;for(let i=3;i<end-2;i+=7)g.fillRect(x+1+i,y+3,4,1);
+    g.fillStyle=rp.hi;g.fillRect(x+1,y,end,1);
+    if(!ready){g.fillStyle=col;g.fillRect(x+1+end,y+1,1,3);g.fillRect(x+2+end,y+2,1,1);}
+  }
+  if(ready){
+    // A glint travels along the finished stroke.
+    const gx=Prefs.shake?((B.t*2)%(len+30))-15:len-12;
+    if(gx>0&&gx<len-4){g.fillStyle='#fff7df';g.fillRect(x+gx,y+1,4,1);g.fillRect(x+gx+1,y+2,2,1);}
+    // The end of a full stroke keeps a wet bead that catches the light.
+    g.fillStyle=rp.hi;g.fillRect(x+len-4,y+1,2,3);g.fillStyle='#fff7df';g.fillRect(x+len-4,y+1,1,1);
+    if(Prefs.shake&&uiAge(c.readyAt,24)<1){g.fillStyle=reserved?'#ddc6f3':'#fff4c4';g.fillRect(x+len-2,y-3,1,1);g.fillRect(x+len+1,y-1,1,1);g.fillRect(x+len-6,y-2,1,1);}
+  }else{
+    const tip=x+1+end;
+    g.fillStyle=KIT_INK;g.fillRect(tip-1,y-2,11,4);g.fillStyle='#8d563b';g.fillRect(tip+4,y-1,6,2);g.fillStyle='#e4b774';g.fillRect(tip+4,y-1,6,1);
+    g.fillStyle='#e6dfcf';g.fillRect(tip+2,y-2,2,4);g.fillStyle='#ae9775';g.fillRect(tip,y-1,2,3);
+  }
 }
 function unitStateLabels(u) { const labels=Object.keys(u.status).filter(k=>STATUS_INFO[k]).map(k=>STATUS_INFO[k][0]+u.status[k]);if(u.guard?.charges)labels.push('P1');return labels; }
 // Card states are tiny material glyphs with one pip per remaining action: a drip, a smudge, a pencil frame, a red flourish, a shield arc.
@@ -224,11 +234,12 @@ function drawPartyCards() {
     if (low) { g.fillStyle = '#c4384a'; g.globalAlpha = .35; g.beginPath(); g.ellipse(x+70, y+5, 6, 4, .4, 0, 6.29); g.fill(); g.globalAlpha = 1; }
     if (Prefs.shake && uiAge(c.hit, 20) < 1) { g.fillStyle = '#c4384a'; g.globalAlpha = 1 - uiAge(c.hit, 20); for (let k = 0; k < 4; k++) g.fillRect(x + 48 + ((k * 13) % 26), y + 1 + ((k * 7) % 5), 1 + (k & 1), 1); g.globalAlpha = 1; }
     paintTube(x+79,y+5,u,c,cost);
-    maskingLabel(x+79,y-4,24,9,cost? '#f7dfad':UI_PAPER); textCenter(cost ? '-'+cost : 'MP', x+91,y-3,cost>u.mp?'#a12f42':UI_INK);
+    // The tube speaks only when it has news: the spend being previewed, or a reserved mix.
+    if(cost||reserved){maskingLabel(x+79,y-4,24,9,cost?'#f7dfad':'#e4d5ee');textCenter(cost?'-'+cost:'MIX',x+91,y-3,cost>u.mp?'#a12f42':cost?UI_INK:'#674875');}
     drawStatusIcons(u,x+1,y+14);
     // An enemy's ink thread reaches the portrait too: a drop hangs from the sticker while the attack is announced.
     if (u.alive && B.enemies.some(e => e.alive && e.intent && !e.acting && (e.intent.all || e.intent.target === u))) { const wob = Prefs.shake ? Math.round(Math.sin(B.t * .3)) : 0; g.fillStyle = '#2a2438'; g.fillRect(x+3, y-4+wob, 1, 2); g.fillRect(x+2, y-2+wob, 3, 3); g.fillRect(x+3, y+1+wob, 1, 1); g.fillStyle = '#8c8ab0'; g.fillRect(x+2, y-1+wob, 1, 1); }
-    drawATBBrush(x+1,174,u,c,reserved);
+    drawATBBrush(x+3,174,u,c,reserved);
     if(ready&&Prefs.shake&&uiAge(c.readyAt,24)<1){g.fillStyle=KIT_LIGHT;g.fillRect(x+4,148-bounce,2,2);g.fillRect(x+20,148+bounce,1,2);}
     if (!u.alive) { const k = uiIn(c.koAt, 14); g.save(); g.translate(x+13, y+12); g.rotate(-.2 * k); g.scale(1 + (1 - k) * .8, 1 + (1 - k) * .8); maskingLabel(-10,-5,20,10,'#f3d9d9');smallText('KO',-6,-3,'#a12f42'); g.restore(); }
     g.restore();
@@ -410,23 +421,27 @@ function drawListDetails(m,e) {
 }
 function drawTargetDetails(m) {
   const ts=selectedTargets(m),t=ts[0];if(!t)return;
-  const p=m.pending,preview=previewAction(m.unit,p,t),group=targetGroup(p,m.unit);
+  const p=m.pending,preview=previewAction(m.unit,p,t),group=targetGroup(p,m.unit),col=C(preview.col||m.unit.color);
   const title=actionName(p,m.unit),targetName=group?'Todos: '+ts.length:(t.kind==='enemy'?String.fromCharCode(65+t.idx)+': ':'')+t.name+(m.targets.length>1?' >':'');
   const drop=Math.round((1-uiIn(BUI.openedAt,10))*-16),rise=Math.round((1-uiIn(BUI.openedAt,10,4))*10),fade=uiFade(BUI.openedAt,8,4);
+  // One tape says what and how much; the health stroke over the target already shows what is left.
+  const amount=t.kind==='enemy'&&group?ts.map(q=>String.fromCharCode(65+q.idx)+' '+previewAction(m.unit,p,q).label.replace(' daño','')).join('  '):preview.label.replace(' daño','');
+  const states=t.kind==='party'?unitStateLabels(t):[],tail=states.length?'  '+states.join(' '):'';
   g.save();g.translate(0,drop);
-  maskingLabel(3,3,textWidth(title)+16,12);smallText(title,11,7);
+  const tw=textWidth(title),aw=textWidth(amount+tail),w=tw+aw+30;
+  maskingLabel(3,3,w,12);paintDab(11,9,4,col,uiPop(BUI.selectedAt,12));smallText(title,18,7);smallText(amount+tail,26+tw,7,t.kind==='enemy'&&/\d/.test(amount)?'#8f2f3b':UI_INK);
   maskingLabel(301-textWidth(targetName),3,textWidth(targetName)+16,12);textRight(targetName,308,7,UI_MUTED);
-  const detail=t.kind==='enemy'?(group?ts.map(q=>String.fromCharCode(65+q.idx)+':'+previewAction(m.unit,p,q).label.replace(' daño','')).join(' / ')+' daño':preview.label+' / x'+Number((preview.mult??1).toFixed(2))+' / HP '+t.hp+'/'+t.maxhp):preview.label+(unitStateLabels(t).length?' / '+unitStateLabels(t).join(' '):'');
-  maskingLabel(3,15,textWidth(detail)+16,12);smallText(detail,11,18,UI_INK);
-  if(t.kind==='enemy'&&(preview.mult??1)>=2){const tag='x2 complementario',tw=textWidth(tag)+16;maskingLabel(3,28,tw,12,'#fff0c2');smallText(tag,11,31,'#8a5a12');}
+  const mult=t.kind==='enemy'?preview.mult??1:1;
+  if(mult!==1){const tag=mult>=2?'x2 complementario':'x'+Number(mult.toFixed(2))+' mismo color',tw2=textWidth(tag)+16;maskingLabel(3,16,tw2,12,mult>=2?'#fff0c2':'#e6e0d6');smallText(tag,11,19,mult>=2?'#8a5a12':UI_MUTED);}
   g.restore();
   if(!group&&m.targets.length>1)uiHit(299-textWidth(targetName),2,textWidth(targetName)+18,17,()=>{m.tidx=(m.tidx+1)%m.targets.length;Audio.sfx('cursor');});
   // Spend is previewed on each participant's physical paint tube below.
   g.save();g.translate(0,rise);g.globalAlpha*=fade;
-  const effectLines=wrapSmall(preview.effect,234).slice(0,2);maskingLabel(3,124,Math.max(...effectLines.map(textWidth))+16,effectLines.length*10+1);effectLines.forEach((line,i)=>smallText(line,11,127+i*10,UI_INK));
-  maskingLabel(253,124,64,21);textCenter(battleKey('ok')+' usar',282,127,'#735128');smallText(battleKey('back')+' volver',258,137,UI_MUTED);
+  if(p.type==='tech'&&preview.effect){const effectLines=wrapSmall(preview.effect,200).slice(0,2);maskingLabel(3,124,Math.max(...effectLines.map(textWidth))+16,effectLines.length*10+1);effectLines.forEach((line,i)=>smallText(line,11,127+i*10,UI_INK));}
+  const ok=battleKey('ok'),back=battleKey('back')+' volver',kw=Math.max(13,textWidth(ok)+6),bw=kw+textWidth('usar')+textWidth(back)+22,bx=317-bw;
+  maskingLabel(bx,131,bw,13);brushBand(bx+1,131,kw,13,col);textCenter(ok,bx+1+kw/2,134,accentInk(col));smallText('usar',bx+kw+5,134,UI_INK);smallText(back,bx+kw+textWidth('usar')+13,134,UI_MUTED);
   g.restore();
-  uiHit(253,124,64,21,()=>pressed.ok=true);
+  uiHit(bx,129,bw,17,()=>pressed.ok=true);
 }
 function drawReservation() {
   const r=B.reservation;if(!r||B.menu&&B.menu.level!=='cmd')return;
