@@ -167,12 +167,13 @@ const DATA = {
   },
   // ---- Diálogo previo a la jefa (who: tinta | carmin | ambar | anil)
   bossDialogue: [
-    { who: 'tinta', text: 'Otra vez color en mi página.' },
-    { who: 'tinta', text: 'Yo tracé cada línea de Chromara antes de que nadie pintara nada. Cuando llegasteis, nadie volvió a mirar el contorno.' },
-    { who: 'carmin', text: 'El contorno sigue ahí. Debajo de todo.' },
-    { who: 'tinta', text: 'Debajo. Exacto. Pues hoy la página vuelve al boceto. Bebed.' },
-    { who: 'anil', text: 'Un dibujo terminado tiene las dos cosas: la línea y el color.' },
-    { who: 'tinta', text: 'Demostradlo.' },
+    { who: 'tinta', mood: 'smug', text: 'Otra vez color en mi página.' },
+    { who: 'tinta', mood: 'cold', text: 'Yo tracé cada línea de Chromara antes de que nadie pintara nada. Cuando llegasteis, nadie volvió a mirar el contorno.' },
+    { who: 'carmin', mood: 'determined', text: 'El contorno sigue ahí. Debajo de todo.' },
+    { who: 'tinta', mood: 'menace', text: 'Debajo. Exacto. Pues hoy la página vuelve al boceto. Bebed.' },
+    { who: 'ambar', mood: 'worried', text: '¿Beber? Yo he venido a pintar, no a desaparecer.' },
+    { who: 'anil', mood: 'calm', text: 'Un dibujo terminado tiene las dos cosas: la línea y el color.' },
+    { who: 'tinta', mood: 'angry', text: 'Demostradlo.' },
   ],
   texts: {
     intro: ['Chromara pierde sus colores.', 'Las Gotas Negras beben el pigmento', 'de todo lo que tocan.', '', 'Tres gotas primarias salen a', 'devolver el color al mundo.'],

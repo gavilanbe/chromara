@@ -339,24 +339,62 @@ function pageCurl(snap, k, back = PAPER, back2 = PAPER2) {
 // Diálogo: página abajo con retrato en pegatina, nombre en su color y texto a máquina de escribir. Z completa/avanza.
 // =====================================================================
 const SPEAKERS = { tinta: { name: 'La Tinta', col: '#8c8ab0', spr: () => buildSprite('tinta', C('negro'), null, { eyes: 'normal' }), sc: 1 }, carmin: { name: 'Carmín', col: 'rojo', spr: () => buildSprite('carmin_title', C('rojo'), null, {}), sc: 1 }, ambar: { name: 'Ámbar', col: 'amarillo', spr: () => buildSprite('ambar_title', C('amarillo'), null, {}), sc: .9 }, anil: { name: 'Añil', col: 'azul', spr: () => buildSprite('anil_title', C('azul'), null, {}), sc: .9 } };
+// Retratos del diálogo. Las gotas: su dibujo grande sobre una mancha de acuarela de su color, con la cara y los detalles de su
+// emoción. La Tinta: un borrón vivo que respira, con ojos y boca que cambian según lo que dice.
+const MOOD_EYES = { determined: 'angry', calm: 'normal', happy: 'happy', worried: 'worried', surprised: 'wide' };
+function drawPortrait(who, mood, x, y, t, talk, at) {
+  const shake = Prefs.shake, heroes = ['carmin', 'ambar', 'anil'];
+  if (who === 'tinta') {
+    const angry = mood === 'angry', jit = angry && shake ? Math.round(Math.sin(t * 1.3) * 1.5) : 0, R = 19 + (shake ? Math.sin(t * .08) * 1.2 : 0) + (mood === 'menace' ? 2 : 0);
+    g.save(); g.globalAlpha = .55; g.fillStyle = angry ? '#8a2a3a' : mood === 'menace' ? '#5a2a6a' : '#3a3652'; g.beginPath(); g.ellipse(x, y + 2, 27, 23, 0, 0, 6.29); g.fill(); g.restore();
+    inkBlob(x + jit, y, R, t * (angry ? 3 : 1), 7);
+    const ex = x + jit, ey = y - 4, glow = mood === 'menace' || angry, eye = glow ? '#ff5a6a' : '#efe4bf';
+    const E = (cx, lid, slant) => { if (mood === 'smug') { g.fillStyle = eye; g.fillRect(cx - 3, ey, 7, 2); g.fillRect(cx - 2, ey - 1, 5, 1); return; } // ojos entornados
+      if (mood === 'cold') { g.fillStyle = eye; g.fillRect(cx - 3, ey, 7, 2); g.fillStyle = '#0b0912'; g.fillRect(cx, ey, 2, 2); return; } // rendijas
+      g.fillStyle = eye; g.fillRect(cx - 3, ey - 3, 7, 6); g.fillStyle = glow ? '#fff0f0' : '#0b0912'; g.fillRect(cx - 1 + (glow ? 0 : 1), ey - 1, 2, 2); // ojos abiertos
+      g.fillStyle = '#0b0912'; for (let i = 0; i < 7; i++) g.fillRect(cx - 3 + i, ey - 4 - Math.round(i * slant), 1, 2); };
+    E(ex - 7, 0, angry ? -.4 : mood === 'menace' ? -.2 : 0); E(ex + 7, 0, angry ? .4 : mood === 'menace' ? .2 : 0);
+    const my = y + 7; g.fillStyle = '#efe4bf';
+    if (mood === 'smug') { for (let i = -6; i <= 7; i++) g.fillRect(ex + i, my + 1 - Math.round(Math.max(0, i) * Math.max(0, i) / 12), 1, 1); g.fillRect(ex + 7, my - 4, 1, 1); } // sonrisa torcida, sube por un lado
+    else if (mood === 'menace') { g.fillStyle = '#0b0912'; g.fillRect(ex - 8, my - 1, 17, 5); g.fillStyle = '#efe4bf'; for (let i = -7; i <= 7; i += 3) { g.fillRect(ex + i, my - 1, 2, 2); g.fillRect(ex + i + 1, my + 2, 2, 2); } } // dientes
+    else if (angry) { g.fillStyle = '#6a1a2a'; g.fillRect(ex - 6, my, 13, 4); g.fillStyle = '#efe4bf'; for (let i = -6; i <= 6; i += 2) g.fillRect(ex + i, my + (i % 4 ? 0 : 3), 1, 1); }
+    else g.fillRect(ex - 3, my + 1, 7, 1);
+    if (glow && shake) for (let i = 0; i < 4; i++) { const ph = ((t + i * 9) % 30) / 30; g.fillStyle = '#0b0912'; g.fillRect(Math.round(x - 18 + i * 12), Math.round(y + 16 + ph * 10), 2, 3); } // goterones
+    return;
+  }
+  const sp = SPEAKERS[who]; if (!heroes.includes(who)) { drawSprite(sp.spr(), x, y + 14, sp.sc); return; }
+  const p = Party.find(q => q.id === who) || DATA.party.find(q => q.id === who), col = C(p.color), rp = ramp(col);
+  // mancha de acuarela detrás, que respira
+  g.save(); for (let k = 0; k < 3; k++) { g.globalAlpha = [.5, .35, .7][k]; g.fillStyle = [rp.hi, col, rp.base][k]; g.beginPath(); for (let i = 0; i <= 20; i++) { const a = i / 20 * 6.283, rr = (22 - k * 5) * (1 + .09 * Math.sin(a * 5 + k * 2 + t * .03)); const X = x + Math.cos(a) * rr + (k - 1) * 2, Y = y + Math.sin(a) * rr * .9; if (i) g.lineTo(X, Y); else g.moveTo(X, Y); } g.fill(); } g.restore();
+  const eyes = talk > .5 && ((t >> 3) & 1) === 0 && mood === 'calm' ? 'blink' : MOOD_EYES[mood] || 'normal', spr = buildSprite(who + '_title', col, null, { eyes });
+  const bob = Math.round(Math.max(0, talk) * 1.5), sc = Math.min(1.2, 34 / spr.height), shk = mood === 'determined' && shake ? Math.round(Math.sin(t * .9) * .6) : 0;
+  drawSprite(spr, x + shk, y + 19 - bob - Math.round(artPop(at) * 3), sc * (1 + talk * .02), false, sc * (1 - talk * .03));
+  // detalles de la emoción
+  if (mood === 'worried') { const dy = shake ? (t % 40) / 40 * 4 : 0; g.fillStyle = '#8ec8e8'; g.fillRect(x + 12, y - 12 + dy, 2, 3); g.fillRect(x + 11, y - 10 + dy, 4, 3); g.fillStyle = '#e8f6fb'; g.fillRect(x + 12, y - 10 + dy, 1, 1); } // gota de sudor
+  if (mood === 'determined') for (let i = 0; i < 3; i++) pstroke(x + 14 + i * 3, y - 16 + i, x + 18 + i * 3, y - 20 + i, 1, rp.hi, 1, 0, false); // trazos de energía
+  if (mood === 'happy' || mood === 'calm') for (let i = 0; i < 3; i++) { const a = t * .05 + i * 2.1, sx = Math.round(x + Math.cos(a) * 20), sy = Math.round(y - 8 + Math.sin(a) * 8); g.fillStyle = '#fff8e6'; if (mood === 'happy' || i === 0) { g.fillRect(sx - 1, sy, 3, 1); g.fillRect(sx, sy - 1, 1, 3); } }
+}
+// La hoja del diálogo: las gotas hablan sobre una página de cuaderno pautada con el margen de su color; la Tinta, sobre una hoja
+// empapada de tinta con letra clara. El retrato va pegado con cinta en su tarjeta al lado.
 function drawDialogue(dlg) {
   UI_HITS.length=0; UI_TEXT.length=0;
-  const line=DATA.bossDialogue[Math.min(dlg.i,DATA.bossDialogue.length-1)],sp=SPEAKERS[line.who];
-  const col=sp.col.startsWith('#')?sp.col:C(sp.col),left=['carmin','ambar','anil'].includes(line.who);
-  const lines=wrapSmall(line.text,237),h=lines.length*10+23,y=H-h-5;
-  const at=artObserve('dialogue',dlg.i),portraitX=left?26:294,tx=left?52:14,ready=dlg.ch>=line.text.length;
-  // The sheet slides up from the page edge; the speaker leans in and nods while the pen writes.
-  const rise=Math.round((1-artIn(at,18))*(h+26)),talk=!ready&&Prefs.shake?Math.sin(ARTUI.t*.55):0;
+  const line=DATA.bossDialogue[Math.min(dlg.i,DATA.bossDialogue.length-1)],sp=SPEAKERS[line.who],ink=line.who==='tinta'||!['carmin','ambar','anil'].includes(line.who);
+  const col=sp.col.startsWith('#')?sp.col:C(sp.col),left=['carmin','ambar','anil'].includes(line.who),mood=line.mood||'calm';
+  const lines=wrapSmall(line.text,214),h=Math.max(46,lines.length*10+26),y=H-h-5;
+  const at=artObserve('dialogue',dlg.i),ready=dlg.ch>=line.text.length,talk=!ready&&Prefs.shake?Math.sin(ARTUI.t*.55):0;
+  const sx=left?74:8,sw=238,px2=left?38:282,rise=Math.round((1-artIn(at,18))*(h+30)),sway=Prefs.shake?Math.sin(ARTUI.t*.05)*.02:0;
   g.save();g.translate(0,rise);
-  artSheet(left?44:7,y,269,h,col);
-  paintDab(portraitX,y+14,19,col);
-  drawSprite(sp.spr(),portraitX,y+29-Math.round(artPop(at)*3)-Math.round(Math.max(0,talk)*1.5),sp.sc*(1+talk*.02),false,sp.sc*(1-talk*.03));
-  artTag(sp.name,left?49:13,y-15,col,170);
-  // The whole line is wrapped first, so words never jump while the ink is revealed.
-  writtenLines(lines,tx,y+7,UI_INK,dlg.ch,{wet:col,nib:!!Prefs.shake});
-  const key=battleKey('ok')+(ready?' seguir':' completar'),kx=left?304:265;
-  textRight(key,kx,y+h-11,UI_MUTED);
-  if(ready)dropCursor(kx-textWidth(key)-11,y+h-12,col);
+  // la hoja
+  if(ink){brushBand(sx+1,y+2,sw,h,'#0b0912');brushBand(sx,y,sw,h,'#1e1a2c');g.fillStyle='#2a2438';for(let i=0;i<sw;i+=7)g.fillRect(sx+4+i,y+3+((i*3)%5),3,1);g.fillStyle='#3a3652';for(let r=0;r<3;r++)g.fillRect(sx+8,y+17+r*10,sw-16,1);}
+  else{artSheet(sx,y,sw,h,col);g.fillStyle='#c3d3e4';for(let r=0;r<3;r++)g.fillRect(sx+6,y+16+r*10,sw-12,1);g.fillStyle=col;g.fillRect(sx+13,y+3,1,h-6);}
+  // el nombre, a brocha, en su color
+  const nw=rotuloWidth(sp.name)+20,nx=left?sx+6:sx+sw-nw-6;brushBand(nx+1,y-12,nw,15,'#0b0912');brushBand(nx,y-13,nw,15,ink?'#2a2438':KIT_INK);bigText(sp.name,nx+10,y-10,ink?'#dbbae8':col,{outline:'#0b0912'});
+  writtenLines(lines,sx+18,y+8,ink?'#e8e0f0':UI_INK,dlg.ch,{wet:ink?'#8c8ab0':col,nib:!!Prefs.shake});
+  const key=battleKey('ok')+(ready?' seguir':' completar'),kx=sx+sw-8;textRight(key,kx,y+h-11,ink?'#9a98b0':UI_MUTED);if(ready)dropCursor(kx-textWidth(key)-11,y+h-12,ink?'#dbbae8':col);
+  // la tarjeta del retrato, con cinta
+  g.save();g.translate(px2,y+h/2-4);g.rotate((left?-.05:.05)+sway);maskingLabel(-30,-28,60,54,ink?'#2a2438':'#f7efd6');g.restore();
+  g.fillStyle='rgba(233,220,181,.85)';g.fillRect(px2-8,y+h/2-34,16,6);
+  drawPortrait(line.who,mood,px2,y+h/2-6,ARTUI.t,talk,at);
   g.restore();
   uiHit(0,y-16,W,h+21,()=>pressed.ok=true);
 }

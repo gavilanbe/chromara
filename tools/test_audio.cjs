@@ -66,9 +66,10 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   await page.evaluate(()=>__chromara.OW.x=30*16); await delay(100);
   assert.equal(await page.evaluate(()=>__chromara.Audio.cur),'atelier');
   console.log('PASS atelier cue and doorway debounce');
+  const DIALOGUE_PRESSES=2*(await page.evaluate(()=>__chromara.DATA?.bossDialogue?.length??7))+3;
   await page.evaluate(()=>{__chromara.battle('B');});
   await page.waitForFunction(()=>__chromara.B.tr?.stage==='dialogue' && __chromara.Audio.src?.name==='prelude');
-  for(let i=0;i<13;i++){await page.keyboard.press('z');await delay(90);}
+  for(let i=0;i<DIALOGUE_PRESSES;i++){await page.keyboard.press('z');await delay(90);}
   await page.waitForFunction(()=>__chromara.Game.state==='battle' && __chromara.Audio.src?.name==='boss',null,{timeout:20000});
   await page.evaluate(()=>__chromara.win()); await page.waitForFunction(()=>__chromara.B.showResult);
   await delay(650); await page.keyboard.press('z');

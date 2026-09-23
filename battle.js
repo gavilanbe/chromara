@@ -220,7 +220,7 @@ function* bossTransitionGen(foe) {
   // retumba: la jefa pequeña del mapa se hunde en su charco (que crece) para emerger después a tamaño real, sin verse dos veces
   T.stage = 'rumble'; for (let i = 0; i < 50; i++) { T.k = i / 50; if (i % 10 === 0) { B.shake = 3; Audio.sfx('impact_sub', { vol: .35 }); } if (i === 30) Audio.sfx('slow_drip', { vol: .6 }); yield; }
   Audio.sfx('ink_jet'); Audio.sfx('splash', { when: .2 });
-  T.stage = 'rise'; for (let i = 0; i < 40; i++) { T.k = i / 40; if (i === 30) B.shake = 5; yield; }
+  T.stage = 'rise'; for (let i = 0; i < 60; i++) { T.k = i / 60; if (i === 36) { B.shake = 6; Audio.sfx('impact_sub', { vol: .8 }); Audio.sfx('glass', { when: .05, vol: .5 }); } if (i === 42) Audio.sfx('banner'); yield; }
   // diálogo
   Audio.play('prelude', { fade: .8 });
   T.stage = 'dialogue'; T.dlg = { i: 0, ch: 0, t: 0 };
@@ -239,6 +239,35 @@ function* bossTransitionGen(foe) {
   B.tr = null; OW.hideFoe = null; B.phase = 'fight'; B.fightStart = B.t; Audio.sfx('banner'); setState('battle');
 }
 // Dibujo de la transición sobre el mapa cenital (fases 1-3) y de la mancha/gotas sobre la escena (4-5)
+// La entrada de la jefa: el papel se oscurece, la tinta repta desde los bordes de la pantalla, caen goterones hacia ella, sus
+// ojos se abren con un destello y su nombre se estampa a brocha. Durante el diálogo, la tinta de los bordes respira.
+function drawBossEntrance(T, fx0, fy0, front) {
+  const rise = T.stage === 'rise', k = rise ? T.k : 1, t = B.t, sh = Prefs.shake;
+  if (!front) { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); g.fillStyle = 'rgba(11,9,18,' + (.25 * k).toFixed(2) + ')'; g.fillRect(0, 0, W, H);
+  const creep = (rise ? k * k * (3 - 2 * k) : 1) * (1 + (sh ? Math.sin(t * .05) * .08 : 0)), tt = sh ? t : 0; g.fillStyle = '#0b0912';
+  // marco de tinta: bandas con el borde ondulado que respira y goterones que cuelgan de arriba
+  const edge = (u, s1, s2) => creep * (12 + 6 * Math.sin(u * .06 + s1 + tt * .03) + 4 * Math.sin(u * .17 + s2) + (Math.sin(u * .5 + s2) > .93 ? 5 : 0));
+  for (let x = 0; x < W; x += 2) { const a = edge(x, 0, 1), b = edge(x, 2, 4); g.fillRect(x, 0, 2, a); g.fillRect(x, H - b, 2, b); g.fillStyle = '#3a3652'; g.fillRect(x, a - 1, 2, 1); g.fillStyle = '#0b0912'; }
+  for (let y = 0; y < H; y += 2) { const a = edge(y, 5, 3) * .8, b = edge(y, 1, 6) * .8; g.fillRect(0, y, a, 2); g.fillRect(W - b, y, b, 2); }
+  for (let i = 0; i < 9; i++) { const x = 14 + i * 36 + (i * 17) % 11, L = creep * (8 + (i * 23) % 17) + (sh ? ((t * .15 + i * 5) % 12) : 0), w = 2 + (i % 2); g.fillRect(x, 0, w, edge(x, 0, 1) + L); g.beginPath(); g.arc(x + w / 2, edge(x, 0, 1) + L, w * .9 + .6, 0, 6.29); g.fill(); }
+    if (rise) { for (let i = 0; i < 7; i++) { const q = ((k * 2.2 + i * .14) % 1), dx = fx0 + (i - 3) * 14 + Math.sin(i * 2) * 6, dy = lerp(-10, fy0 - 20, q * q); g.fillStyle = '#0b0912'; g.fillRect(Math.round(dx), Math.round(dy), 2, 4 + Math.round(q * 3)); g.fillRect(Math.round(dx) - 1, Math.round(dy) + 3, 4, 2); } }
+    return; }
+  if (rise) { if (k > .6 && k < .8 && Prefs.flash) { const q = (k - .6) / .2; g.save(); g.globalAlpha = (1 - q) * .8; g.fillStyle = '#efe4bf'; g.beginPath(); g.ellipse(fx0, fy0 - 18, 6 + q * 40, 3 + q * 16, 0, 0, 6.29); g.fill(); g.restore(); } } // los ojos se abren
+  // el rótulo: LA TINTA, estampado a brocha con su lema
+  const tk = rise ? clamp((k - .55) / .2, 0, 1) : 1, fade = rise ? 1 : clamp(1 - (T.dlg ? (T.dlg.i > 0 ? 1 : T.dlg.t / 40) : 0), 0, 1);
+  if (tk > 0 && fade > 0) { const title = 'LA TINTA', w = rotuloWidth(title) + 40, x = Math.round((W - w) / 2), y = 22, pop = sh ? Math.max(0, 1 - tk) * 10 : 0;
+    g.save(); g.globalAlpha = fade; g.translate(W / 2, y + 10); g.scale(1 + pop * .05, 1 + pop * .05); g.translate(-W / 2, -y - 10);
+    brushBand(x + 2, y + 3, w, 20, '#0b0912'); brushBand(x, y, w, 20, '#1e1a2c'); brushBand(x + 4, y + 16, w - 8, 3, '#8c3a8a'); bigText(title, x + 20, y + 5, '#dbbae8', { outline: '#0b0912', progress: tk * (w - 40) + 1 });
+    smallText('la que trazó Chromara', Math.round(W / 2 - textWidth('la que trazó Chromara') / 2), y + 25, '#b8a8c8'); g.restore(); }
+}
+// Borrón liso de tinta (sin dedos): la cara de la Tinta en su retrato
+function inkBlob(x, y, R, t, seed = 1, col = '#0b0912') {
+  const rnd = seeded(seed), Hm = []; for (let i = 0; i < 3; i++) Hm.push({ n: 3 + i * 2, a: .09 - i * .02, ph: rnd() * 6.28 });
+  const r = a => R * (1 + Hm.reduce((s, h) => s + h.a * Math.sin(h.n * a + h.ph + t * .04), 0));
+  g.fillStyle = col; g.beginPath(); for (let i = 0; i <= 48; i++) { const a = i / 48 * 6.283, rr = r(a); if (i) g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * .92); else g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * .92); } g.fill();
+  for (let i = 0; i < 3; i++) { const a = 1.1 + i * .5, dx = x + Math.cos(a) * r(a) * .9, dy = y + Math.sin(a) * r(a) * .85, L = 4 + i * 3 + Math.sin(t * .05 + i) * 2; g.fillRect(Math.round(dx - 1), Math.round(dy), 3, L); g.beginPath(); g.arc(dx + .5, dy + L, 2, 0, 6.29); g.fill(); }
+  g.strokeStyle = '#4a4664'; g.lineWidth = 1.5; g.beginPath(); g.arc(x - R * .1, y - R * .05, R * .78, 3.5, 4.6); g.stroke(); g.fillStyle = '#6a6690'; g.fillRect(Math.round(x - R * .5), Math.round(y - R * .55), 3, 2);
+}
 function drawTransitionFx() {
   const T = B.tr; if (!T || !T.stage) return;
   const lead = B.party[0];
@@ -249,8 +278,8 @@ function drawTransitionFx() {
       g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 14 + k * 16, 4 + k * 4, 0, 0, 6.29); g.fill();
       const e0 = DATA.enemies[foe.enemies[0]], spr = buildSprite(foe.enemies[0] + '_mini', C('negro'), e0.color === 'negro' ? null : C(e0.color), { eyes: k > .55 ? 'blink' : 'normal' }), sink = k * k * (spr.height + 10), tr = k > .4 ? (((Game.t >> 1) & 1) ? 1 : -1) : 0;
       g.save(); g.beginPath(); g.rect(0, 0, W, fy0 + 6); g.clip(); drawSprite(spr, fx0 + tr, fy0 + 2 + sink, 1 + k * .25, false, 1); g.restore(); }
-    else if (T.stage === 'rise') { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); const k = T.k, spr = buildSprite(foe.enemies[0], C('negro'), null, { eyes: k > .6 ? 'normal' : 'blink' }); g.save(); g.beginPath(); g.rect(0, 0, W, fy0 + 6); g.clip(); drawSprite(spr, fx0, fy0 + 6 + (1 - k) * 44, 1, false, 1 + (1 - k) * .3); g.restore(); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 30 + k * 10, 8 + k * 3, 0, 0, 6.29); g.fill(); if (k > .3) for (let i = 0; i < 6; i++) { const a = i * 1.05 + k * 2, d = 20 + Math.sin(k * 9 + i) * 6; g.fillRect(fx0 + Math.cos(a) * d - 1, fy0 + 4 + Math.sin(a) * d * .35 - (k * 10 * ((i * 7) % 3 + 1)) % 14, 2, 3); } }
-    else if (T.stage === 'dialogue') { g.fillStyle = 'rgba(11,9,18,.45)'; g.fillRect(0, 0, W, H); const spr = buildSprite(foe.enemies[0], C('negro'), null, { eyes: 'normal' }); drawSprite(spr, fx0, fy0 + 6 + Math.sin(B.t * .06) * 1.5, 1, false, 1 + Math.sin(B.t * .06) * .02); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 40, 11, 0, 0, 6.29); g.fill(); drawDialogue(T.dlg); }
+    else if (T.stage === 'rise') { drawBossEntrance(T, fx0, fy0); const k = T.k, spr = buildSprite(foe.enemies[0], C('negro'), null, { eyes: k > .6 ? 'normal' : 'blink' }); g.save(); g.beginPath(); g.rect(0, 0, W, fy0 + 6); g.clip(); drawSprite(spr, fx0, fy0 + 6 + (1 - k) * 44, 1, false, 1 + (1 - k) * .3); g.restore(); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 30 + k * 10, 8 + k * 3, 0, 0, 6.29); g.fill(); if (k > .3) for (let i = 0; i < 6; i++) { const a = i * 1.05 + k * 2, d = 20 + Math.sin(k * 9 + i) * 6; g.fillRect(fx0 + Math.cos(a) * d - 1, fy0 + 4 + Math.sin(a) * d * .35 - (k * 10 * ((i * 7) % 3 + 1)) % 14, 2, 3); } drawBossEntrance(T, fx0, fy0, true); }
+    else if (T.stage === 'dialogue') { drawBossEntrance(T, fx0, fy0); const spr = buildSprite(foe.enemies[0], C('negro'), null, { eyes: 'normal' }); g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(fx0, fy0 + 5, 40, 11, 0, 0, 6.29); g.fill(); g.strokeStyle = '#3a3652'; g.lineWidth = 1; g.beginPath(); g.ellipse(fx0, fy0 + 5, 36 + Math.sin(B.t * .05) * 2, 9, 0, 3.4, 6); g.stroke(); drawSprite(spr, fx0, fy0 + 6 + Math.sin(B.t * .06) * 1.5, 1, false, 1 + Math.sin(B.t * .06) * .02); drawBossEntrance(T, fx0, fy0, true); drawDialogue(T.dlg); }
     else if (T.stage === 'flood') { const k = T.k, e = k * k; g.fillStyle = '#0b0912'; for (let x = 0; x <= W; x += 4) { const hb = e * (H * .62) + Math.sin(x * .05 + B.t * .15) * 6 + Math.sin(x * .13) * 3; g.fillRect(x, H - hb, 4, hb + 2); const ht = e * (H * .5) + Math.sin(x * .07 + B.t * .12) * 5; g.fillRect(x, 0, 4, ht); } for (let y = 0; y <= H; y += 4) { const wl = e * (W * .55) + Math.sin(y * .06 + B.t * .13) * 6; g.fillRect(0, y, wl, 4); g.fillRect(W - wl, y, wl, 4); } if (k > .5) { g.fillStyle = '#2a2438'; for (let i = 0; i < 12; i++) { const rnd = seeded(i * 9); g.fillRect(rnd() * W | 0, (H * .4 + rnd() * 20 - e * 40) | 0, 3, 1); } } }
     else if (T.stage === 'tide') { const k = T.k, e = 1 - Math.pow(1 - k, 2); g.fillStyle = '#0b0912'; for (let x = 0; x <= W; x += 4) { const top = e * (H + 30) + Math.sin(x * .05 + B.t * .2) * 8 + Math.sin(x * .17) * 4; g.fillRect(x, top - 4, 4, H); g.fillStyle = '#3a3652'; g.fillRect(x, top - 5, 4, 2); g.fillStyle = '#0b0912'; } }
     return;

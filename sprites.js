@@ -657,6 +657,8 @@ function drawEyes(x, def, mode, kind, rp) {
     if (mode === 'hurt') { F(eyeCol, ex - 1, ey); F(eyeCol, ex + 1, ey); F(eyeCol, ex, ey - 1); F(eyeCol, ex, ey + 1); return; }
     if (mode === 'happy') { F(eyeCol, ex - 1, ey); F(eyeCol, ex, ey - 1); F(eyeCol, ex + 1, ey); return; }
     if (mode === 'blink') { F(eyeCol, ex - 1, ey, 3, 1); return; }
+    if (mode === 'wide' && !ink) { F(eyeCol, ex - 1, ey - 2, 3, 4); F(hi, ex - 1, ey - 2); F(hi, ex + 1, ey + 1); return; } // sorpresa: ojos redondos
+    if (mode === 'worried' && !ink) { F(eyeCol, ex, ey - 1, 2, 3); F(hi, ex, ey - 1); if (i) { F('#14121c', ex, ey - 4, 2, 1); F('#14121c', ex + 2, ey - 3); } else { F('#14121c', ex - 1, ey - 3); F('#14121c', ex, ey - 4, 2, 1); } return; } // cejas que suben por dentro
     if (ink) { F(eyeCol, ex, ey - 1, 2, 3); F('#14121c', ex + 1, ey, 1, 1); if (def.big) { F(eyeCol, ex - 1, ey - 2, 4, 5); F('#14121c', ex + 1, ey, 2, 2); } return; }
     if (kind === 'side') { F(eyeCol, ex, ey - 1, 1, 3); F(hi, ex, ey - 1); F(eyeCol, ex + 1, ey, 1, 1); }
     else { F(eyeCol, ex, ey - 1, 2, 3); F(hi, ex, ey - 1); }
@@ -769,7 +771,7 @@ function drawHeroFace(x, def, mode, rp) {
   if (!def.mouth) return; const [mx, my] = def.mouth;
   if (def.mini) { if (mode === 'happy') F(ink, mx, my, 2, 1); else if (mode !== 'blink' && mode !== 'wide') F(ink, mx, my, 1, 1); else if (mode === 'wide') F(ink, mx, my, 1, 2); return; }
   if (mode === 'happy') { F(ink, mx - 1, my, 4, 1); F(ink, mx, my + 1, 2, 1); F('#e8707a', mx, my + 1, 2, 1); F(ink, mx - 1, my + 1); F(ink, mx + 2, my + 1); F(ink, mx, my + 2, 2, 1); } // boca abierta
-  else if (mode === 'hurt' || mode === 'ko') { F(ink, mx - 1, my + 1); F(ink, mx, my); F(ink, mx + 1, my + 1); F(ink, mx + 2, my); } // mueca en zigzag
+  else if (mode === 'hurt' || mode === 'ko' || mode === 'worried') { F(ink, mx - 1, my + 1); F(ink, mx, my); F(ink, mx + 1, my + 1); F(ink, mx + 2, my); } // mueca en zigzag
   else if (mode === 'angry') F(ink, mx - 1, my, 4, 1); // gesto serio al atacar
   else if (mode === 'wide') { F(ink, mx, my, 2, 2); }
   else { F(ink, mx - 1, my); F(ink, mx, my + 1, 2, 1); F(ink, mx + 2, my); } // sonrisa

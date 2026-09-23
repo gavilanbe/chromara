@@ -34,6 +34,7 @@ for(const mobile of [false,true,'bindings']){
  }
  run('OW.menu=null;OW.msg={lines:DATA.texts.intro,t:50}');
  for(const key of ['intro','ending','gameover'])layout('message '+key,`drawMessage(DATA.texts.${key})`);
+ assert(run("DATA.bossDialogue.every(l=>l.who==='tinta'?['smug','cold','menace','angry'].includes(l.mood):l.mood in MOOD_EYES)"),'every dialogue line needs a mood its speaker can show');
  for(let i=0;i<run('DATA.bossDialogue.length');i++)for(const ch of [0,12,999])layout('dialogue '+i+'/'+ch,`drawDialogue({i:${i},ch:${ch},t:50})`);
  run('OW.msg=null;Game.overlay=null');
  // the field ring, aimed at each piece of the atelier, with every art selected and each stage of the puzzle
