@@ -815,7 +815,8 @@ function updateCover() {
   const t = Math.floor(COVER.t * 1.35), prev = Math.floor((COVER.t - 1) * 1.35), done = t >= 175;
   if (t > 20 && t <= 110 && (t - 20) % 10 === 1) Audio.sfx('scratch', { vol: .35, semi: RI(-2, 4) }); // el lápiz escribe
   if (t >= 112 && prev < 112) Audio.sfx('scratch_long', { vol: .5 }); if (t >= 126 && prev < 126) Audio.sfx('fwip', { vol: .6 }); // subrayado y floritura
-  if (t >= 146 && prev < 146) { Audio.sfx('impact_sub', { vol: .5 }); Audio.sfx('plop', { semi: 2, when: .03 }); for (let i = 0; i < 12; i++) COVER.dust.push({ x: W / 2 + 64 + R(-30, 30), y: 118 + R(-6, 6), vx: R(-1.4, 1.4), vy: -R(.2, 1.2), t: 0, life: RI(12, 20), col: '#e9e1cc' }); } // el sticker se pega
+  if (t >= 138 && prev < 138) { Audio.sfx('impact_sub', { vol: .55 }); Audio.sfx('rub', { when: .02, vol: .4 }); for (let i = 0; i < 12; i++) COVER.dust.push({ x: 200 + R(-40, 40), y: 132 + R(-4, 4), vx: R(-1.4, 1.4), vy: -R(.2, 1.2), t: 0, life: RI(12, 20), col: '#e9e1cc' }); } // el sello golpea
+  if (t >= 158 && prev < 158) { Audio.sfx('whip', { vol: .5 }); Audio.sfx('fwip', { when: .12, semi: 5, vol: .5 }); } // la goma elástica salta
   if (ANYKEY || done) { ANYKEY = false; COVER.t = Math.max(COVER.t, 130); COVER.open = COVER.t; Audio.sfx('page'); for (const k in pressed) pressed[k] = false; }
 }
 // Letras manuscritas como trazos (rejilla 8×14: ascendente 0, altura de x 4, base 10, descendente 14). Cada letra = lista de trazos (polilíneas).
@@ -841,43 +842,115 @@ const HAND = {
 // trazos de una palabra a mano en pantalla: [{pts,len,start}] y longitud total
 function handStrokes(word, x0, y0, S = 1.4, cw = 12) { const out = []; let acc = 0; word.split('').forEach((ch, i) => { for (const st of HAND[ch] || []) { const pts = st.map(([x, y]) => [x0 + i * cw + x * S, y0 + y * S]); let len = 0; for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); out.push({ pts, len, start: acc }); acc += len + 4; } }); return { list: out, total: acc }; }
 function drawHand(HS, dist, col, w = 2) { for (const st of HS.list) { if (dist <= st.start) break; const k = clamp((dist - st.start) / st.len, 0, 1), P = st.pts; for (let i = 1; i < P.length; i++) { const segEnd = i / (P.length - 1), segStart = (i - 1) / (P.length - 1); if (k <= segStart) break; const kk = clamp((k - segStart) / (segEnd - segStart), 0, 1); pstroke(P[i - 1][0], P[i - 1][1], lerp(P[i - 1][0], P[i][0], kk), lerp(P[i - 1][1], P[i][1], kk), w, col, 1, 0, false); } } }
+// La tapa: un cuaderno de dibujo de cartón kraft sobre la mesa del taller. Espiral metálica, goma elástica, esquinas gastadas y
+// huellas de los tres pigmentos. Una plumilla escribe «gavilanbe» en una tira de cinta de carrocero, un sello de goma estampa
+// «presenta» en violeta, la goma elástica salta y la tapa se abre. Todo depende de t (sin azar): redibujar da la misma imagen.
+const COVER_BOOK = { x: 26, y: 10, w: 276, h: 160 };
+function coverDesk() {
+  return cached('cover-desk', () => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'), rnd = seeded(33), F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    // mesa de nogal: tablones con vetas largas y juntas oscuras
+    F('#4a3122', 0, 0, W, H);
+    for (let y = 0; y < H; y++) { const plank = Math.floor(y / 45); for (let xx = 0; xx < W; xx += 1) { const v = Math.sin(xx * .045 + plank * 3 + Math.sin(y * .3 + plank) * 1.4) + Math.sin(xx * .19 + y * .07) * .3; if (v > .9) F('#5a3d2a', xx, y); else if (v < -1.05) F('#3c2619', xx, y); } if (y % 45 === 0) F('#2a1a10', 0, y, W, 1); }
+    for (let i = 0; i < 260; i++) F(rnd() < .5 ? '#553a28' : '#402a1c', rnd() * W | 0, rnd() * H | 0, 2, 1);
+    // cosas sobre la mesa: un lápiz, un tubo apretado y unas gotas secas
+    const pencil = (px, py, len, col) => { const rp = ramp(col); for (let i = 0; i < len; i++) { F('#241e32', px + i, py - 1, 1, 5); F(rp.base, px + i, py, 1, 3); F(rp.hi, px + i, py, 1, 1); } F('#e8cf9a', px + len, py, 3, 3); F('#241e32', px + len + 3, py + 1, 2, 1); F('#c5848b', px - 3, py, 3, 3); };
+    pencil(70, 173, 30, C('amarillo')); pencil(214, 174, 22, C('rojo'));
+    x.save(); x.translate(306, 22); x.rotate(1.2); const t = ramp(C('azul')); x.fillStyle = '#241e32'; x.fillRect(-2, -5, 26, 10); x.fillStyle = '#c9c4d4'; x.fillRect(0, -4, 22, 8); x.fillStyle = t.base; x.fillRect(6, -4, 10, 8); x.fillStyle = t.hi; x.fillRect(6, -4, 10, 2); x.fillStyle = '#8c8ab0'; x.fillRect(22, -2, 5, 4); x.restore();
+    [[12, 30, 'rojo'], [16, 36, 'rojo'], [306, 150, 'azul'], [300, 120, 'amarillo']].forEach(([a, b, k]) => { const rp = ramp(C(k)); F(rp.sh, a - 2, b, 5, 2); F(rp.base, a - 1, b - 1, 3, 2); F(rp.hi, a - 1, b - 1, 1, 1); });
+    // sombra del cuaderno sobre la mesa
+    const B0 = COVER_BOOK; x.globalAlpha = .45; F('#1a100a', B0.x + 4, B0.y + 5, B0.w, B0.h); x.globalAlpha = .25; F('#1a100a', B0.x + 7, B0.y + 8, B0.w, B0.h); x.globalAlpha = 1;
+    return c;
+  });
+}
+function coverBoard() {
+  return cached('cover-board', () => {
+    const B0 = COVER_BOOK, c = document.createElement('canvas'); c.width = B0.w; c.height = B0.h; const x = c.getContext('2d'), rnd = seeded(71), F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    // cartón kraft: base cálida, fibras cortas en todas direcciones y motas
+    F('#a57c52', 0, 0, B0.w, B0.h);
+    for (let i = 0; i < 2600; i++) { const a = rnd() * B0.w | 0, b = rnd() * B0.h | 0, L = 1 + (rnd() * 3 | 0); F(rnd() < .5 ? '#b58b5f' : '#96704a', a, b, rnd() < .5 ? L : 1, rnd() < .5 ? 1 : L); }
+    for (let i = 0; i < 180; i++) F(rnd() < .6 ? '#6f5034' : '#caa37a', rnd() * B0.w | 0, rnd() * B0.h | 0);
+    // luz desde arriba a la izquierda y un velo más oscuro hacia la esquina de abajo
+    for (let y = 0; y < B0.h; y++) for (let a = 0; a < B0.w; a += 2) { const k = (a / B0.w + y / B0.h) / 2; if (((a >> 1) + y) % 3 === 0) { if (k < .22) F('#b99064', a, y); else if (k > .78) F('#8a6440', a, y); } }
+    // canto: borde oscuro, bisel claro arriba, y un marco hundido a 7 px
+    F('#5e4229', 0, 0, B0.w, 1); F('#5e4229', 0, B0.h - 1, B0.w, 1); F('#5e4229', B0.w - 1, 0, 1, B0.h); F('#caa37a', 1, 1, B0.w - 2, 1); F('#7c5a39', 1, B0.h - 2, B0.w - 2, 1);
+    const fr = (col, o) => { F(col, 16 + o, 7 + o, B0.w - 23 - o * 2, 1); F(col, 16 + o, B0.h - 8 - o, B0.w - 23 - o * 2, 1); F(col, 16 + o, 7 + o, 1, B0.h - 14 - o * 2); F(col, B0.w - 8 - o, 7 + o, 1, B0.h - 14 - o * 2); };
+    fr('#7c5a39', 0); fr('#c49b70', 1);
+    // esquinas gastadas: el cartón se deshilacha en claro
+    [[B0.w - 1, 0, -1, 1], [B0.w - 1, B0.h - 1, -1, -1]].forEach(([cx, cy, dx, dy]) => { for (let i = 0; i < 7; i++) for (let j = 0; j < 7 - i; j++) if ((i + j) % 2 || i + j < 3) F(i + j < 2 ? '#4a3122' : '#d6b287', cx + dx * i, cy + dy * j); });
+    // huellas de pigmento: tres dedos de pintor, rojo, amarillo y azul, con sus crestas
+    [[B0.w - 58, 122, 'rojo'], [B0.w - 44, 128, 'amarillo'], [B0.w - 31, 121, 'azul']].forEach(([a, b, k], n) => { const rp = ramp(C(k)); for (let r = 0; r < 7; r++) { const ry = r - 3.5, half = Math.round(4 * Math.sqrt(Math.max(0, 1 - (ry / 4.2) ** 2))); for (let q = -half; q <= half; q++) if ((q + r * 2 + n) % 3) F(r % 2 ? rp.base : rp.sh, a + q, b + r); } F(rp.hi, a - 2, b + 1, 2, 1); });
+    // un cerco de café
+    x.strokeStyle = '#7a5634'; x.lineWidth = 2; x.globalAlpha = .5; x.beginPath(); x.ellipse(52, 132, 17, 15, 0, .3, 5.6); x.stroke(); x.globalAlpha = .25; x.beginPath(); x.ellipse(52, 132, 15, 13, 0, 2, 4.4); x.stroke(); x.globalAlpha = 1;
+    return c;
+  });
+}
+function coverSpiral(t) {
+  const B0 = COVER_BOOK;
+  for (let y = B0.y + 7; y < B0.y + B0.h - 6; y += 9) {
+    g.fillStyle = '#2a1a10'; g.fillRect(B0.x + 6, y + 1, 4, 3); // el agujero en el cartón
+    // la espira: entra por el agujero, rodea el canto y sale por detrás; brillo en su curva
+    g.fillStyle = '#4a4660'; g.fillRect(B0.x - 5, y - 1, 13, 3); g.fillStyle = '#8c8ab0'; g.fillRect(B0.x - 5, y - 1, 13, 2); g.fillStyle = '#d8d6e6'; g.fillRect(B0.x - 3, y - 1, 6, 1); g.fillStyle = '#4a4660'; g.fillRect(B0.x - 6, y, 2, 3); g.fillStyle = '#b8b6cc'; g.fillRect(B0.x - 6, y, 1, 2);
+  }
+}
 function coverStrokes() { // trazos de "gavilanbe" en pantalla, con longitudes acumuladas
   if (COVER.strokes) return COVER.strokes;
-  const word = 'gavilanbe', S = 2.2, cw = 19, x0 = W / 2 - word.length * cw / 2 + 2, ty = 60, out = []; let acc = 0;
+  const word = 'gavilanbe', S = 2.2, cw = 19, x0 = W / 2 - word.length * cw / 2 + 6, ty = 58, out = []; let acc = 0;
   word.split('').forEach((ch, i) => { for (const st of HAND[ch]) { const pts = st.map(([x, y]) => [x0 + i * cw + x * S, ty + y * S]); let len = 0; for (let k = 1; k < pts.length; k++) len += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); out.push({ pts, len, start: acc, letter: i }); acc += len + 6; } });
   return COVER.strokes = { list: out, total: acc, x0, ty, cw, S };
 }
-function drawCoverArt(t) { // tapa de cartón con anillas y una etiqueta donde un lápiz escribe "gavilanbe" a mano; luego un sticker de "presenta" se pega de un golpe
-  g.fillStyle = '#7a5a3a'; g.fillRect(0, 0, W, H); const rnd = seeded(21); g.fillStyle = '#8a6a48'; for (let i = 0; i < 1800; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1); g.fillStyle = '#5e4229'; for (let i = 0; i < 500; i++) g.fillRect(rnd() * W | 0, rnd() * H | 0, 1, 1);
-  g.fillStyle = '#5e4229'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2); g.fillRect(W - 2, 0, 2, H);
-  for (let y = 10; y < H - 6; y += 12) { g.fillStyle = '#2a1a10'; g.fillRect(6, y, 5, 4); g.fillStyle = '#8c8ab0'; g.fillRect(2, y - 2, 9, 2); g.fillRect(2, y - 2, 2, 6); g.fillStyle = '#e8e6f0'; g.fillRect(3, y - 2, 5, 1); }
-  const writing = t > 20 && t < 112, slap = t >= 140 && t < 152, shx = writing && t % 4 === 0 ? R(-.6, .6) : slap ? R(-1.5, 1.5) * (1 - (t - 140) / 12) : 0, shy = slap ? R(-1, 1) * (1 - (t - 140) / 12) : 0;
-  g.save(); g.translate(Math.round(shx), Math.round(shy));
-  page(66, 56, 188, 66); tape(60, 52, 40, 9); tape(220, 52, 40, 9);
+function drawCoverArt(t) {
+  const B0 = COVER_BOOK;
+  g.drawImage(coverDesk(), 0, 0);
+  // la goma elástica: al final se estira, salta y cae por el canto derecho
+  const snap = clamp((t - 158) / 14, 0, 1), bandX = B0.x + B0.w - 22 + (snap < .45 ? snap / .45 * 5 : 5 + (snap - .45) / .55 * 40), bandA = snap > .45 ? 1 - (snap - .45) / .55 : 1;
+  const writing = t > 20 && t < 112, stamp = t >= 138 && t < 150, jx = writing && t % 4 === 0 ? .5 : 0, jy = stamp ? Math.round(Math.sin((t - 138) * 1.7) * (1 - (t - 138) / 12) * 2) : 0;
+  g.save(); g.translate(Math.round(jx), jy);
+  g.drawImage(coverBoard(), B0.x, B0.y); coverSpiral(t);
+  // la etiqueta: una tira de cinta de carrocero con los extremos rasgados y la cinta translúcida
+  const L = { x: 72, y: 50, w: 190, h: 50 };
+  g.fillStyle = 'rgba(40,24,12,.35)'; g.fillRect(L.x + 2, L.y + 3, L.w, L.h);
+  g.fillStyle = '#efe4c4'; g.fillRect(L.x, L.y, L.w, L.h); g.fillStyle = '#e3d5ae'; for (let i = 0; i < L.w; i += 3) g.fillRect(L.x + i, L.y + ((i * 7) % 5 < 2 ? 0 : 1), 2, 1);
+  g.fillStyle = '#f7efd6'; g.fillRect(L.x, L.y + 2, L.w, 1); g.fillStyle = '#d8c79b'; g.fillRect(L.x, L.y + L.h - 1, L.w, 1);
+  for (let j = 0; j < L.h; j++) { const l = (j * 7) % 4, r = (j * 5) % 4; g.fillStyle = '#a57c52'; g.fillRect(L.x, L.y + j, l, 1); g.fillRect(L.x + L.w - r, L.y + j, r, 1); }
+  // la plumilla escribe con tinta: los trazos terminados quedan con un brillo húmedo que se seca
   const CS = coverStrokes(), word = 'gavilanbe', cw = CS.cw, x0 = CS.x0, ty = CS.ty + 14;
-  // línea guía a lápiz, muy tenue, que aparece antes de escribir
-  const gk = clamp((t - 8) / 12, 0, 1); if (gk > 0) { g.fillStyle = '#c9bd9c'; g.fillRect(x0 - 4, ty + 9, Math.round((word.length * cw + 8) * gk), 1); }
-  // el lápiz recorre los trazos: los completos se dibujan enteros, el actual hasta donde va la punta
+  const gk = clamp((t - 8) / 12, 0, 1); if (gk > 0) { g.fillStyle = '#cdbf9a'; g.fillRect(x0 - 4, ty + 9, Math.round((word.length * cw + 8) * gk), 1); }
   const prog = clamp((t - 20) / 90, 0, 1), dist = prog * CS.total; let penX = x0, penY = ty + 8, lifting = true;
-  for (const st of CS.list) { if (dist <= st.start) break; const k = clamp((dist - st.start) / st.len, 0, 1); const S2 = st.pts; g.fillStyle = INK;
-    for (let i = 1; i < S2.length; i++) { const segEnd = i / (S2.length - 1), segStart = (i - 1) / (S2.length - 1); if (k <= segStart) break; const kk = clamp((k - segStart) / (segEnd - segStart), 0, 1); const ex = lerp(S2[i - 1][0], S2[i][0], kk), ey = lerp(S2[i - 1][1], S2[i][1], kk); pstroke(S2[i - 1][0], S2[i - 1][1], ex, ey, 2, INK, 1, 0, false); }
+  for (const st of CS.list) { if (dist <= st.start) break; const k = clamp((dist - st.start) / st.len, 0, 1), S2 = st.pts, fresh = dist - st.start - st.len < 40;
+    for (let i = 1; i < S2.length; i++) { const segEnd = i / (S2.length - 1), segStart = (i - 1) / (S2.length - 1); if (k <= segStart) break; const kk = clamp((k - segStart) / (segEnd - segStart), 0, 1), ex = lerp(S2[i - 1][0], S2[i][0], kk), ey = lerp(S2[i - 1][1], S2[i][1], kk), dy = Math.abs(S2[i][1] - S2[i - 1][1]), len = Math.hypot(S2[i][0] - S2[i - 1][0], S2[i][1] - S2[i - 1][1]) || 1;
+      pstroke(S2[i - 1][0], S2[i - 1][1], ex, ey, dy / len > .6 ? 3 : 2, INK, 1, 0, false); if (fresh) pstroke(S2[i - 1][0] - 1, S2[i - 1][1] - 1, ex - 1, ey - 1, 1, '#5a5478', 1, 0, false); } // plumilla: más gruesa en los trazos verticales
     if (k < 1) { const q = pointAt(S2, k); penX = q[0]; penY = q[1]; lifting = false; } }
-  if (prog >= 1) { lifting = true; }
   if (t > 20 && t < 112 && lifting) { const nx = CS.list.find(st => st.start >= dist); if (nx) { penX = nx.pts[0][0]; penY = nx.pts[0][1] - 4; } }
-  // subrayado a mano al acabar, y floritura: el lápiz sube girando y se va
-  const uk = clamp((t - 112) / 12, 0, 1); if (uk > 0) { g.fillStyle = INK; for (let i = 0; i < Math.round((word.length * cw + 6) * uk); i++) g.fillRect(x0 - 3 + i, ty + 12 + Math.round(Math.sin(i * .35) * 1.2), 1, 1); if (uk < 1) { penX = x0 - 3 + (word.length * cw + 6) * uk; penY = ty + 13; lifting = false; } }
-  if (t > 20 && t < 140) { const img = propSprite('lapiz', C('amarillo')), P = PROP.lapiz, fk = clamp((t - 124) / 16, 0, 1), lift = lifting && uk >= 1 ? 1 : 0;
+  // subrayado ondulado con un remate
+  const uk = clamp((t - 112) / 12, 0, 1); if (uk > 0) { g.fillStyle = INK; for (let i = 0; i < Math.round((word.length * cw + 6) * uk); i++) g.fillRect(x0 - 3 + i, ty + 12 + Math.round(Math.sin(i * .35) * 1.2), 2, 1); if (uk < 1) { penX = x0 - 3 + (word.length * cw + 6) * uk; penY = ty + 13; lifting = false; } }
+  if (t > 20 && t < 140) { const img = propSprite('pluma', '#6a4a8a'), P = PROP.pluma, fk = clamp((t - 124) / 16, 0, 1), lift = lifting && uk >= 1 ? 1 : 0;
     const px = lift ? lerp(x0 + word.length * cw + 4, W + 40, fk * fk) : penX, py = lift ? lerp(ty + 13, -30, fk) : penY, ang = lift ? -.95 + fk * 5 : -.95 + Math.sin(t * .8) * .05;
-    drawProp(img, px, py, ang, 1, P.tip[0], P.tip[1], 1, lift ? 1 - fk * .6 : 1); if (!lifting && t % 2 === 0) COVER.dust.push({ x: penX + R(-2, 2), y: penY - 1, vx: R(-.5, .5), vy: -R(.3, .9), t: 0, life: RI(8, 14), col: '#6a6480' }); }
+    drawProp(img, px, py, ang, 1, P.tip[0], P.tip[1], 1, lift ? 1 - fk * .6 : 1); }
+  // el sello: baja, golpea y se levanta; deja «presenta» en violeta con la tinta desigual de un sello de goma
+  if (t > 128) {
+    const sx = 200, sy = 122, down = t < 138 ? 1 - (t - 128) / 10 : t < 150 ? 0 : clamp((t - 150) / 10, 0, 1);
+    if (t >= 138) { const stampImg = cached('cover-stamp', () => { const c = document.createElement('canvas'); c.width = 84; c.height = 24; const x = c.getContext('2d'), rnd = seeded(12), vi = C('violeta');
+        x.fillStyle = '#5a2f86'; x.fillRect(1, 0, 82, 1); x.fillRect(1, 23, 82, 1); x.fillRect(0, 1, 1, 22); x.fillRect(83, 1, 1, 22); x.fillRect(3, 2, 78, 1); x.fillRect(3, 21, 78, 1); x.fillRect(2, 3, 1, 18); x.fillRect(81, 3, 1, 18);
+        return c; });
+      g.save(); g.translate(sx, sy); g.rotate(-.09); g.globalAlpha = .9; g.drawImage(stampImg, -42, -12); bigText('PRESENTA', -34, -7, '#5a2f86', { outline: 'rgba(0,0,0,0)', hi: '#6e3d9e', shadow: '#4a2470' }); g.globalAlpha = 1;
+      // la goma no carga igual en todas partes: calvas de papel dentro de las letras
+      const rnd = seeded(5); g.fillStyle = '#a57c52'; for (let i = 0; i < 26; i++) g.fillRect(Math.round(-38 + rnd() * 76), Math.round(-9 + rnd() * 18), 1 + (rnd() * 2 | 0), 1); g.restore(); }
+    if (down < 1) { const hy = sy - 16 - down * 70, sq = t >= 138 && t < 142 ? 2 : 0;
+      g.fillStyle = 'rgba(40,24,12,.3)'; g.fillRect(sx - 30 + down * 10, sy + 10, 64 - down * 20, 4);
+      g.fillStyle = '#241e32'; g.fillRect(sx - 44, hy + 10 + sq, 88, 7); g.fillStyle = '#6b4a8a'; g.fillRect(sx - 43, hy + 14 + sq, 86, 3); // la goma entintada
+      g.fillStyle = '#241e32'; g.fillRect(sx - 40, hy + 2 + sq, 80, 9); g.fillStyle = '#b07a48'; g.fillRect(sx - 39, hy + 3 + sq, 78, 7); g.fillStyle = '#d8a870'; g.fillRect(sx - 39, hy + 3 + sq, 78, 2); // taco de madera
+      g.fillStyle = '#241e32'; g.fillRect(sx - 7, hy - 22, 14, 25); g.fillStyle = '#8a5a34'; g.fillRect(sx - 6, hy - 21, 12, 24); g.fillStyle = '#b07a48'; g.fillRect(sx - 5, hy - 21, 4, 24); // mango
+      g.fillStyle = '#241e32'; g.fillRect(sx - 10, hy - 30, 20, 10); g.fillStyle = '#6a3a3a'; g.fillRect(sx - 9, hy - 29, 18, 8); g.fillStyle = '#a65a5a'; g.fillRect(sx - 8, hy - 29, 7, 3); }
+  }
   g.restore();
-  // sticker de "presenta": estrella troquelada con borde blanco, se pega de un golpe girando, luego brilla y se menea
-  if (t > 138) { const k = clamp((t - 138) / 10, 0, 1), e = 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2), sc = lerp(2.6, 1, e), rot = lerp(-1.1, -.12, e) + (k >= 1 ? Math.sin(t * .09) * .03 : 0), sq = k >= 1 && t < 156 ? 1 + Math.sin((t - 148) / 8 * Math.PI) * .12 : 1;
-    g.save(); g.translate(W / 2 + 64, 118); g.rotate(rot); g.scale(sc * sq, sc / sq);
-    const star = (rx, ry, col) => { g.fillStyle = col; g.beginPath(); for (let i = 0; i < 28; i++) { const a = i / 28 * 6.28, r = i % 2 ? .82 : 1; if (i) g.lineTo(Math.cos(a) * rx * r, Math.sin(a) * ry * r); else g.moveTo(Math.cos(a) * rx * r, Math.sin(a) * ry * r); } g.closePath(); g.fill(); };
-    g.globalAlpha = .35; star(50, 26, '#2a1a10'); g.globalAlpha = 1; g.translate(-2, -2); star(50, 26, '#ffffff'); star(45, 22, C('violeta')); star(41, 19, ramp(C('violeta')).hi); star(38, 16, C('violeta'));
-    txt('presenta', -32, -4, '#fff3c0', '#4a2a6a');
-    if (k >= 1) { const sh = ((t - 148) % 150) / 150; if (sh < .3) { g.globalAlpha = .45; g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(-44 + sh * 300, -6, 6, 14, .4, 0, 6.29); g.fill(); g.globalAlpha = 1; } g.globalAlpha = .5; g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(-18, -10, 12, 3, -.1, 0, 6.29); g.fill(); g.globalAlpha = 1; }
-    g.restore(); }
+  // la goma elástica por encima de todo: roja, con brillo; salta al final
+  if (bandA > 0) { g.save(); g.globalAlpha = bandA; const bx = Math.round(bandX), sag = snap > .45 ? Math.round((snap - .45) * 60) : 0;
+    g.fillStyle = '#241e32'; g.fillRect(bx - 1, 0, 7, H); g.fillStyle = '#9a2f3a'; g.fillRect(bx, 0, 5, H); g.fillStyle = '#d0505c'; g.fillRect(bx + 1, 0, 1, H); g.fillStyle = '#6a1f28'; g.fillRect(bx + 4, 0, 1, H);
+    g.fillStyle = 'rgba(20,12,8,.3)'; g.fillRect(bx + 6, B0.y, 2, B0.h); if (sag) g.fillRect(bx, H - sag, 5, sag); g.restore(); }
+  // luz de la lámpara del taller: esquinas en penumbra
+  const vg = cached('cover-vignette', () => { const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d'); for (let y = 0; y < H; y++) for (let a = 0; a < W; a++) { const d = Math.hypot((a - W * .42) / W, (y - H * .4) / H); if (d > .5 && (a + y) % 2 === 0) { x.fillStyle = `rgba(20,10,4,${Math.min(.5, (d - .5) * 1.4).toFixed(2)})`; x.fillRect(a, y, 1, 1); } } return c; });
+  g.drawImage(vg, 0, 0);
   for (const d of COVER.dust || []) { g.fillStyle = d.col; g.fillRect(Math.round(d.x), Math.round(d.y), 1, 1); }
 }
 function drawCover() {
