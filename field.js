@@ -314,9 +314,12 @@ function* fieldGen(art, target, check) {
       if (Prefs.shake && ((art.kind === 'color' && t === 44) || (art.kind === 'trazar' && t === 70) || (art.kind === 'aguada' && t === 40))) OW.shake = 2; // el golpe de la magia se nota
       if (t === dur - 14) Audio.sfx('tinkle', { vol: .3, semi: semi + 12 }); // la pintura sobrante vuelve a quien la puso
       if (t === 16) Audio.sfx(art.kind === 'color' ? 'brush_sweep' : art.kind === 'trazar' ? 'scratch_long' : art.kind === 'borrar' ? 'rub' : 'brush_hiss', { vol: .6 });
+      if (art.kind === 'color' && t === 34) Audio.sfx('plop', { semi: -6, vol: .4 }); // se posa
+      if (art.kind === 'color' && t === 38) { Audio.sfx('plop', { semi: 14, vol: .5 }); Audio.sfx('tinkle', { semi: 7, vol: .3 }); } // ¡pop! la tapa
+      if (art.kind === 'color' && t === 40) Audio.sfx('brush_hiss', { vol: .45, semi: -4 }); // el chorro
       if (art.kind === 'color' && t === 44) { commit(); Audio.sfx(z.real[id] ? 'grow' : 'plop', { semi: SEMI[owners[0].id] || 0, vol: .6 }); if (z.real[id]) Audio.sfx('discovery', { vol: .4, when: .15 }); }
       if (art.kind === 'trazar') { s.draw = clamp((t - 30) / 40, 0, 1); if (t % 8 === 0 && t > 30 && t < 70) Audio.sfx('scratch', { vol: .35, semi: t / 8 }); if (t === 70) { commit(); Audio.sfx('tinkle', { semi: 4, vol: .5 }); } }
-      if (art.kind === 'borrar') { if (t > 24 && t < 70 && t % 10 === 0) Audio.sfx('rub', { vol: .45 }); if (t % 12 === 6 && t > 24 && t < 70) Audio.sfx('crumbs', { vol: .3 }); s.fade = clamp((t - 30) / 40, 0, 1); if (t === 70) commit(); }
+      if (art.kind === 'borrar') { if (t === 33) { Audio.sfx('plop', { semi: -9, vol: .55 }); Audio.sfx('crumbs', { vol: .45 }); if (Prefs.shake) OW.shake = 1; } if (t === 71) { Audio.sfx('whip', { vol: .45, semi: 5 }); Audio.sfx('brush_hiss', { vol: .3 }); } if (t === 75) Audio.sfx('tinkle', { semi: 16, vol: .35 }); if (t > 34 && t < 68 && t % Math.max(4, 10 - ((t - 34) / 6 | 0)) === 0) Audio.sfx('rub', { vol: .45 }); if (t % 12 === 6 && t > 24 && t < 70) Audio.sfx('crumbs', { vol: .3 }); s.fade = clamp((t - 30) / 40, 0, 1); if (t === 70) commit(); }
       if (art.kind === 'aguada') { s.wash = clamp((t - 24) / 56, 0, 1); if (t === 40) Audio.sfx('splash_clean', { vol: .5 }); if (t === 64) Audio.sfx('bubbles', { vol: .4 }); if (t === 80) commit(); }
       yield;
     }
@@ -416,7 +419,7 @@ function fieldSpirit(img, key, x, y, a, sc, col, alpha, tip) {
   const prev = g.globalAlpha; g.globalAlpha = prev * alpha * .5; for (const [ox, oy] of [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, 1]]) drawProp(halo, x + ox, y + oy, a, 1, tip[0], tip[1], sc);
   g.globalAlpha = prev * alpha * .85; drawProp(img, x, y, a, 1, tip[0], tip[1], sc); g.globalAlpha = prev;
 }
-function fieldSpiritKind(art) { return art.kind === 'color' ? art.tool : art.kind === 'trazar' ? 'lapiz' : art.kind === 'borrar' ? 'goma' : 'pincel'; }
+function fieldSpiritKind(art) { return art.kind === 'color' ? 'bote' : art.kind === 'trazar' ? 'lapiz' : art.kind === 'borrar' ? 'goma' : 'pincel'; }
 function fieldSpiritColor(art) { return art.kind === 'aguada' ? '#8ec8e8' : C(art.color); }
 const FIELD_INV = 46; // fotogramas de la invocación
 // El boceto de una herramienta: su silueta en papel, contorno a grafito y trama en las sombras. Sale del propio sprite.
@@ -524,27 +527,66 @@ function drawFieldEffects(cx, cy) {
   const faceR = ax > fx, fl = A => faceR ? -A : A, sx0 = fx + spiritCenter(fieldSpiritKind(s.art), faceR), arc = q => { const sy = fy - 31, mx = (fx + ax) / 2, my = Math.min(sy, ay) - 24, u = 1 - q; return [u * u * sx0 + 2 * u * q * mx + q * q * ax, u * u * sy + 2 * u * q * my + q * q * (ay - 8)]; }; // sale de donde nació la herramienta
   const ghosts = (q, kind, gcol, glow, a) => { if (!shake) return; for (let j = 3; j >= 1; j--) { const [gx, gy] = arc(Math.max(0, q - j * .08)); spiritGhost(kind, gcol, glow, gx, gy, fl(a), .22 * (4 - j) / 3, faceR); } };
   const trail = (q, w, c) => { const n = 10; let prev = arc(Math.max(0, q - .35)); for (let i = 1; i <= n; i++) { const qq = Math.max(0, q - .35 + .35 * i / n), p = arc(qq); pstroke(prev[0], prev[1], p[0], p[1], Math.max(1, w * i / n), c, 1, 0, false); prev = p; } };
-  if (k === 'color') { // 2) la herramienta de la gota vuela en grande dejando su cinta; 3) tres brochazos anchos y salpicadura
-    const P = PROP[s.art.tool], img = propSprite(s.art.tool, col);
-    if (t >= 16 && t < 36) { const q = (t - 16) / 20, [x, y] = arc(q); trail(q, 4, col); ghosts(q, s.art.tool, col, rp.hi, -.3 + q * .3); drawSpirit(s.art.tool, col, rp.hi, x, y, { a: fl(-.3 + q * .3), flip: faceR }); }
-    if (t >= 36 && t < 64) { const q = (t - 36) / 28, strokes = Math.min(3, Math.floor(q * 3.6));
-      for (let i = 0; i < 3; i++) { if (i > strokes) break; const f = i < strokes ? 1 : (q * 3.6) % 1, y = ay - 7 + i * 6, x0 = ax - 12, x1 = x0 + 24 * f; if (f > 0) fieldBand(x0, y, x1, y + (i % 2 ? 1 : -1), 5, col); if (i === strokes) drawSpirit(s.art.tool, col, rp.hi, x1, y - 1, { a: .2, flip: true }); } }
-    if (t >= 44 && t < 76) { const q = (t - 44) / 32, real = Game.puzzle.real[s.target.sketch?.id]; paintRing(ax, ay, q, real ? C(s.target.sketch.color) : col, real ? 40 : 24);
-      for (let i = 0; i < 12; i++) { const a = i * .52, d = q * (real ? 30 : 18); g.globalAlpha = 1 - q; g.fillStyle = i % 3 ? col : rp.hi; g.fillRect(Math.round(ax + Math.cos(a) * d), Math.round(ay + Math.sin(a) * d * .6 - Math.sin(q * Math.PI) * 10 + q * q * 8), 2, 2); } g.globalAlpha = 1;
-      if (real && shake) for (let i = 0; i < 6; i++) { const a = i * 1.05 + t * .1, d = 10 + q * 24; g.fillStyle = '#fff8e6'; const X = Math.round(ax + Math.cos(a) * d), Y = Math.round(ay + Math.sin(a) * d * .6); g.fillRect(X - 1, Y, 3, 1); g.fillRect(X, Y - 1, 1, 3); } } }
+  if (k === 'color') { // el bote vuela dando una voltereta, salta la tapa, se vuelca y un chorro espeso empapa el boceto
+    const dir = faceR ? 1 : -1, lipX = ax - dir * 7, lipY = ay - 36, sy0 = fy - 31, E = q => 1 - (1 - q) ** 3;
+    const arcB = q => { const mx = (sx0 + lipX) / 2, my = Math.min(sy0, lipY) - 20, u = 1 - q; return [u * u * sx0 + 2 * u * q * mx + q * q * lipX, u * u * sy0 + 2 * u * q * my + q * q * lipY]; };
+    if (t >= 16 && t < 34) { const q = (t - 16) / 18, e = E(q), [x, y] = arcB(e), spin = shake ? dir * e * 6.283 : 0; // vuela y da una vuelta entera
+      if (shake) for (let j = 3; j >= 1; j--) { const [gx, gy] = arcB(E(Math.max(0, q - j * .07))); spiritGhost('bote', col, rp.hi, gx, gy, dir * E(Math.max(0, q - j * .07)) * 6.283, .2 * (4 - j) / 3, faceR); }
+      drawSpirit('bote', col, rp.hi, x, y, { a: spin, flip: faceR }); }
+    // el vuelco: se asienta, coge aire, se inclina (en torno al labio) y al final se sacude y se endereza
+    const tilt = t < 34 ? 0 : t < 38 ? -.18 * Math.sin((t - 34) / 4 * Math.PI) : t < 46 ? (shake ? easeBack(clamp((t - 38) / 8, 0, 1)) : 1) * 1.95 : t < 56 ? 1.95 + Math.sin(t * .8) * .04 : t < 63 ? 1.95 + Math.sin((t - 56) * 2.2) * .22 * (1 - (t - 56) / 7) : t < 70 ? 1.95 * (1 - E((t - 63) / 7)) : 0;
+    const land = t >= 34 && t < 38 ? Math.sin((t - 34) / 4 * Math.PI) : 0, gone = clamp((t - 69) / 7, 0, 1);
+    // el charco y la corona de salpicaduras donde cae
+    if (t >= 43) { const q = clamp((t - 43) / 10, 0, 1), fade = 1 - clamp((t - 62) / 14, 0, 1), rx = Math.max(1, 17 * (shake ? easeBack(q) : 1)), ry = Math.max(1, 6.5 * (shake ? easeBack(q) : 1));
+      g.save(); g.globalAlpha = fade; g.fillStyle = rp.out || rp.sh; g.beginPath(); g.ellipse(ax, ay + 3, rx + 1, ry + 1, 0, 0, 6.29); g.fill(); g.fillStyle = rp.sh; g.beginPath(); g.ellipse(ax, ay + 3, rx, ry, 0, 0, 6.29); g.fill();
+      g.fillStyle = col; g.beginPath(); g.ellipse(ax - 1, ay + 2, Math.max(.5, rx - 1.5), Math.max(.5, ry - 1.5), 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(Math.round(ax - rx * .55), Math.round(ay - ry * .3 + 2), Math.round(rx * .5), 1); g.fillStyle = '#ffffff'; g.fillRect(Math.round(ax - rx * .45), Math.round(ay + 1), 2, 1);
+      for (let i = 0; i < 5; i++) { const a = i * 1.3 + 1, bx = ax + Math.cos(a) * (rx + 2), by = ay + 3 + Math.sin(a) * (ry + 1.5); g.fillStyle = col; if (q > .05) { g.beginPath(); g.ellipse(bx, by, 2 * q, 1.2 * q, 0, 0, 6.29); g.fill(); } } g.restore(); // gotas sueltas alrededor
+      if (shake && t < 50) { const c = (t - 43) / 7; for (let i = 0; i < 9; i++) { const a = Math.PI + i / 8 * Math.PI, X = Math.round(ax + Math.cos(a) * (6 + c * 8)), H = Math.round(Math.sin(c * Math.PI) * (4 + (i % 3) * 2)); g.fillStyle = i % 2 ? col : rp.hi; g.fillRect(X, Math.round(ay + 2 - H), 2, H); g.fillRect(X, Math.round(ay + 1 - H), 2, 2); } } // la corona
+      for (let i = 0; i < 18; i++) { const birth = 43 + (i % 6) * 2, age = t - birth; if (age < 0 || age > 20) continue; const a = -Math.PI * (.12 + (i * .41) % .76), sp = 1.3 + (i % 4) * .45; g.globalAlpha = 1 - age / 20; g.fillStyle = i % 3 ? col : rp.hi; g.fillRect(Math.round(ax + Math.cos(a) * sp * age * 1.2), Math.round(ay + Math.sin(a) * sp * age + .13 * age * age), i % 4 ? 2 : 1, 2); } g.globalAlpha = 1; }
+    // el chorro: sale del labio, se curva y cae; lleva tragos que bajan por él
+    if (t >= 40 && t < 59) { const head = clamp((t - 40) / 4, 0, 1), tail = clamp((t - 54) / 5, 0, 1), W = 4.2 * Math.min(1, (t - 40) / 3) * (1 - tail * .5);
+      const pt = q => { const u = 1 - q, cxp = lipX + dir * 9, cyp = lipY + 4; let X = u * u * lipX + 2 * u * q * cxp + q * q * (ax + dir), Y = u * u * lipY + 2 * u * q * cyp + q * q * (ay + 1); if (shake) X += Math.sin(t * .9 + q * 7) * q * 1.3; return [X, Y]; };
+      for (let i = 0; i < 16; i++) { const q0 = i / 16, q1 = (i + 1) / 16; if (q1 > head || q0 < tail) continue; const [x0, y0] = pt(q0), [x1, y1] = pt(q1), w = Math.max(1.5, W * (1 - q0 * .25));
+        pstroke(x0, y0, x1, y1, w + 2, rp.sh, 1, 0, false); pstroke(x0, y0, x1, y1, w, col, 1, 0, false); pstroke(x0 - dir, y0, x1 - dir, y1, 1, rp.hi, 1, 0, false); }
+      if (shake) for (let i = 0; i < 3; i++) { const q = ((t * .09 + i / 3) % 1); if (q > head || q < tail) continue; const [X, Y] = pt(q); g.fillStyle = col; g.beginPath(); g.ellipse(X, Y, W * .75 + 1, W * .75 + 1.5, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(Math.round(X - 1), Math.round(Y - 1), 1, 1); } } // los tragos
+    if (t >= 56 && t < 66) for (let i = 0; i < 3; i++) { const age = t - 56 - i * 3; if (age < 0) continue; g.fillStyle = col; g.fillRect(Math.round(lipX + dir * 2), Math.round(lipY + 2 + age * age * .35), 2, 3); } // las últimas gotas al sacudirlo
+    // la tapa sale disparada girando
+    if (t >= 38 && t < 62) { const age = t - 38, lx = lipX + dir * (10 + age * 1.6), ly = lipY - 4 - age * 3.2 + age * age * .22, sp = age * .45; g.save(); g.globalAlpha = 1 - clamp((age - 16) / 8, 0, 1); g.translate(Math.round(lx), Math.round(ly)); g.rotate(sp * dir);
+      g.fillStyle = KIT_INK; g.beginPath(); g.ellipse(0, 0, 11, Math.max(1.2, Math.abs(Math.cos(sp * 1.7)) * 4), 0, 0, 6.29); g.fill(); g.fillStyle = '#c9c4d4'; g.beginPath(); g.ellipse(0, 0, 10, Math.max(.6, Math.abs(Math.cos(sp * 1.7)) * 3), 0, 0, 6.29); g.fill(); g.fillStyle = '#f4f0ea'; g.fillRect(-7, -1, 6, 1); g.fillStyle = col; g.fillRect(5, -1, 3, 1); g.restore();
+      if (age < 5 && shake) { g.fillStyle = '#fff8e6'; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + (i - 2) * .5, d = 4 + age * 2.5; g.fillRect(Math.round(lipX + dir * 10 + Math.cos(a) * d), Math.round(lipY - 3 + Math.sin(a) * d), 2, 1); } } } // ¡pop!
+    // el bote: posado, volcado o desapareciendo
+    if (t >= 34 && gone < 1) { const kind2 = t >= 38 ? 'bote_abierto' : 'bote', sq = shake ? land * .2 : 0, sc = 1 - gone, twirl = gone * dir * 2;
+      drawSpirit(kind2, col, rp.hi, lipX, lipY + land * 2, { a: dir * tilt + twirl, flip: faceR, sx: (1 + sq) * sc, sy: (1 - sq) * sc, alpha: 1 - gone * .5 });
+      if (gone > 0 && gone < 1) paintRing(lipX + dir * 10, lipY + 8, gone, rp.hi, 20); }
+    if (t >= 44 && t < 76) { const q = (t - 44) / 32, real = Game.puzzle.real[s.target.sketch?.id]; if (real) { paintRing(ax, ay, q, C(s.target.sketch.color), 40);
+      if (shake) for (let i = 0; i < 8; i++) { const a = i * .785 + t * .1, d = 10 + q * 26; g.fillStyle = i % 2 ? '#fff8e6' : C(s.target.sketch.color); const X = Math.round(ax + Math.cos(a) * d), Y = Math.round(ay + Math.sin(a) * d * .6); g.fillRect(X - 1, Y, 3, 1); g.fillRect(X, Y - 1, 1, 3); } } } } // se vuelve real: estalla en su color
   if (k === 'trazar') { // el lápiz, enorme, se clava en la chincheta y arrastra la línea; saltan virutas y la línea vibra al tensarse
     const P = PROP.lapiz, img = propSprite('lapiz', C('amarillo')), [bx, by] = [s.aim2[0] - cx, s.aim2[1] - cy], d = s.draw || 0;
     if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); trail(q, 2, '#6a6480'); ghosts(q, 'lapiz', C('amarillo'), '#fff3c0', -.5); drawSpirit('lapiz', C('amarillo'), '#fff3c0', x, y, { a: fl(-.5), flip: faceR }); }
     if (t >= 30 && t < 78) { const x = lerp(ax, bx, d), y = lerp(ay + 2, by + 2, d); drawSpirit('lapiz', C('amarillo'), '#fff3c0', x, y, { a: (bx > ax ? .5 : -.5) + Math.sin(t * .9) * .05, flip: bx > ax });
       for (let i = 0; i < 5; i++) { const ph = ((t + i * 5) % 16) / 16; g.fillStyle = i % 2 ? '#e8cf9a' : '#4a4460'; g.fillRect(Math.round(x - 4 + i * 2 - ph * 6), Math.round(y - ph * 12 + ph * ph * 16), 2, 1); } }
     if (t >= 70 && t < 92) { const q = (t - 70) / 22, amp = Math.sin(q * Math.PI * 6) * (1 - q) * 3; for (const [px, py] of [[ax, ay], [bx, by]]) paintRing(px, py, q, '#6a6480', 14); if (shake) { g.fillStyle = '#9a98b0'; for (let i = 0; i <= 12; i++) { const f = i / 12; g.fillRect(Math.round(lerp(ax, bx, f)), Math.round(lerp(ay, by, f) + 3 + Math.sin(f * Math.PI) * amp), 1, 1); } } } }
-  if (k === 'borrar') { // una goma gigante baja y frota; se aplasta a cada pasada, las virutas rosas se amontonan y el grafito se levanta en motas
-    const img = propSprite('goma');
-    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q); ghosts(q, 'goma', null, '#ffd0dc', 0); drawSpirit('goma', null, '#ffd0dc', x, y, { a: Math.sin(q * Math.PI) * .3 }); }
-    if (t >= 30 && t < 78) { const rub = Math.sin((t - 30) * .55), sq = shake ? 1 + Math.abs(rub) * .14 : 1; drawSpirit('goma', null, '#ffd0dc', ax + rub * 12, ay + 4, { sx: sq, sy: 2 - sq, a: rub * .08 });
-      for (let i = 0; i < 10; i++) { const ph = ((t * 1.3 + i * 7) % 26) / 26, side = i % 2 ? 1 : -1; g.fillStyle = i % 3 ? '#e88aa0' : '#f4f0ea'; g.fillRect(Math.round(ax + side * (8 + ph * 14)), Math.round(ay - 4 + ph * 14 - Math.sin(ph * Math.PI) * 8), 2, 1); }
-      for (let i = 0; i < 4; i++) { const ph = ((t + i * 11) % 30) / 30; g.fillStyle = '#4a4460'; g.globalAlpha = 1 - ph; g.fillRect(Math.round(ax - 6 + i * 4), Math.round(ay - 6 - ph * 22), 1, 1); } g.globalAlpha = 1; }
-    if (t >= 30) { const n = Math.min(14, (t - 30) >> 2); for (let i = 0; i < n; i++) { g.fillStyle = i % 3 ? '#e88aa0' : '#c96a86'; g.fillRect(Math.round(ax - 14 + (i * 7) % 28), Math.round(ay + 7 + (i % 3)), 2, 1); } } } // montoncito de virutas
+  if (k === 'borrar') { // la goma cae de golpe, frota cada vez más rápido gastándose y ensuciándose, y al final sopla las virutas
+    const dir = faceR ? 1 : -1, W = 'goma', GL = '#ffd0dc';
+    if (t >= 16 && t < 30) { const q = (t - 16) / 14, [x, y] = arc(q), lift = q > .75 ? (q - .75) / .25 * 8 : 0; ghosts(q, W, null, GL, 0); drawSpirit(W, null, GL, x, y - lift, { a: Math.sin(q * Math.PI) * .35 * dir }); } // llega y coge altura
+    const ph = t >= 34 ? (t - 34) * (.42 + (t - 34) * .0075) : 0, amp = 11 + clamp((t - 34) / 30, 0, 1) * 4, wear = 1 - clamp((t - 34) / 34, 0, 1) * .2, scrubX = ax + Math.sin(ph) * amp;
+    if (t >= 30 && t < 34) { const q = (t - 30) / 4, y = lerp(ay - 16, ay + 4, q * q); drawSpirit(W, null, GL, ax, y, { sx: 1 - q * .1, sy: 1 + q * .25 }); } // ¡cae!
+    if (t >= 34 && t < 38 && shake) { const q = (t - 34) / 4; paintRing(ax, ay + 5, q, '#e88aa0', 22); for (let i = 0; i < 10; i++) { const a = -Math.PI * (i / 9), d = 4 + q * 16; g.fillStyle = i % 3 ? '#e88aa0' : '#f4f0ea'; g.fillRect(Math.round(ax + Math.cos(a) * d * 1.3), Math.round(ay + 4 + Math.sin(a) * d * .7 + q * q * 6), 2, 1); } } // el golpe: anillo y virutas
+    if (t >= 34 && t < 68) {
+      // papel limpio donde ya ha pasado: franjas claras sobre el garabato
+      g.save(); g.globalAlpha = .55 * clamp((t - 36) / 20, 0, 1); g.fillStyle = '#f4eee0'; for (let i = 0; i < 4; i++) { const yy = Math.round(ay - 4 + i * 3), w = Math.round(amp * 2 * clamp((t - 34 - i * 4) / 14, 0, 1)); g.fillRect(Math.round(ax - w / 2), yy, w, 1); } g.restore();
+      const land = t < 38 ? 1 - (t - 34) / 4 : 0, vel = Math.cos(ph), sq = shake ? Math.abs(vel) * .16 : 0; // se aplasta al invertir el sentido y se estira al correr
+      if (shake) for (let j = 2; j >= 1; j--) { const pj = Math.max(0, ph - j * .35); spiritGhost(W, null, GL, ax + Math.sin(pj) * amp, ay + 4, Math.cos(pj) * .2, .22 * (3 - j) / 2); }
+      drawSpirit(W, null, GL, scrubX, ay + 4 + Math.abs(Math.sin(ph * 2)) * -1, { sx: (1 + sq + land * .25) * wear, sy: (1 - sq - land * .2) * wear, a: vel * .22 });
+      g.save(); g.globalAlpha = clamp((t - 38) / 24, 0, 1) * .8; g.fillStyle = '#4a4460'; for (let i = 0; i < 6; i++) g.fillRect(Math.round(scrubX - 8 * wear + i * 3 * wear), Math.round(ay + 3), 2, 1); g.restore(); // se ensucia de grafito
+      for (let i = 0; i < 14; i++) { const q = ((t * 1.5 + i * 9) % 22) / 22, side = i % 2 ? 1 : -1, X = Math.round(scrubX + side * (7 + q * 16)), Y = Math.round(ay - 3 + q * 12 - Math.sin(q * Math.PI) * 10); g.globalAlpha = 1 - q * .6; g.fillStyle = i % 4 === 0 ? '#6a6480' : i % 3 ? '#e88aa0' : '#f4f0ea'; g.fillRect(X, Y, 1, 1); g.fillRect(X + 1, Y - 1, 1, 1); g.fillRect(X + 2, Y, 1, 1); } g.globalAlpha = 1; // virutas rizadas
+      for (let i = 0; i < 5; i++) { const q = ((t + i * 11) % 30) / 30; g.fillStyle = '#4a4460'; g.globalAlpha = 1 - q; g.fillRect(Math.round(ax - 8 + i * 4), Math.round(ay - 6 - q * 24), 1, 1); } g.globalAlpha = 1; } // el grafito se levanta en motas
+    // el montón de virutas; al final, un soplido se lo lleva
+    if (t >= 34) { const blow = clamp((t - 71) / 12, 0, 1), n = Math.min(18, (t - 34) >> 1); for (let i = 0; i < n; i++) { const bx = ax - 16 + (i * 7) % 32, by = ay + 7 + (i % 3), fly = blow * (20 + (i % 5) * 9); g.globalAlpha = 1 - blow; g.fillStyle = i % 3 ? '#e88aa0' : i % 2 ? '#c96a86' : '#f4f0ea'; g.fillRect(Math.round(bx + dir * fly * 1.6), Math.round(by - Math.sin(blow * Math.PI) * (4 + i % 4) - fly * .2), 2, 1); } g.globalAlpha = 1; }
+    if (t >= 68 && t < 84) { const q = (t - 68) / 16, hop = Math.sin(clamp(q * 1.6, 0, 1) * Math.PI) * 14, gone = clamp((q - .6) / .4, 0, 1);
+      if (gone < 1) drawSpirit(W, null, GL, ax - dir * 10 * q, ay + 4 - hop, { sx: wear * (1 - gone), sy: wear * (1 - gone) * (1 + Math.sin(q * 6) * .1), a: -dir * q * .6 }); // salta y se va
+      if (t >= 71 && t < 80 && shake) { const b = (t - 71) / 9; g.strokeStyle = '#fff8e6'; g.lineWidth = 1; for (let i = 0; i < 3; i++) { g.globalAlpha = (1 - b) * .9; g.beginPath(); g.arc(ax - dir * 20 + dir * b * 34, ay + 2 - i * 4, 6 + i * 2, dir > 0 ? -1.2 : 1.9, dir > 0 ? 1.2 : 4.3); g.stroke(); } g.globalAlpha = 1; } // el soplido
+      if (t >= 74) { const b = clamp((t - 74) / 10, 0, 1); for (let i = 0; i < 3; i++) { const X = Math.round(ax - 8 + i * 8), Y = Math.round(ay - 2 - (i % 2) * 5), r = Math.round(Math.sin(clamp(b * 1.4 - i * .15, 0, 1) * Math.PI) * 3); if (r <= 0) continue; g.fillStyle = '#fff8e6'; g.fillRect(X - r, Y, r * 2 + 1, 1); g.fillRect(X, Y - r, 1, r * 2 + 1); } } } } // ¡limpio! destellos
   if (k === 'aguada') { // el pincel se carga de agua y pinta una nube de acuarela; llueve, el charco se abre en ondas y la tinta se deshace en volutas grises
     const P = PROP.pincel, w = s.wash || 0, cloudK = clamp((t - 20) / 14, 0, 1), fade = t > 84 ? (96 - t) / 12 : 1;
     if (t >= 14 && t < 30) { const q = (t - 14) / 16, [x, y] = arc(q); trail(q, 3, '#9fd0ea'); ghosts(q, 'pincel', '#8ec8e8', '#e8f6fb', -.3); drawSpirit('pincel', '#8ec8e8', '#e8f6fb', x, y, { a: fl(-.3), flip: faceR }); }
@@ -579,13 +621,29 @@ const SPIRITS = {
   lapiz: { w: 58, h: 18, tip: [2, 15] },
   brocha: { w: 60, h: 30, tip: [4, 24] },
   pincel: { w: 56, h: 16, tip: [2, 13] },
+  bote: { w: 28, h: 31, tip: [3, 10] }, // el bote de pintura: la punta es el labio del borde, por donde se vuelca
+  bote_abierto: { w: 28, h: 31, tip: [3, 10] },
 };
 function spiritSprite(kind, color) {
   return cached('spirit2|' + kind + '|' + color, () => {
     const S = SPIRITS[kind], c = document.createElement('canvas'); c.width = S.w; c.height = S.h; const x = c.getContext('2d'), rp = ramp(color || '#c0c0c0');
     const F = (col, a, b, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); }, poly = (col, pts) => { x.fillStyle = col; x.beginPath(); pts.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); x.fill(); };
     const INK = '#241e32';
-    if (kind === 'goma') { // goma bicolor en tres cuartos: rosa y azul fieltro, funda de cartón impresa, bordes gastados
+    if (kind === 'bote' || kind === 'bote_abierto') { // bote de pintura de latón en tres cuartos: asa de alambre, etiqueta de su color, chorretones secos
+      const open = kind === 'bote_abierto', ell = (cx, cy, rx, ry, col, ring = 0) => { for (let yy = Math.floor(cy - ry - 1); yy <= cy + ry + 1; yy++) for (let xx = Math.floor(cx - rx - 1); xx <= cx + rx + 1; xx++) { const d = ((xx + .5 - cx) / rx) ** 2 + ((yy + .5 - cy) / ry) ** 2; if (d <= 1 && d >= ring) F(col, xx, yy); } };
+      for (let a = Math.PI; a <= 2 * Math.PI + .01; a += .05) { const hx = Math.round(14 + Math.cos(a) * 12), hy = Math.round(12 + Math.sin(a) * 10); F('#4a4460', hx, hy); F('#c9c4d4', hx, hy - 1); } // el asa
+      F(INK, 10, 0, 8, 4); F('#b0703a', 11, 1, 6, 2); F('#e0a060', 11, 1, 6, 1); // el mango de madera del asa
+      ell(14, 27, 12, 4, INK); for (let yy = 10; yy <= 27; yy++) { F(INK, 1, yy, 26, 1); }
+      for (let yy = 10; yy <= 27; yy++) for (let xx = 2; xx <= 25; xx++) F(xx < 5 ? '#f4f0ea' : xx < 8 ? '#dcd8e4' : xx > 22 ? '#8c8ab0' : '#c9c4d4', xx, yy);
+      ell(14, 27, 11, 3, '#8c8ab0'); for (let xx = 2; xx <= 25; xx++) F(xx < 5 ? '#f4f0ea' : xx < 8 ? '#dcd8e4' : xx > 22 ? '#8c8ab0' : '#c9c4d4', xx, 26);
+      F(INK, 2, 14, 24, 1); F(INK, 2, 23, 24, 1); for (let yy = 15; yy <= 22; yy++) for (let xx = 2; xx <= 25; xx++) F(xx < 6 ? rp.hi : xx > 21 ? rp.sh : rp.base, xx, yy); // la etiqueta
+      F('#fff8e6', 13, 16, 2, 1); F('#fff8e6', 12, 17, 4, 3); F('#fff8e6', 13, 20, 2, 1); F(rp.hi, 13, 18, 1, 1); // una gota blanca en la etiqueta
+      for (const [dx, len] of [[6, 8], [15, 11], [21, 5]]) { F(rp.sh, dx, 11, 2, len); F(rp.base, dx, 11, 1, len - 1); F(rp.hi, dx, len + 10, 2, 1); } // chorretones secos
+      ell(14, 10, 12.5, 4.5, INK); ell(14, 10, 11.5, 3.6, '#e8e4f0'); ell(14, 10, 11.5, 3.6, '#8c8ab0', .72); // el borde
+      if (open) { ell(14, 10.4, 9.6, 2.6, rp.sh); ell(14, 10.6, 9, 2.2, rp.base); F(rp.hi, 8, 9, 6, 1); F('#ffffff', 9, 9, 2, 1); F(rp.base, 3, 10, 2, 2); } // abierto: la pintura dentro
+      else { ell(14, 9.6, 10, 3, '#c9c4d4'); ell(14, 9.6, 5, 1.4, '#8c8ab0', .5); F('#f4f0ea', 7, 8, 7, 1); F(rp.base, 20, 8, 3, 1); } // la tapa, con pintura seca en el canto
+      F('#ffffff', 3, 16, 1, 5); F('#ffffff', 4, 12, 1, 2);
+    } else if (kind === 'goma') { // goma bicolor en tres cuartos: rosa y azul fieltro, funda de cartón impresa, bordes gastados
       const top = [[3,9],[9,3],[35,3],[29,9]], front = [[3,9],[29,9],[29,23],[3,23]], side = [[29,9],[35,3],[35,17],[29,23]];
       poly(INK, [[2,9],[9,2],[36,2],[36,17],[29,24],[2,24]]);
       poly('#e88a9e', front); poly('#f4b8c4', top); poly('#c46a82', side);
