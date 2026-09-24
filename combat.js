@@ -284,8 +284,9 @@ function planEnemy(u) {
   let target = pick(targets);
   if (u.ai === 'hunter') target = targets.slice().sort((a, b) => (a.hp / a.maxhp - b.hp / b.maxhp))[0];
   let kind = u.ai === 'tiznar' && u.acts % 2 === 0 ? 'tiznar' : 'attack';
+  if (u.ai === 'contrario' && u.acts % 2 === 1 && u.data.tech) kind = 'tech'; // los Contrarios alternan su herramienta y su técnica de color, como nosotros
   if (u.boss) kind = u.bossPhase === 1 ? (u.acts % 2 === 0 ? 'steal' : 'attack') : u.bossPhase === 2 ? (u.acts % 2 === 0 ? 'tide' : 'attack') : (u.acts % 3 === 2 ? 'erase' : 'tide');
-  const names = { attack: { round: 'Planchazo', splash: 'Saliva de tinta', tall: 'Embestida', blob: 'Ola de tinta' }[u.data.shape], tiznar: 'Tiznar', steal: 'Robar pigmento', tide: 'Marea negra', erase: 'Borrar el lienzo' };
+  const names = { tech: DATA.techs[u.data.tech]?.name, attack: { round: 'Planchazo', splash: 'Saliva de tinta', tall: 'Embestida', blob: 'Ola de tinta' }[u.data.shape], tiznar: 'Tiznar', steal: 'Robar pigmento', tide: 'Marea negra', erase: 'Borrar el lienzo' };
   u.intent = { kind, name: u.data.intentNames?.[kind] || names[kind], target, all: kind === 'tide' || kind === 'erase' }; u.warned = false;
 }
 // Only the next attacker asks for urgent attention. Frozen clocks and the

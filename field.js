@@ -36,7 +36,7 @@ function fieldGroups() {
 }
 function fieldTile(x, y) { return [(x + .5) * TILE, (y + .5) * TILE]; }
 function fieldTargets() {
-  const G = fieldGroups(), z = Game.puzzle, p = MAP.pz; if (!G || !z || Game.page === 1) return [];
+  const G = fieldGroups(), z = Game.puzzle, p = MAP.pz; if (!G || !z || Game.page >= 1) return [];
   const T = DATA.puzzle.things, list = [], thing = (id, kind, tiles, extra = {}) => { const cx = tiles.reduce((s, t) => s + t[0], 0) / tiles.length, cy = tiles.reduce((s, t) => s + t[1], 0) / tiles.length; list.push({ id, kind, name: T[kind].name, tiles, tx: tiles[0][0], ty: tiles[0][1], tw: 1, th: 1, x: (cx + .5) * TILE, y: (cy + .5) * TILE, ...extra }); };
   for (const s of G.scribbles) if (!z.erased[s.id]) thing(s.id, 'scribble', s.tiles);
   for (const q of G.pairs) { q.pins.forEach((pin, i) => thing(q.id + '#' + i, z.lines[q.id] ? 'line' : 'pin', [pin], { pair: q, pin: i })); if (z.lines[q.id]) thing(q.id + '#line', 'line', q.line, { pair: q }); }
@@ -259,7 +259,7 @@ function fieldInkTile(tx, ty, cx, cy) { const x = tx * TILE - cx, y = ty * TILE 
   const ink = (a, b) => fieldGroups().inkSet.has((tx + a) + ',' + (ty + b)); g.fillStyle = '#f2e8d2'; // borde de papel rasgado donde la tinta toca el suelo
   for (let i = 0; i < 16; i += 3) { if (!ink(0, -1)) g.fillRect(x + i, y - 1 + (i % 2), 2, 1); if (!ink(0, 1)) g.fillRect(x + i + 1, y + 16 - (i % 2), 2, 1); if (!ink(-1, 0)) g.fillRect(x - 1 + (i % 2), y + i, 1, 2); if (!ink(1, 0)) g.fillRect(x + 16 - (i % 2), y + i + 1, 1, 2); } }
 function drawFieldPuzzle(ents, cx, cy, pal) {
-  const G = fieldGroups(); if (!Game.puzzle || !G || Game.page === 1) return;
+  const G = fieldGroups(); if (!Game.puzzle || !G || Game.page >= 1) return;
   const z = Game.puzzle, p = MAP.pz, s = OW.fieldCast, vis = (tx, ty) => tx * TILE - cx > -32 && tx * TILE - cx < W + 16 && ty * TILE - cy > -32 && ty * TILE - cy < H + 16;
   for (const [tx, ty] of p.ink) if (vis(tx, ty)) fieldInkTile(tx, ty, cx, cy);
   // garabatos: una maraña de grafito sobre el suelo; la goma la va levantando

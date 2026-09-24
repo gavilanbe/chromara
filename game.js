@@ -425,6 +425,7 @@ function walkable(px, py) { // hitbox pies 8×6
 // cannot repeatedly restart the cues. Returning from combat resumes the phrase.
 function worldCue() {
   if (Game.page === 1) return typeof CHAPTER !== 'undefined' && CHAPTER.complete ? 'restored' : 'atelier';
+  if (Game.page === 2) return typeof CHAPTER !== 'undefined' && CHAPTER.complete2 ? 'restored' : 'prelude'; // el agua sucia suena por debajo del color
   if (Game.palette === 'vivo') return 'restored';
   return OW.x >= 28 * TILE && OW.y >= 16 * TILE ? 'atelier' : 'map';
 }
@@ -554,7 +555,7 @@ function drawOverworld() {
   for (let ty = cy / TILE | 0; ty <= (cy + H) / TILE + 1; ty++) for (let tx = cx / TILE | 0; tx <= (cx + W) / TILE; tx++) {
     const ch = tileAt(tx, ty); if (pageEdgeAt(tx, ty)) { g.drawImage(pageEdgeTile(tx, ty), tx * TILE - cx, ty * TILE - cy); continue; } // el borde de la hoja
     g.drawImage(groundTile(tx, ty, pal, ch === '~' ? wf : 0), tx * TILE - cx, ty * TILE - cy);
-    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => { const spr = treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7, Game.page === 1 ? null : worldRegion(tx, ty)), X = tx * TILE - cx, Y = ty * TILE - 8 - cy, sw = Prefs.shake ? Math.sin(OW.t * .025 + tx * .6 + ty * .4) : 0; // el viento mece las cerdas: la punta más que el mango
+    if (ch === 'T' && ty < MAP.h) ents.push({ y: ty * TILE + TILE, draw: () => { const spr = treeSprite(pal, tileAt(tx - 1, ty) === 'T', tileAt(tx + 1, ty) === 'T', hash2(tx, ty) & 7, Game.page >= 1 ? null : worldRegion(tx, ty)), X = tx * TILE - cx, Y = ty * TILE - 8 - cy, sw = Prefs.shake ? Math.sin(OW.t * .025 + tx * .6 + ty * .4) : 0; // el viento mece las cerdas: la punta más que el mango
       g.drawImage(spr, 0, 0, 16, 6, X + Math.round(sw * 1.4), Y, 16, 6); g.drawImage(spr, 0, 6, 16, 7, X + Math.round(sw * .6), Y + 6, 16, 7); g.drawImage(spr, 0, 13, 16, 11, X, Y + 13, 16, 11); } });
   }
   drawRegionDetails(cx, cy); drawWorldGround(g, cx, cy, pal); drawFootprints(cx, cy);
@@ -1484,7 +1485,7 @@ function drawTitle() {
 }
 function drawDebug() {
   win(W - 124, 24, 120, 70, { solid: 'rgba(11,9,18,0.85)' }); txt('DEBUG', W - 114, 28, '#f2c93a');
-  [Game.page === 1 ? '7-9/N: lucha' : '1-6/B: batalla', 'H: curar', 'F: ATB lleno', 'K: enemigos 1HP', 'C: paleta', 'W: Active/Wait'].forEach((s, i) => txt(s, W - 114, 38 + i * 9, '#b8b4cc'));
+  [Game.page === 2 ? 'Contrarios: m v o / X' : Game.page === 1 ? '7-9/N: lucha' : '1-6/B: batalla', 'H: curar', 'F: ATB lleno', 'K: enemigos 1HP', 'C: paleta', 'W: Active/Wait'].forEach((s, i) => txt(s, W - 114, 38 + i * 9, '#b8b4cc'));
 }
 addEventListener('keydown', e => {
   if (!Game.debug) return; const k = e.key.toUpperCase();

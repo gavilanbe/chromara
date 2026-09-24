@@ -23,7 +23,7 @@ const ctx = vm.createContext({
   Audio: new Proxy({ positions:{}, muted:false, sfx:noop, play:noop, init:noop, prepare:noop, stop:noop, bend:noop }, {get:(o,k)=>o[k] || noop}), SFX:{ambient:noop}, MUSIC:{},
 });
 ctx.window = ctx; ctx.Math.random = () => .5;
-for (const file of ['data.js','font.js','sprites.js','world_art.js','rinse.js','field.js','scene.js','gui.js','battle.js','attacks.js','combat.js','battle_ui.js','settings.js','mobile.js','chapter_art.js','chapters.js','game.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
+for (const file of ['data.js','font.js','sprites.js','world_art.js','rinse.js','field.js','scene.js','gui.js','battle.js','ink_transition.js','attacks.js','combat.js','battle_ui.js','settings.js','mobile.js','chapter_art.js','chapters.js','game.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
 const run = code => vm.runInContext(code,ctx);
 function scenario(group='5') {
   run(`resetGame(); Game.overlay = null; initBattle(OW.foes.find(f=>f.key==='${group}') || {...OW.foes[0],key:'${group}',enemies:DATA.encounters['${group}'],boss:'${group}'==='B'}); B.gen=null; B.tr=null; B.phase='fight'; B.fightStart=-100; Game.state='battle'; B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;}); B.unitScale=1; B.propScale=1; camSet(SCENE.rest); projectUnits(); B.party.forEach(u=>u.atb=100); ATB_ACTIVE=false; Prefs.speed=1;`);
@@ -79,5 +79,42 @@ test('the complete new boss can be beaten with the shared combat and finite star
 });
 test('reduced motion still completes the same trip and leaves input neutral',()=>{
  run('Prefs.shake=0;OW.msg=null');travel(0);assert.equal(run('OW.vx+OW.vy'),0);assert.equal(run('CHAPTER.turn'),null);
+});
+test('the third leaf opens after the Devoralíneas, and its bridges only after the three Contrarios',()=>{
+ run(`resetGame();Game.intro=false;OW.msg=null;`);travel(1);
+ assert.equal(run('chapterPortals().some(p=>p.to===2)'),false,'the forward fold shows before the boss falls');
+ run(`CHAPTER.complete=true;`);assert.equal(run('chapterPortals().some(p=>p.to===2)'),true);
+ travel(2);assert.equal(run('MAP.paper'),'#7c8272');assert.equal(run('OW.msg&&OW.msg.lines[0]'),'El agua sucia');run('OW.msg=null');
+ // every lair and the back fold are reachable from the arrival; the island is sealed
+ const reach=run(`(()=>{const seen=new Set(),q=[[OW.x,OW.y]];for(let n=0;n<q.length;n++){const [x,y]=q[n];for(const [dx,dy] of [[4,0],[-4,0],[0,4],[0,-4]]){const a=x+dx,b=y+dy,k=a+','+b;if(a<8||a>632||b<8||b>472||seen.has(k)||!walkable(a,b))continue;seen.add(k);q.push([a,b]);}}
+  const near=(x,y)=>q.some(([a,b])=>Math.hypot(a-x,b-y)<24);return {lairs:CONTRA_LAIRS.map(l=>near(l.x*16+8,l.y*16+12)),fold:near(chapterPortal(1).x,chapterPortal(1).y),island:near(20*16+8,14*16+12)};})()`);
+ assert.deepEqual(Array.from(reach.lairs),[true,true,true]);assert(reach.fold);assert.equal(reach.island,false);
+ run(`['m','v','o'].forEach(k=>Game.defeated.add(k));`);assert.equal(run('walkable(20*16+8,10*16)'),true,'the bridges stay sealed');
+ for(const k of ['m','v','o','X'])assert(run(`OW.foes.some(f=>f.key==='${k}')`),k);assert(run(`OW.foes.find(f=>f.key==='X').boss`));
+ travel(1);travel(2);assert.equal(run('Game.page'),2);
+});
+test('each Contrario is its painter reversed: doubled colour both ways, its own tool and its colour technique',()=>{
+ for(const [hero,contra] of [['rojo','moho'],['amarillo','moraton'],['azul','naranja']]) { const c=contra==='naranja'?'oxido':contra; assert.equal(run(`colorMult('${hero}','${c}')`),2);assert.equal(run(`colorMult('${c}','${hero}')`),2); }
+ for(const key of ['m','v','o']){
+  run(`Party.forEach(p=>{const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'${key}',enemies:DATA.encounters['${key}'],boss:false});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();`);
+  const id=run('B.enemies[0].id');assert(run(`!!B.enemies[0].data.weapon&&!!B.enemies[0].data.tech`),id);
+  for(const kind of ['attack','tech']){const hp=run('B.party.reduce((a,u)=>a+u.hp,0)');
+   run(`(()=>{const u=B.enemies[0];u.acts=${kind==='tech'?1:0};planEnemy(u);if(u.intent.kind!=='${kind}')throw Error('intent '+u.intent.kind);B.actQueue.push(tracked(u,actEnemy(u),[u],{type:'enemy'}));})()`);
+   for(let i=0;run('B.actions.length||B.actQueue.length');i++){if(i>2000)throw Error(id+' '+kind+' never ends');run('updateBattle();render();');}
+   assert(run('B.party.reduce((a,u)=>a+u.hp,0)')<hp,id+' '+kind+' did no damage');assert.equal(run('B.currentAction'),null);
+   run('B.party.forEach(u=>{u.hp=u.maxhp;u.alive=true;u.pose="idle";})');}
+ }
+});
+test('El Negro fuses the three, changes with its phases and can be beaten with the shared combat',()=>{
+ run(`Game.inventory={...DATA.inventory};Party.forEach((p,i)=>{p.weapon=DATA.party[i].weapon;p.acc=DATA.party[i].acc;const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'X',enemies:DATA.encounters.X,boss:true});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();var boss=B.enemies[0];`);
+ run(`boss.hp=Math.ceil(boss.maxhp*.67);bossPhaseCheck(boss);render();`);assert(run('unitSpriteInfo(boss,0).spr.__key.includes("el_negro_2")'));
+ run(`boss.hp=boss.maxhp;boss.bossPhase=1;`);
+ const result=run(`(()=>{for(let f=0;f<60000&&B.phase==='fight';f++){
+  if(B.menu&&!B.currentAction){const u=B.menu.unit,dead=B.party.find(p=>!p.alive),weak=alive(B.party).sort((a,b)=>a.hp/a.maxhp-b.hp/b.maxhp)[0];let p={type:'attack'},t=alive(B.enemies)[0];
+   if(dead&&Game.inventory.savia){p={type:'item',item:'savia'};t=dead;}else if(weak.hp<weak.maxhp*.55&&Game.inventory.gota_agua){p={type:'item',item:'gota_agua'};t=weak;}
+   if(!executeCommand(u,p,[t]))throw Error('Cannot perform selected action');}
+  updateBattle();if(f%9===0)render();}return {phase:B.phase,hp:B.party.map(p=>p.hp),boss:B.enemies[0].hp};})()`);
+ assert.equal(result.phase,'victory',JSON.stringify(result));
+ run(`setState('overworld');Game.page=2;OW.msg=null;chapterWon({boss:true,key:'X'});`);assert(run('CHAPTER.complete2'));assert.equal(run('Game.palette'),'vivo');
 });
 console.log(tests+' shared-book integration checks passed.');

@@ -8,6 +8,7 @@ const SEMI = { carmin: 0, ambar: 4, anil: 7 }; // cada gota tiene su nota: acord
 const semiOf = u => ({ semi: SEMI[u.id] ?? -5 });
 let ATB_ACTIVE = true; const ATB_RATE = .055; // Active: todos los menús. Wait: pausa sólo en técnicas, objetos y objetivos.
 function colorMult(atkCol, defCol) {
+  atkCol = DATA.colors[atkCol]?.base || atkCol; defCol = DATA.colors[defCol]?.base || defCol; // los colores podridos cuentan como su color puro
   if (atkCol === 'blanco') return defCol === 'negro' ? 3 : 1.5;
   if (defCol === 'negro') return 1;
   if (DATA.complement[atkCol] === defCol) return 2;
@@ -261,10 +262,11 @@ function drawBossEntrance(T, fx0, fy0, front) {
   if (rise) { if (k > .6 && k < .8 && Prefs.flash) { const q = (k - .6) / .2; g.save(); g.globalAlpha = (1 - q) * .8; g.fillStyle = '#efe4bf'; g.beginPath(); g.ellipse(fx0, fy0 - 18, 6 + q * 40, 3 + q * 16, 0, 0, 6.29); g.fill(); g.restore(); } } // los ojos se abren
   // el rótulo: LA TINTA, estampado a brocha con su lema
   const tk = rise ? clamp((k - .55) / .2, 0, 1) : 1, fade = rise ? 1 : clamp(1 - (T.dlg ? (T.dlg.i > 0 ? 1 : T.dlg.t / 40) : 0), 0, 1);
-  if (tk > 0 && fade > 0) { const title = 'LA TINTA', w = rotuloWidth(title) + 40, x = Math.round((W - w) / 2), y = 22, pop = sh ? Math.max(0, 1 - tk) * 10 : 0;
+  const bossData = DATA.enemies[T.foe.enemies[0]] || {}, epithet = bossData.epithet || 'la que trazó Chromara';
+  if (tk > 0 && fade > 0) { const title = (bossData.name || 'La Tinta').toUpperCase(), w = rotuloWidth(title) + 40, x = Math.round((W - w) / 2), y = 22, pop = sh ? Math.max(0, 1 - tk) * 10 : 0;
     g.save(); g.globalAlpha = fade; g.translate(W / 2, y + 10); g.scale(1 + pop * .05, 1 + pop * .05); g.translate(-W / 2, -y - 10);
     brushBand(x + 2, y + 3, w, 20, '#0b0912'); brushBand(x, y, w, 20, '#1e1a2c'); brushBand(x + 4, y + 16, w - 8, 3, '#8c3a8a'); bigText(title, x + 20, y + 5, '#dbbae8', { outline: '#0b0912', progress: tk * (w - 40) + 1 });
-    smallText('la que trazó Chromara', Math.round(W / 2 - textWidth('la que trazó Chromara') / 2), y + 25, '#b8a8c8'); g.restore(); }
+    smallText(epithet, Math.round(W / 2 - textWidth(epithet) / 2), y + 25, '#b8a8c8'); g.restore(); }
 }
 // Borrón liso de tinta (sin dedos): la cara de la Tinta en su retrato
 function inkBlob(x, y, R, t, seed = 1, col = '#0b0912') {
@@ -661,13 +663,13 @@ function* victoryGen() {
     yield;
   }
   rf.dur = 0;
-  if (typeof chapterWon === 'function' && Game.page === 1) chapterWon(B.foe);
+  if (typeof chapterWon === 'function' && Game.page >= 1) chapterWon(B.foe);
   else if (B.foe.boss) { Game.bossDown = true; Game.palette = 'vivo'; Audio.sfx('saturate'); Party.forEach(p => { const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; }); OW.msg = { lines: DATA.texts.ending, t: 0 }; }
   OW.cam.x = camX; OW.cam.y = camY; OW.vx = OW.vy = 0; OW.bob = 0; if (Party.some(q => q.cur.hp < effStats(q).hp * .6 || q.cur.mp < effStats(q).mp * .3)) OW.hint = 150; setState('overworld'); Audio.play(worldCue(), { resume: true });
 }
 function resetGame() {
-  if (typeof CHAPTER !== 'undefined' && Game.page === 1) chapterInstall(0);
-  if (typeof CHAPTER !== 'undefined') { CHAPTER.turn=null;CHAPTER.pages=[];CHAPTER.complete=false;CHAPTER.visited=new Set([0]); }
+  if (typeof CHAPTER !== 'undefined' && Game.page >= 1) chapterInstall(0);
+  if (typeof CHAPTER !== 'undefined') { CHAPTER.turn=null;CHAPTER.pages=[];CHAPTER.complete=false;CHAPTER.complete2=false;CHAPTER.visited=new Set([0]); }
   Game.pigmento = 0; Game.palette = 'gris'; Game.inventory = { ...DATA.inventory }; Game.defeated = new Set(); Game.bossDown = false; Game.ended = false; Game.owned = {}; Game.puzzle = PUZ0();
   Game.studies = {}; Game.techLevels = {}; Game.seenTechs = new Set();
   Party.forEach((p, i) => { p.weapon = DATA.party[i].weapon; p.acc = DATA.party[i].acc; const s = effStats(p); p.cur.hp = s.hp; p.cur.mp = s.mp; });

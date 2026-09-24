@@ -72,7 +72,7 @@ function worldGroundPalette(tx, ty, pal) {
   const tint = rgbHex(...sum.map(v => Math.round(v / Math.max(.00001, total) / 6) * 6));
   const key = pal + '|' + tint;
   if (!WORLD_ART.palettes.has(key)) {
-    const paper = Game.page === 1 && pal === 'gris' ? worldMix('#81778f', tint, .24) : worldMix(pal === 'vivo' ? '#f4e7c9' : '#d0c5ac', tint, pal === 'vivo' ? .66 : .40);
+    const paper = Game.page >= 1 && pal === 'gris' ? worldMix(MAP.paper || '#81778f', tint, .24) : worldMix(pal === 'vivo' ? '#f4e7c9' : '#d0c5ac', tint, pal === 'vivo' ? .66 : .40);
     WORLD_ART.palettes.set(key, { ...PAL[pal], key,
       grass: paper, grass2: worldMix(paper, '#776c72', .10), grassHi: worldMix(paper, '#fff6d6', .25),
       grassDk: worldMix(paper, '#74745e', .32), hatch: worldMix(paper, '#827474', .17),
@@ -319,7 +319,7 @@ function drawFootprints(cx,cy){
 }
 // Motas de pigmento en el aire: suben despacio y toman el color de la región por la que pasan. Son función de OW.t.
 function drawPigmentMotes(cx,cy,pal){
-  if(!Prefs.shake||Game.page===1)return;
+  if(!Prefs.shake||Game.page>=1)return;
   for(let i=0;i<18;i++){const sp=.12+(i%5)*.04,life=H+40,ph=(OW.t*sp+i*47)%life,x=Math.round(((i*73+Math.sin(OW.t*.01+i)*14)%W+W)%W),y=Math.round(H+10-ph);
     const r=worldRegion((x+cx)/TILE|0,(y+cy)/TILE|0),col=worldPigment(r.color,pal,r.drained);g.globalAlpha=.45*Math.sin(ph/life*Math.PI);g.fillStyle=i%3?col:'#fff6e2';g.fillRect(x,y,i%4===0?2:1,i%4===0?2:1);}
   g.globalAlpha=1;
@@ -413,7 +413,7 @@ function pageEdgeTile(tx, ty) {
 function pageEdgeAt(tx, ty) { return Game.page !== 1 && (tx === 0 || ty === 0 || tx === MAP.w - 1 || ty === MAP.h - 1); }
 // ---- Detalles de región sobre el suelo: la Tinta ha manchado el Tiznal y el Atelier está sobre una hoja pautada.
 function drawRegionDetails(cx, cy) {
-  if (Game.page === 1) return;
+  if (Game.page >= 1) { if (Game.page === 2 && typeof drawDirtyWater === 'function') drawDirtyWater(cx, cy); return; }
   const x0 = cx / TILE | 0, y0 = cy / TILE | 0, ink = MAP.pz ? fieldGroups().inkSet : new Set();
   for (let ty = y0; ty <= y0 + 12; ty++) for (let tx = x0; tx <= x0 + 20; tx++) {
     if (pageEdgeAt(tx, ty) || tx < 0 || ty < 0 || tx >= MAP.w || ty >= MAP.h) continue;
