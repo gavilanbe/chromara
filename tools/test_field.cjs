@@ -10,6 +10,7 @@ function cast(id){return run(`(()=>{openRing();OW.ring.idx=FIELD.findIndex(a=>a.
 function open(){run(`(()=>{OW.msg=null;pressed.ok=true;updateOverworld();let n=0;while(OW.act){if(++n>200)throw Error("chest");if(OW.act.next().done)OW.act=null;}OW.msg=null;})()`);}
 function reach(tx,ty){return run(`(()=>{const nx=MAP.w*4,ny=MAP.h*4,st=[Math.round(MAP.spawn[0]*4+2),Math.round(MAP.spawn[1]*4+3)],seen=new Set([st[1]*nx+st[0]]),q=[st];for(let i=0;i<q.length;i++){const [x,y]=q[i];for(const [a,b] of [[1,0],[-1,0],[0,1],[0,-1]]){const X=x+a,Y=y+b,k=Y*nx+X;if(X<0||Y<0||X>=nx||Y>=ny||seen.has(k)||!walkable(X*4,Y*4))continue;seen.add(k);q.push([X,Y]);}}return q.some(([a,b])=>Math.abs(a*4-(${tx}*16+8))<6&&Math.abs(b*4-(${ty}*16+8))<6);})()`);}
 const ok=r=>{assert(!r.refused,r.notice);return r;};
+const FIELD_INV_EXPECTED=40;
 test('every art is owned by a painter and costs paint',()=>{fresh();for(const [id,users,mp] of run('FIELD.map(a=>[a.id,a.users.join(),a.mp])'))assert(users&&mp>0,id);});
 test('the route: Refugio → Prado → Jardín → Colinas → Tiznal, each step opened by its art',()=>{
  fresh();
@@ -66,5 +67,11 @@ test('with two places around, arrows cycle between them and tapping a place cast
  const empty=['up','right','down','left'].find(d=>!dirs.includes(d));if(empty){run(`pressed.${empty}=true;updateRing();pressed.${empty}=false;`);assert(dirs.includes(run('OW.ring.aimDir')),'an empty direction moves to another valid place');}
  const aimed=run('OW.ring.aimDir');run('OW.ring.t+=20;UI_HITS.length=0;drawRing();UI_HITS.filter(h=>h.w>6&&h.y>40&&h.y<130)[0].run()');assert.notEqual(run('OW.ring.aimDir'),aimed,'tapping another place re-aims');assert.equal(run('!!OW.act'),false);
  run('UI_HITS.length=0;drawRing();UI_HITS.filter(h=>h.w>6&&h.y>40&&h.y<130).pop().run()');assert.equal(run('!!OW.act'),true,'tapping the aimed place casts');run('OW.act=null');
+});
+test('the invocation (compass, wash, the tool sketched then painted, flight, bloom, paint coming back) draws every frame, with and without motion',()=>{
+ for(const shake of [1,0]){fresh();run(`Prefs.shake=${shake}`);stand(10,22,'right');
+  const frames=run(`(()=>{openRing();OW.ring.idx=FIELD.findIndex(a=>a.id==='borrar');fieldCast();let n=0,born=0;while(OW.act){if(++n>300)throw Error('never');if(OW.fieldCast&&OW.fieldCast.inv>=38&&OW.fieldCast.t<0)born++;drawOverworld();if(OW.act.next().done)OW.act=null;}return [n,born];})()`);
+  assert(frames[0]>FIELD_INV_EXPECTED,'the invocation is part of the cast');assert(frames[1]>0,'the tool is born before it flies');}
+ run('Prefs.shake=1');
 });
 console.log(checks+' field magic checks passed.');
