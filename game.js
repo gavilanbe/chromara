@@ -687,7 +687,37 @@ function logoTip(ch, progress) {
   return { x: lerp(segment.from[0], segment.to[0], k), y: lerp(segment.from[1], segment.to[1], k), lift: segment.lift ? Math.sin(k * Math.PI) * 4 : 0, angle: Math.atan2(segment.to[1] - segment.from[1], segment.to[0] - segment.from[0]) };
 }
 // La letra terminada: un búfer de tonos pintado cerda a cerda a lo largo del esqueleto.
+// Pintura espesa y brillante: el trazo se estampa con discos redondos (se ve gordo y blando), y cada píxel se sombrea
+// por su profundidad dentro del trazo, con la luz arriba a la izquierda: canto oscuro abajo, loma clara y un brillo
+// húmedo. Así la letra parece gel de pintura recién puesto, no un brochazo seco.
+function logoGoo(ch, col) {
+  return cached(`logo3|${ch}|${col}`, () => {
+    const { gw, gh } = LOGO, rp = ramp(col), m = new Uint8Array(gw * gh), set = (x, y) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < gw && y < gh) m[y * gw + x] = 1; };
+    logoSkeleton(ch).forEach(pts => { for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]), dir = Math.atan2(b[1] - a[1], b[0] - a[0]), r = 2.7 + .9 * Math.abs(Math.sin(dir - .78));
+      for (let s = 0; s <= l; s += .35) { const px = lerp(a[0], b[0], s / l), py = lerp(a[1], b[1], s / l); for (let yy = -4; yy <= 4; yy++) for (let xx = -4; xx <= 4; xx++) if (xx * xx + yy * yy <= r * r) set(px + xx, py + yy); } } });
+    // la pintura se acumula abajo: gotas gordas en los pies de la letra
+    for (const [x, y] of POOLS[ch] || []) for (let yy = -3; yy <= 1; yy++) for (let xx = -4; xx <= 4; xx++) if (xx * xx / 16 + (yy + 1) * (yy + 1) / 5 <= 1) set(x + xx, y - 1 + yy);
+    // profundidad: distancia al borde (4 vecinos)
+    const d = new Uint8Array(gw * gh); for (let i = 0; i < d.length; i++) d[i] = m[i] ? 99 : 0;
+    for (let pass = 0; pass < 2; pass++) for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) { const i = pass ? (gh - 1 - y) * gw + (gw - 1 - x) : y * gw + x; if (!m[i]) continue; const X = i % gw, Y = i / gw | 0, nb = pass ? [[1, 0], [0, 1]] : [[-1, 0], [0, -1]];
+      for (const [dx, dy] of nb) { const a = X + dx, b = Y + dy, v = a < 0 || b < 0 || a >= gw || b >= gh ? 0 : d[b * gw + a]; if (v + 1 < d[i]) d[i] = v + 1; } }
+    const D = (x, y) => x < 0 || y < 0 || x >= gw || y >= gh ? 0 : d[y * gw + x];
+    const c = document.createElement('canvas'); c.width = gw; c.height = gh; const x = c.getContext('2d'), F = (colr, a, b) => { x.fillStyle = colr; x.fillRect(a, b, 1, 1); };
+    for (let y = 0; y < gh; y++) for (let a = 0; a < gw; a++) { const v = D(a, y);
+      if (!v) { if (D(a - 1, y) || D(a + 1, y) || D(a, y - 1) || D(a, y + 1)) F(rp.out, a, y); continue; }
+      const gx = D(a + 1, y) - D(a - 1, y), gy = D(a, y + 1) - D(a, y - 1), light = -(gx + gy); // mira a la luz si la profundidad crece hacia abajo-derecha
+      let colr = rp.base;
+      if (v === 1) colr = light > 0 ? rp.hi : light < 0 ? rp.dk : rp.sh;
+      else if (v === 2 && light > 0) colr = rp.hi;
+      else if (light < 0 && v <= 2) colr = rp.sh;
+      F(colr, a, y); }
+    // brillo húmedo: una raya clara sobre la loma, arriba a la izquierda de cada trazo
+    for (let y = 1; y < gh - 1; y++) for (let a = 1; a < gw - 1; a++) { const v = D(a, y); if (v >= 2 && D(a - 1, y) < v && D(a, y - 1) < v && D(a + 1, y + 1) >= v) F(rp.spec, a, y); }
+    c.__key = `logo3|${ch}|${col}`; return c;
+  });
+}
 function logoLetter(ch, col) {
+  if (ch !== 'O') return logoGoo(ch, col);
   return cached(`logo2|${ch}|${col}`, () => {
     const { gw, gh } = LOGO, rp = ramp(col), tone = new Array(gw * gh).fill(null), set = (x, y, v) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < gw && y < gh) tone[y * gw + x] = v; };
     const hash = n => { let h = (n * 2654435761 + ch.charCodeAt(0) * 97) >>> 0; h ^= h >>> 13; return (h * 1274126177 >>> 0) % 1000 / 1000; };
@@ -760,12 +790,15 @@ function drawLogo(t, x0, y0) {
     if (k <= 0) continue;
     const settled = clamp(age / 34, 0, 1), pool = 1 - Math.pow(1 - settled, 3);
     if (pool > 0) { g.save(); g.globalAlpha = .16; g.fillStyle = rp.base; g.beginPath(); g.ellipse(x + 14, baseY + 3, 12 + pool * 4, 2 + pool * 2, 0, 0, Math.PI * 2); g.fill(); g.restore(); g.fillStyle = rp.sh; g.beginPath(); g.ellipse(x + 14, baseY + 2, 5 + pool * 9, 1 + pool * 1.4, 0, 0, Math.PI * 2); g.fill(); g.fillStyle = rp.hi; g.fillRect(x + 9, baseY + 1, 3, 1); }
+    if (age > -LOGO_BEATS.stroke) { const r = seeded(900 + i * 31); g.save(); for (let n = 0; n < 8; n++) { const px = x + 14 + (r() - .5) * 44, py = ly + 6 + r() * 40 - 8, rr = .7 + r() * 1.7; if (age + LOGO_BEATS.stroke < n * 2 + 2) continue; g.globalAlpha = .32; g.fillStyle = rp.base; g.beginPath(); g.arc(px, py, rr, 0, 6.29); g.fill(); if (rr > 1.6) g.fillRect(Math.round(px + rr + 1), Math.round(py), 1, 1); } g.restore(); } // salpicaduras en la hoja
     const recoil = age >= 0 ? Math.sin(age * .43) * Math.exp(-age / 8) * motion : 0, sy = 1 - recoil * .2, wob = recoil * 1.5;
     const spr = logoPaint(ch, col, k), raid = titleRaid(t), drain = raid && raid.L === i ? raid.drain : 0;
     if (drain > 0) { g.save(); g.globalAlpha = .7 * drain; g.drawImage(logoGraphite(ch), x, ly); g.restore(); }
     g.save(); g.globalAlpha *= 1 - drain;
-    g.save(); g.globalAlpha *= .16; g.drawImage(spr, x + 1, ly + 2); g.restore();
-    drawGooey(spr, x, ly, wob, sy, age * .18);
+    const land = titleLandKick(i, t), wob2 = wob + land * 1.8 * motion, sy2 = sy - land * .12 * motion;
+    g.save(); g.globalAlpha *= .35; g.drawImage(spr, x + 1, ly + 2); g.restore(); // espesor: la pintura hace bulto
+    drawGooey(spr, x, ly, wob2, sy2, age * .18);
+    const pair = TITLE_PAINTERS[TITLE.cols[i]]; if (pair.length > 1 && age < 34) { const mk = clamp(age / 34, 0, 1); g.save(); g.globalAlpha *= 1 - mk * mk; drawGooey(logoMarble(ch, pair, spr, t), x, ly, wob2, sy2, age * .18); g.restore(); } // vetas de los dos colores antes de fundirse
     g.restore();
     // las secundarias nacen de una mezcla: dos gotas de los pigmentos se juntan en la letra y florecen en su color
     const mixOf = TITLE_PAINTERS[TITLE.cols[i]]; if (mixOf.length > 1 && age >= 0 && age < 22) { const q = clamp(age / 10, 0, 1); if (age < 10) mixOf.forEach((id, n) => paintDab(Math.round(x + 14 + (n ? 1 : -1) * 12 * (1 - q)), Math.round(ly + 16 - Math.sin(q * Math.PI) * 7), 3, C(TITLE_HOME[id].col))); else paintRing(x + 14, ly + 16, (age - 10) / 12, col, 18); }
@@ -774,28 +807,73 @@ function drawLogo(t, x0, y0) {
       for (let n = 0; n < 9; n++) { const dx = (rnd() - .5) * 30, speed = .4 + rnd() * .9, launchY = 8 + rnd() * 16, flight = clamp(age, 0, 24), px = x + 14 + dx * (.28 + flight * .04), py = ly + launchY - speed * flight + .043 * flight * flight;
         if (age < 24 && motion) { g.save(); g.globalAlpha = (1 - age / 24) * (.7 + motion * .3); g.fillStyle = n % 3 ? rp.base : rp.hi; g.fillRect(Math.round(px), Math.round(py), n % 4 ? 1 : 2, 1 + (n % 3 === 0 ? 1 : 0)); g.restore(); }
         if (n < 3) { g.save(); g.globalAlpha = .28 * pool; g.fillStyle = col; g.fillRect(Math.round(x + 14 + dx), baseY + 4 + n % 2, n === 0 ? 2 : 1, 1); g.restore(); } }
-      // goterones: la pintura acumulada en la base cae despacio; al salir hacia la aventura, chorrea por la página
-      for (const [n, point] of (POOLS[ch] || []).entries()) {
-        const length = Math.round(clamp((age - 8 - n * 12) / 40, 0, 1) * (3 + (i + n) % 3) + (exitAge > 0 ? exitAge * (1.6 + ((i + n) % 3) * .5) : 0)), dx = x + point[0]; if (length <= 0) continue;
-        g.fillStyle = rp.out; g.fillRect(dx - 1, baseY - 2, 3, length + 2); g.fillStyle = rp.base; g.fillRect(dx, baseY - 2, 1, length + 2); g.fillStyle = rp.sh; g.fillRect(dx - 1, baseY + length - 1, 3, 2); g.fillStyle = rp.hi; g.fillRect(dx, baseY - 1, 1, 1);
-      }
+      // goterones vivos: crecen, se balancean, sueltan una gota que salpica la hoja y vuelven a crecer; al salir, chorrean
+      for (const [n, point] of (POOLS[ch] || []).entries()) titleDrip(x + point[0], baseY - 1, age - 6 - n * 14, i * 7 + n, rp, exitAge);
       const shine = t - finished - 4 - i * 3;
       if (Prefs.flash && shine > 0 && shine < 32) { g.save(); g.globalAlpha = Prefs.flash * .55 * Math.sin(shine / 32 * Math.PI); g.drawImage(logoGlint(ch, col, shine), x, ly); g.restore(); }
     }
   }
-  // un pincel cargado recorre el esqueleto de cada letra; la gota (o las dos gotas) que lo pintan van agarradas a él
-  if (t >= 2 && t < finished + 16) {
-    const index = clamp(Math.floor((t - LOGO_BEATS.start) / LOGO_BEATS.step), 0, TITLE.letters.length - 1), age = t - LOGO_BEATS.start - index * LOGO_BEATS.step, progress = clamp(age / LOGO_BEATS.stroke, 0, 1);
-    const tip = logoTip(TITLE.letters[index], progress), rp = ramp(C(TITLE.cols[index]));
-    let bx = x0 + index * cw + tip.x, by = y0 + logoLetterY(index) + tip.y, lift = tip.lift, angle = -2.3 + Math.sin(tip.angle) * .22;
-    if (age < 0) { const k = clamp((t - 2) / 8, 0, 1); bx -= (1 - k) * 15; lift += (1 - k) * 13; }
-    else if (progress >= 1 && index < TITLE.letters.length - 1) { const next = logoTip(TITLE.letters[index + 1], 0), k = clamp((age - LOGO_BEATS.stroke) / (LOGO_BEATS.step - LOGO_BEATS.stroke), 0, 1); bx = lerp(bx, x0 + (index + 1) * cw + next.x, k); by = lerp(by, y0 + logoLetterY(index + 1) + next.y, k); lift += Math.sin(k * Math.PI) * 7; }
-    else if (t >= finished) { const k = (t - finished) / 16; bx += k * 23; lift += k * k * 24; angle -= k * .55; }
-    if (lift < .5 && progress > 0 && progress < 1) { g.fillStyle = rp.hi; g.fillRect(Math.round(bx) - 2, Math.round(by) - 1, 3, 2); g.fillStyle = rp.base; for (let n = 0; n < 3; n++) g.fillRect(Math.round(bx) - 2 + n * 2, Math.round(by) + 2 + n % 2, 1, 2); }
-    g.save(); g.globalAlpha = .1; g.fillStyle = '#67533c'; g.beginPath(); g.ellipse(bx + 4, by + 3, 7 + lift * .12, 2, 0, 0, Math.PI * 2); g.fill(); g.restore();
-    drawProp(propSprite('brocha', C(TITLE.cols[index])), bx, by - lift, angle, 1, 58, 10, .7, clamp((finished + 16 - t) / 7, 0, 1));
+  titlePaintersDraw(t, x0, y0);
+}
+// Un goterón vivo al pie de una letra: crece, se balancea, suelta su gota (que cae y salpica la hoja) y vuelve a crecer.
+function titleDrip(x, y, age, seed, rp, exitAge = 0) {
+  if (age < 0) return; const rnd = seeded(seed * 13 + 1), Lmax = 4 + rnd() * 6, period = 190 + (seed % 5) * 23, cyc = Math.floor(age / period), a = age % period, first = cyc === 0;
+  let L, bulb = 1.6, drop = null; const base = first ? 0 : Lmax * .35;
+  if (a < 70) L = lerp(base, Lmax, ease(a / 70));
+  else if (a < 110) { L = Lmax + Math.sin((a - 70) * .25) * .6 * Prefs.shake; bulb = 1.6 + (a - 70) / 40 * .9; }
+  else { L = Lmax * .35; const q = (a - 110) / 18; if (q < 1) drop = { y: y + Lmax + q * q * 22, r: 2.2 }; else if (a < 110 + 18 + 70) drop = { splat: (a - 128) / 70 }; }
+  L += exitAge > 0 ? exitAge * (1.6 + seed % 3 * .5) : 0;
+  const sway = Prefs.shake ? Math.round(Math.sin(age * .08 + seed) * Math.min(1, L / 8)) : 0, Y = Math.round(y + L);
+  g.fillStyle = rp.out; g.fillRect(x - 1, y, 3, Math.round(L) + 1); g.fillStyle = rp.base; g.fillRect(x, y, 1, Math.round(L) + 1); g.fillStyle = rp.hi; g.fillRect(x, y, 1, 2);
+  g.fillStyle = rp.out; g.beginPath(); g.arc(x + .5 + sway, Y + 1, bulb + .8, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.arc(x + .5 + sway, Y + 1, bulb, 0, 6.29); g.fill(); g.fillStyle = rp.spec; g.fillRect(x + sway, Y, 1, 1);
+  if (drop && drop.y != null) { g.fillStyle = rp.base; g.beginPath(); g.ellipse(x + .5, drop.y, drop.r * .8, drop.r * 1.2, 0, 0, 6.29); g.fill(); g.fillStyle = rp.hi; g.fillRect(x, Math.round(drop.y - 1), 1, 1); }
+  else if (drop && drop.splat != null) { const q = drop.splat, fy = y + Lmax + 22; if (q < .25) paintRing(x, fy, q * 4, rp.base, 7); g.save(); g.globalAlpha = .55 * (1 - q); g.fillStyle = rp.base; g.fillRect(x - 2, Math.round(fy), 5, 1); g.fillRect(x - 1, Math.round(fy) - 1, 3, 1); if (q < .3 && Prefs.shake) { g.fillRect(x - 4, Math.round(fy - q * 12), 1, 1); g.fillRect(x + 4, Math.round(fy - q * 10), 1, 1); } g.restore(); }
+}
+// La letra se sacude como gelatina cuando una gota aterriza en ella (al empezar a pintarla y al sentarse encima)
+function titleLandKick(i, t) {
+  let k = 0; const [s, e] = titleLetterSpan(i);
+  const v = titleVisit(t), evs = [s, e + 8]; if (v && v.L === i) for (const h of TITLE_VISIT_HOPS) evs.push(t - v.p + h);
+  for (const ev of evs) { const q = t - ev; if (q >= 0 && q < 20) k += Math.sin(q * .7) * Math.exp(-q / 5); }
+  return k;
+}
+// Letra de dos pintoras mientras aún está fresca: vetas de sus dos colores que se mueven antes de fundirse en la mezcla
+function logoMarble(ch, pair, reveal, t) {
+  const phase = (t >> 1) % 6, stripes = cached('logo-stripes|' + phase, () => { const c = document.createElement('canvas'); c.width = LOGO.gw; c.height = LOGO.gh; const x = c.getContext('2d'); x.fillStyle = '#fff';
+    for (let y = 0; y < LOGO.gh; y++) for (let a = 0; a < LOGO.gw; a++) if (Math.floor((a + y * .7 + Math.sin(y * .45) * 2.5 + phase) / 3) % 2) x.fillRect(a, y, 1, 1); return c; });
+  const c = cached('logo-marble', () => { const c = document.createElement('canvas'); c.width = LOGO.gw; c.height = LOGO.gh; return c; }), tmp = cached('logo-marble2', () => { const c = document.createElement('canvas'); c.width = LOGO.gw; c.height = LOGO.gh; return c; });
+  const x = c.getContext('2d'), y2 = tmp.getContext('2d');
+  x.clearRect(0, 0, LOGO.gw, LOGO.gh); x.globalCompositeOperation = 'source-over'; x.drawImage(logoLetter(ch, C(TITLE_HOME[pair[1]].col)), 0, 0);
+  y2.clearRect(0, 0, LOGO.gw, LOGO.gh); y2.globalCompositeOperation = 'source-over'; y2.drawImage(logoLetter(ch, C(TITLE_HOME[pair[0]].col)), 0, 0); y2.globalCompositeOperation = 'destination-in'; y2.drawImage(stripes, 0, 0);
+  x.drawImage(tmp, 0, 0); x.globalCompositeOperation = 'destination-in'; x.drawImage(reveal, 0, 0); x.globalCompositeOperation = 'source-over';
+  return c;
+}
+// Las gotas pintan con su propio cuerpo: van aplastadas sobre la punta del trazo, con una perla de su pintura debajo,
+// salpican gotitas al correr; al despegarse de una letra tiran de un hilo de pintura que se estira y se rompe.
+function titlePaintersDraw(t, x0, y0) {
+  for (const id of ['carmin', 'ambar', 'anil']) {
+    const p = titlePainterAt(id, t); if (!p || p.mode === 'leave') continue;
+    const col = C(TITLE_HOME[id].col), rp = ramp(col), X = x0 + p.x, Y = y0 + p.y;
+    if (p.mode === 'paint') {
+      const i = p.i, ch = TITLE.letters[i], [s] = titleLetterSpan(i), k = clamp((t - s) / LOGO_BEATS.stroke, 0, 1), tip = logoTip(ch, k), left = Math.cos(tip.angle) < -.2;
+      if (t - s < 10) { const st = titleBrushTip(i, 0); paintRing(x0 + st[0], y0 + st[1], (t - s) / 10, col, 14); }
+      // gotitas que salen despedidas por detrás
+      if (Prefs.shake) for (let b = 1; b <= 10; b++) { const birth = t - b; if (birth < s) break; const r = seeded(birth * 7 + i * 131 + id.length), bt = titleBrushTip(i, clamp((birth - s) / LOGO_BEATS.stroke, 0, 1)), a = logoTip(ch, clamp((birth - s) / LOGO_BEATS.stroke, 0, 1)).angle;
+        const vx = -Math.cos(a) * 1.1 + (r() - .5) * 1.4, vy = -.9 - r() * 1.1; g.globalAlpha = 1 - b / 11; g.fillStyle = b % 3 ? rp.base : rp.hi; g.fillRect(Math.round(x0 + bt[0] + vx * b), Math.round(y0 + bt[1] + vy * b + .12 * b * b), 1 + (b < 3), 1); }
+      g.globalAlpha = 1;
+      // la perla de pintura bajo su cuerpo y la gota, aplastada y estirada en la dirección en que corre
+      g.fillStyle = rp.out; g.beginPath(); g.ellipse(X, Y - 3, 6, 3.4, 0, 0, 6.29); g.fill(); g.fillStyle = rp.base; g.beginPath(); g.ellipse(X, Y - 3.5, 5, 2.6, 0, 0, 6.29); g.fill(); g.fillStyle = rp.spec; g.fillRect(Math.round(X - 3), Math.round(Y - 5), 2, 1);
+      const squish = Prefs.shake ? Math.sin(t * .9 + id.length) * .06 : 0;
+      drawSprite(buildSprite(id + '_side_mini', col, null, { eyes: 'angry' }), Math.round(X), Math.round(Y - 2), 2 * (1.16 + squish), left, .8 - squish);
+      continue;
+    }
+    if (p.mode === 'hop' && p.i != null) { // hilo de pintura al despegarse del final de la letra
+      const [, e] = titleLetterSpan(p.i), q = (t - e) / 8;
+      if (q > 0 && q <= 1) { const end = titleBrushTip(p.i, 1), ax = x0 + end[0], ay = y0 + end[1], mx = (ax + X) / 2, my = (ay + Y - 8) / 2 + 4 * (1 - q);
+        if (q < .6) { const w = 2.4 * (1 - q / .6) + .6; for (let n = 0; n <= 12; n++) { const u = n / 12, bx = (1 - u) * (1 - u) * ax + 2 * u * (1 - u) * mx + u * u * X, by = (1 - u) * (1 - u) * ay + 2 * u * (1 - u) * my + u * u * (Y - 8), ww = Math.max(1, Math.round(w * (1 - Math.abs(u - .5) * .9))); g.fillStyle = rp.base; g.fillRect(Math.round(bx), Math.round(by), ww, ww); } }
+        else { const f = (q - .6) / .4; g.fillStyle = rp.base; for (let n = 0; n < 3; n++) { g.beginPath(); g.arc(mx + (n - 1) * 3, my + f * f * 14 + n, 1.2, 0, 6.29); g.fill(); } } }
+    }
+    titleDrop(id, X, Y, t, p.flip, 2, p.mode === 'paint' ? 'angry' : undefined);
   }
-  for (const id of ['carmin', 'ambar', 'anil']) { const p = titlePainterAt(id, t); if (!p || p.mode === 'leave') continue; titleDrop(id, x0 + p.x, y0 + p.y, t, p.flip, 2, p.mode === 'paint' ? 'angry' : undefined); }
 }
 // ---- Portada breve y automática. Cualquier tecla adelanta su apertura y desbloquea el audio.
 const COVER = { t: 0, open: 0 };
@@ -1208,7 +1286,7 @@ function titleBrushTip(i, k) { const tip = logoTip(TITLE.letters[i], k); return 
 // Dónde está una gota en el instante t, en coordenadas del logo; o 'leave' con su progreso hacia el paisaje.
 function titlePainterAt(id, t) {
   const mine = titleLettersOf(id), side = i => TITLE_PAINTERS[TITLE.cols[i]].indexOf(id) ? -1 : 1, bob = Math.sin(t * .2 + id.length) * 1.2;
-  const atBrush = (i, k) => { const [x, y] = titleBrushTip(i, k); return [x + 14 * side(i), y - 10 + bob]; }, seat = i => [i * LOGO.cw + 14 + 3 * side(i), logoLetterY(i) + 5];
+  const atBrush = (i, k) => { const [x, y] = titleBrushTip(i, side(i) < 0 ? Math.max(0, k - .16) : k); return [x, y + 5 + bob * .3]; }, seat = i => [i * LOGO.cw + 14 + 3 * side(i), logoLetterY(i) + 5]; // la gota ES la brocha: va sobre la punta del trazo (la segunda, un poco detrás)
   const [s0] = titleLetterSpan(mine[0]); if (t < s0 - 10) return null;
   const last = mine[mine.length - 1], [, lastEnd] = titleLetterSpan(last), land = TITLE_HOME[id].land;
   if (t > lastEnd + 8) return t >= land ? null : { mode: 'leave', k: clamp((t - lastEnd - 8) / (land - lastEnd - 8), 0, 1), from: logoToScreen(...seat(last)) };
@@ -1235,6 +1313,27 @@ function titleRaid(t) {
   return { L, p, painter, drain, away: p >= 110 && p < 232 };
 }
 function titleRaidAway(id, t) { const r = titleRaid(t); return !!r && r.painter === id && r.away; }
+// Visitas: cada poco, una de las gotas sube del paisaje a una letra de su color, bota encima (la letra tiembla como
+// gelatina y salpica) y vuelve a su sitio. Nunca coincide con la Tinta.
+const TITLE_VISIT = { from: 330, every: 290, dur: 92, who: ['ambar', 'anil', 'carmin'] };
+function titleVisit(t) {
+  if (t < TITLE_VISIT.from || titleRaid(t)) return null; const n = Math.floor((t - TITLE_VISIT.from) / TITLE_VISIT.every), p = (t - TITLE_VISIT.from) % TITLE_VISIT.every; if (p >= TITLE_VISIT.dur) return null;
+  const id = TITLE_VISIT.who[n % 3], own = TITLE.cols.map((c, i) => c === TITLE_HOME[id].col ? i : -1).filter(i => i >= 0), L = own[Math.floor(n / 3) % own.length];
+  return { id, L, p, n };
+}
+function titleAway(id, t) { const v = titleVisit(t); return titleRaidAway(id, t) || (!!v && v.id === id); }
+const TITLE_VISIT_HOPS = [24, 38, 50, 60];
+function drawTitleVisit(t) {
+  const v = titleVisit(t); if (!v) return; const { id, L, p } = v, home = TITLE_HOME[id].home, [sx, sy] = logoToScreen(L * LOGO.cw + 14, logoLetterY(L) + 17), col = C(TITLE_HOME[id].col);
+  let x, y, sc = 1.6, sq = [1, 1], eyes = 'normal';
+  if (p < 24) { const q = p / 24; x = lerp(home[0], sx, ease(q)); y = lerp(home[1], sy, q) - Math.sin(q * Math.PI) * 40; sc = 1 + q * .6; sq = q < .3 ? [.8, 1.25] : [1, 1]; }
+  else if (p < 62) { const hop = TITLE_VISIT_HOPS.findIndex((h, i) => p < (TITLE_VISIT_HOPS[i + 1] ?? 62)), a = TITLE_VISIT_HOPS[hop], b = TITLE_VISIT_HOPS[hop + 1] ?? 62, q = (p - a) / (b - a);
+    x = sx; y = sy - Math.sin(q * Math.PI) * (hop === 2 ? 14 : 9); eyes = 'happy'; if (q < .18) sq = [1.3, .72]; else if (q > .85) sq = [.85, 1.2];
+    if (q < .3 && Prefs.shake) { const r = seeded(t + L); g.fillStyle = col; for (let n = 0; n < 5; n++) g.fillRect(Math.round(sx + (r() - .5) * 26), Math.round(sy + 2 - r() * 8 - q * 10), 1, 1); } }
+  else { const q = (p - 62) / 30; x = lerp(sx, home[0], ease(q)); y = lerp(sy, home[1], q) - Math.sin(q * Math.PI) * 30; sc = 1.6 - q * .6; }
+  shadow(Math.round(x), Math.round(p >= 24 && p < 62 ? sy + 1 : y), 6);
+  drawSprite(buildSprite(id + '_side_mini', col, null, { eyes }), Math.round(x), Math.round(y), sc * sq[0], x > home[0], sq[1]);
+}
 function drawTitleRaid(t) {
   const r = titleRaid(t); if (!r) return;
   const { L, p, painter } = r, [lx, ly] = logoToScreen(L * LOGO.cw + 14, logoLetterY(L) + 3), start = [W + 14, 14];
@@ -1263,7 +1362,7 @@ function titleResidents(t) {
     drawSprite(buildSprite(id + '_side_mini', C(col), null, { eyes: t % 240 < 7 ? 'blink' : 'normal' }), x, y, 1, flip);
     g.restore();
   };
-  const red = titleRaidAway('carmin',t) ? 0 : titleProgress(t,165,3), blue = titleRaidAway('anil',t) ? 0 : titleProgress(t,160,3), gold = titleRaidAway('ambar',t) ? 0 : titleProgress(t,193,3);
+  const red = titleAway('carmin',t) ? 0 : titleProgress(t,165,3), blue = titleAway('anil',t) ? 0 : titleProgress(t,160,3), gold = titleAway('ambar',t) ? 0 : titleProgress(t,193,3);
   if (red > 0) {
     const painting = titleProgress(t,185,60), idle = t % 600, working = t < 260 || idle > 480;
     const x = 108 + painting * 12, tip = [x + 15, 151 + (working ? Math.sin(t * .1) : 0)];
@@ -1377,7 +1476,7 @@ function drawTitle() {
   titleDroplets(t);
   // bajan de un salto al paisaje al terminar sus letras
   for (const id of ['carmin','ambar','anil']) { const p = titlePainterAt(id,t); if (!p || p.mode !== 'leave') continue; const h = TITLE_HOME[id].home, x = lerp(p.from[0],h[0],p.k), y = lerp(p.from[1],h[1],p.k) - Math.sin(p.k * Math.PI) * 30; if (p.k > .1) shadow(Math.round(x),Math.round(lerp(p.from[1],h[1],p.k)) + 1,5); titleDrop(id,x,y,t,h[0] > p.from[0],1 + (1 - p.k),'happy'); }
-  drawTitleRaid(t);
+  drawTitleRaid(t); drawTitleVisit(t);
   if (ex > 0) for (const id of ['carmin','ambar','anil']) { const h = TITLE_HOME[id].home, j = Math.abs(Math.sin((ex + id.length * 3) * .35)) * 10; titleDrop(id, h[0], h[1] - j, t, false, 1, 'happy'); } // saltan de alegría al empezar
   // el lema, escrito a plumilla bajo el logo
   if (t >= 190) { const line = 'El color que la Tinta robó', w = textWidth(line); writtenLines([line], Math.round((W - w) / 2), 51, '#8a7e68', Prefs.shake ? (t - 190) * .6 : Infinity, { nib: !!Prefs.shake }); }
