@@ -37,6 +37,9 @@ function inkLayer(cx, cy, R, o = {}) {
   for (let y = 0, i = 0; y < H; y++) { const dy = (y - cy) * sq, dy2 = dy * dy;
     for (let x = 0; x < W; x++, i++) {
       const dx = x - cx, n = N[i], f = F[i], e = Math.sqrt(dx * dx + dy2) * (.6 + .8 * n) - f * f * 9;
+      if (o.invert) { // al revés: la tinta está fuera del radio y avanza desde los bordes hacia dentro
+        if (e > R) { px[i] = e < R + 2.2 && dx + dy > 0 ? INK_COL.rim : n > sheenLo && n < sheenHi ? INK_COL.sheen : INK_COL.core; continue; }
+        const u = (R - e) / fr; px[i] = u < 1 ? (f > u * .9 + .08 ? INK_COL.fringe : f > u * .5 + .5 ? INK_COL.halo : 0) : 0; continue; }
       if (e < R) { // dentro: negro con vetas húmedas y un canto de luz arriba a la izquierda
         px[i] = e > R - 2.2 && dx + dy < 0 ? INK_COL.rim : n > sheenLo && n < sheenHi ? INK_COL.sheen : INK_COL.core; continue; }
       const u = (e - R) / fr;
