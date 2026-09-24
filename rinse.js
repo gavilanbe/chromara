@@ -4,7 +4,7 @@ const RINSE = { w: 52, h: 68, ox: -10, oy: -30, surface: 32, floor: 63 };
 function rinseState() {
   return { phase: 'idle', clock: 0, visits: 0, bubbles: [], tint: [], hidden: [false,false,false],
     inside: [0,0,0], jump: [null,null,null], pos: [], squash: [0,0,0], clean: [false,false,false],
-    wob: 0, glow: 0, charge: 0, clarity: 0, zoom: 1, focus: 0, cd: 0, rings: [], spray: [], drops: [], toast: 0, gain: [null,null,null], bursts: [], rise: 0, full: [0,0,0] };
+    wob: 0, glow: 0, charge: 0, clarity: 0, zoom: 1, focus: 0, cd: 0, rings: [], spray: [], drops: [], toast: 0, gain: [null,null,null], bursts: [], rise: 0, full: [0,0,0], near: false, spin: 0, stirA: 0, mud: 0, prog: 0, pressAt: -99, rainbow: 0 };
 }
 function rinseOval(x, col, cx, cy, rx, ry) {
   cx=Math.round(cx);cy=Math.round(cy);rx=Math.max(1,Math.round(rx));ry=Math.max(1,Math.round(ry));
@@ -24,11 +24,14 @@ function rinseGlass(x,pal,J,t) {
   // Water is clipped to the inside of the glass, including floating characters.
   x.save();rinseClip(x);
   const wave=Math.sin(t*.04)*.4+J.wob*Math.sin(t*.21)*1.5, surface=RINSE.surface+wave-(J.rise||0); // cada gota que entra sube el agua
-  const water=worldMix(p.wash,'#86d9d5',J.clarity*.45);
+  let water=worldMix(p.wash,'#86d9d5',J.clarity*.45);if(J.mud>0)water=worldMix(water,'#8a7766',J.mud*.5); // turbia de pigmento hasta que se remueve
   for(let row=Math.round(surface);row<62;row++){
     rect(worldMix(water,p.washDk,(row-surface)/45),9,row,34,1);
   }
   oval(worldMix(p.washHi,'#d5f4d9',J.clarity*.35),26,surface,17,4);oval(water,27,surface+1,14,2);
+  if(J.spin>.04){ // remolino: la superficie se hunde en el centro y una espiral de luz baja girando
+    const sp=J.spin;oval(worldMix(water,p.washDk,.5),26,surface+1,3+sp*9,1+sp*1.5);oval(worldMix(water,p.washDk,.8),26,surface+1+sp,1+sp*4,1);
+    x.globalAlpha=.35+sp*.5;for(let n=0;n<26;n++){const a=J.stirA*2.2+n*.55,r=2+n*.5;rect(n%3?'#d4f4e7':light,Math.round(26+Math.cos(a)*r),Math.round(surface+4+n*.9+Math.sin(a)*r*.25));}x.globalAlpha=1;}
   // Fine ribbons of pigment circulate in opposite directions at different depths.
   J.tint.forEach((col,i)=>{
     const r=ramp(col);x.globalAlpha=(.36+J.charge*.2)*(1-J.clarity*.82);
@@ -54,11 +57,14 @@ function rinseGlass(x,pal,J,t) {
   for(const b of J.bubbles){const bx=Math.round(b.x),by=Math.round(b.y);if(b.r>1){rect('#d4f4e7',bx-1,by-1,3,1);rect('#d4f4e7',bx-1,by+1,3,1);rect('#d4f4e7',bx-2,by,1,1);rect('#d4f4e7',bx+2,by,1,1);}else rect(light,bx,by);}
   for(const r of J.rings){x.globalAlpha=(1-r.t/r.life)*.8;const radius=2+r.t*.8;x.strokeStyle=r.col;x.lineWidth=1;x.beginPath();x.ellipse(26+r.x,surface+1,Math.min(18,radius),Math.max(1,radius*.24),0,0,Math.PI*2);x.stroke();}x.globalAlpha=1;
   // The submerged part of the leaning brush bends optically at the meniscus.
-  rect('#5c8590',36,34,3,11);rect('#b7d6d5',36,34,1,7);rect('#617c7e',33,44,6,9);rect('#8fc4bd',33,44,2,7);
+  const stirring=J.phase==='mix',ba=J.stirA||0,bx0=26+Math.cos(ba)*12,bx1=26+Math.cos(ba)*5; // el pincel del vaso: quieto, o removiendo en círculos
+  if(stirring){for(let yy=31;yy<52;yy++){const q=(yy-31)/21,xx=Math.round(lerp(bx0-2,bx1,q));rect(yy<44?'#5c8590':'#617c7e',xx,yy,yy<44?2:3,1);rect('#b7d6d5',xx,yy);}}
+  else{rect('#5c8590',36,34,3,11);rect('#b7d6d5',36,34,1,7);rect('#617c7e',33,44,6,9);rect('#8fc4bd',33,44,2,7);}
   x.restore();
   // Air above the water, brush handle, back and front lip, then glass highlights.
-  for(let yy=0;yy<33;yy++){const bx=43-Math.floor(yy/5);rect('#6c5653',bx,yy,3,1);rect('#bb925f',bx,yy,2,1);rect('#f0d393',bx,yy,1,1);}
-  rect('#6a7b88',36,29,5,4);rect('#e3e7d8',36,29,4,1);
+  if(stirring){const top=26+Math.cos(ba)*18;for(let yy=0;yy<31;yy++){const xx=Math.round(lerp(top,bx0-2,yy/31));rect('#6c5653',xx,yy,3,1);rect('#bb925f',xx,yy,2,1);rect('#f0d393',xx,yy,1,1);}const fx=Math.round(bx0-3);rect('#6a7b88',fx,28,5,4);rect('#e3e7d8',fx,28,4,1);}
+  else{for(let yy=0;yy<33;yy++){const bx=43-Math.floor(yy/5);rect('#6c5653',bx,yy,3,1);rect('#bb925f',bx,yy,2,1);rect('#f0d393',bx,yy,1,1);}
+  rect('#6a7b88',36,29,5,4);rect('#e3e7d8',36,29,4,1);}
   oval(ink,26,19,21,5);oval(rim,26,18,20,4);oval('#809aa2',26,18,17,3);oval('#b6cec5',26,17,15,2);
   rect(light,11,15,17,1);rect('#f3f3dc',8,17,3,1);rect('#8aa6ad',9,21,33,2);rect(light,13,22,21,1);
   rect('#e7efdf',8,25,2,25);rect(light,10,26,2,15);rect(light,11,44,2,5);rect('#d0e4df',40,27,1,20);
@@ -176,22 +182,74 @@ function drawRinseVial(i,x,y,hp,mp,t,filling,full){
   // lleno: anillo y estrellitas
   if(full>0&&full<1){paintRing(x,y-14,full,col,24);if(sh)for(let n=0;n<6;n++){const a=n/6*6.283+i,d=12+full*14;g.globalAlpha=1-full;g.fillStyle=n%2?col:'#fff8e6';const sx=Math.round(x+Math.cos(a)*d),sy=Math.round(y-14+Math.sin(a)*d);g.fillRect(sx-1,sy,3,1);g.fillRect(sx,sy-1,1,3);}g.globalAlpha=1;}
 }
+// Encima de cada gota, una plaquita con dos rayas: su vida (de su color) y su pintura (azul). Entran vacías, salen llenas.
+function drawRinsePlaque(i,x,y,hp,mp,alpha,full){
+  const col=C(Party[i].color),r=ramp(col);x=Math.round(x);y=Math.round(y);
+  g.save();g.globalAlpha*=alpha;
+  if(full>0&&full<1&&Prefs.shake){const s=1+Math.sin(full*Math.PI)*.3;g.translate(x,y);g.scale(s,s);g.translate(-x,-y);}
+  g.fillStyle='#1e1a2c';g.fillRect(x-8,y-5,17,9);g.fillStyle='#f7efd6';g.fillRect(x-7,y-4,15,7);g.fillStyle='#1e1a2c';g.fillRect(x,y+4,1,2); // la plaquita y su palito
+  const bar=(yy,f,c,hi)=>{g.fillStyle='#4a4460';g.fillRect(x-6,yy,13,2);const n=Math.round(13*clamp(f,0,1));if(n){g.fillStyle=c;g.fillRect(x-6,yy,n,2);g.fillStyle=hi;g.fillRect(x-6,yy,n,1);}};
+  bar(y-3,hp,col,r.hi);bar(y,mp,'#6fb4d8','#c8ecf8');
+  if(hp<=0&&Prefs.shake&&(OW.t>>3)%2){g.fillStyle='#e23c3c';g.fillRect(x-9,y-6,2,2);} // sin vida: parpadea
+  g.restore();
+  if(full>0&&full<1){paintRing(x,y,full,col,18);if(Prefs.shake)for(let n=0;n<6;n++){const a=n/6*6.283+i,d=9+full*12;g.globalAlpha=(1-full)*alpha;g.fillStyle=n%2?col:'#fff8e6';const sx=Math.round(x+Math.cos(a)*d),sy=Math.round(y+Math.sin(a)*d*.7);g.fillRect(sx-1,sy,3,1);g.fillRect(sx,sy-1,1,3);}g.globalAlpha=1;}
+}
+// Al acercarse: el vaso invita. Un bocadillo con una gota que se tira de cabeza al agua (y la tecla, con teclado).
+function drawRinseInvite(){
+  const J=OW.jar,at=J.nearAt??OW.t,k=Prefs.shake?easeBack(clamp((OW.t-at)/12,0,1)):1,bob=Prefs.shake?Math.round(Math.sin(OW.t*.12)*2):0;
+  const x=Math.round(MAP.jar.x*TILE+16-OW.cam.x+38),y=Math.round(MAP.jar.y*TILE-8-OW.cam.y+bob),lc=C(Party[0].color);
+  g.save();g.translate(x,y);g.scale(k,k);g.translate(-x,-y);
+  g.fillStyle='#1e1a2c';g.beginPath();g.ellipse(x,y,15,13,0,0,6.29);g.fill();g.beginPath();g.moveTo(x-11,y+6);g.lineTo(x-20,y+13);g.lineTo(x-5,y+10);g.fill(); // bocadillo con rabito hacia el vaso
+  g.fillStyle='#f7efd6';g.beginPath();g.ellipse(x,y,14,12,0,0,6.29);g.fill();g.beginPath();g.moveTo(x-10,y+6);g.lineTo(x-17,y+11);g.lineTo(x-6,y+9);g.fill();
+  g.save();g.beginPath();g.ellipse(x,y,13,11,0,0,6.29);g.clip();
+  const ph=Prefs.shake?(OW.t%72)/72:.3,wy=y+5; // la gota del líder salta y se tira de cabeza; al entrar, salpica
+  g.fillStyle='#6fb4d8';g.fillRect(x-14,wy,28,8);g.fillStyle='#c8ecf8';g.fillRect(x-14,wy,28,1);g.fillStyle='#4a8ab8';g.fillRect(x-14,wy+4,28,4);
+  const spr=buildSprite(Party[0].id+'_front_mini',lc,null,{eyes:'happy'});
+  if(ph<.62){const q=ph/.62,jx=x-6+q*6,jy=wy-3-Math.sin(q*Math.PI)*9+q*q*6,rot=q>.5?(q-.5)*6:0;g.save();g.translate(Math.round(jx),Math.round(jy));g.rotate(rot);drawSprite(spr,0,4,1);g.restore();}
+  else{const q=(ph-.62)/.38;g.strokeStyle='#e8f6fb';g.lineWidth=1;g.globalAlpha=1-q;g.beginPath();g.ellipse(x,wy+1,2+q*9,1+q*1.5,0,0,6.29);g.stroke();g.globalAlpha=1;
+    for(let n=0;n<5;n++){const a=-Math.PI*(.15+n*.175),d=q*9;g.fillStyle=n%2?lc:'#e8f6fb';g.fillRect(Math.round(x+Math.cos(a)*d),Math.round(wy-1+Math.sin(a)*d+q*q*6),1,2);}}
+  g.restore();
+  g.restore();
+  if(!MOBILE?.enabled){const key=battleKey('ok'),kw=Math.max(11,textWidth(key)+6);brushBand(x+10,y+6,kw,11,lc);textCenter(key,x+10+kw/2,y+8,accentInk(lc));}
+  uiHit(x-16,y-13,32,28,()=>{pressed.ok=true;});
+  const gx=Math.round(MAP.jar.x*TILE+16-OW.cam.x),gy=Math.round(MAP.jar.y*TILE+34-OW.cam.y);uiHit(clamp(gx-26,0,W-1),clamp(gy-66,0,H-1),52,Math.min(66,H-clamp(gy-66,0,H-1)),()=>{pressed.ok=true;}); // también se puede tocar el vaso
+}
+// Removiendo: junto al vaso, una flecha circular que gira con el agua y un botón que se hunde con cada pulsación.
+function drawRinseStir(){
+  const J=OW.jar,[gx,gy]=rinseScreen(MAP.jar.x*TILE+16,MAP.jar.y*TILE+RINSE.oy+RINSE.surface-10),z=J.zoom||1,x=Math.round(gx+42*z),y=Math.round(gy+4),pushed=J.clock-J.pressAt<6,lc=C(Party[0].color),a=J.stirA||0;
+  const k=Prefs.shake?easeBack(clamp((J.clock-(J.stirAt||0))/12,0,1)):1;if(k<=0)return;
+  g.save();g.translate(x,y);g.scale(k,k);
+  g.strokeStyle='#1e1a2c';g.lineWidth=3;g.beginPath();g.arc(0,0,11,a,a+4.4);g.stroke();g.strokeStyle='#e8f6fb';g.lineWidth=1;g.beginPath();g.arc(0,0,11,a,a+4.4);g.stroke(); // la flecha que da vueltas
+  const hx=Math.cos(a+4.4)*11,hy=Math.sin(a+4.4)*11,tx=-Math.sin(a+4.4),ty=Math.cos(a+4.4);g.fillStyle='#e8f6fb';g.beginPath();g.moveTo(hx+tx*4,hy+ty*4);g.lineTo(hx-ty*3,hy+tx*3);g.lineTo(hx+ty*3,hy-tx*3);g.fill();
+  const press=pushed?2:Prefs.shake?Math.round(Math.max(0,Math.sin(J.clock*.3))*1.5):0; // el botón: se hunde solo, invitando, y de verdad al pulsar
+  g.fillStyle='#1e1a2c';g.beginPath();g.ellipse(0,3,7,4,0,0,6.29);g.fill();g.fillStyle=ramp(lc).sh;g.beginPath();g.ellipse(0,2,6,3,0,0,6.29);g.fill();
+  g.fillStyle=pushed?ramp(lc).hi:lc;g.beginPath();g.ellipse(0,press,6,3,0,0,6.29);g.fill();g.fillStyle='#fff8e6';g.fillRect(-3,press-2,3,1);
+  if(pushed&&Prefs.shake){const q=(J.clock-J.pressAt)/6;g.strokeStyle='#fff8e6';g.globalAlpha=1-q;g.beginPath();g.ellipse(0,1,8+q*6,4+q*3,0,0,6.29);g.stroke();g.globalAlpha=1;}
+  g.restore();
+  // lo limpia que va: el agua misma, y un anillo de progreso alrededor del botón
+  g.strokeStyle='#8fe0c8';g.lineWidth=2;g.globalAlpha=.9;g.beginPath();g.arc(x,y,15*k,-Math.PI/2,-Math.PI/2+J.prog*6.283);g.stroke();g.globalAlpha=1;
+  uiHit(0,0,W,H,()=>{pressed.ok=true;}); // con el dedo: tocar en cualquier sitio remueve
+}
+// Al quedar limpia: un arcoíris sale del vaso.
+function drawRinseRainbow(){
+  const J=OW.jar,k=J.rainbow||0;if(k<=0||!Prefs.flash)return;const [gx,gy]=rinseScreen(MAP.jar.x*TILE+16,MAP.jar.y*TILE+RINSE.oy+RINSE.surface-8),z=J.zoom||1;
+  g.save();g.globalAlpha=.55*Math.min(1,k*2)*(J.phase==='settle'?.5:1)*Prefs.flash;WORLD_COLORS.forEach((c,i)=>{g.strokeStyle=C(c);g.lineWidth=2*z;g.beginPath();g.arc(gx+30*z,gy,(46-i*2.2)*z,Math.PI,Math.PI+Math.PI*Math.min(1,k),false);g.stroke();});g.restore();
+}
 function drawRinseUI() {
   const J=OW.jar;if(!J||!MAP.jar)return;
+  if(!OW.heal&&J.near&&Game.state==='overworld'&&!OW.msg&&!OW.menu&&!OW.ring&&!OW.act&&J.toast<=0)drawRinseInvite();
   const after=!OW.heal&&J.toast>0&&!OW.msg&&!OW.menu&&!OW.ring;if(!OW.heal&&!after)return;
-  if(OW.heal)drawRinseSpotlight();
-  const k=OW.heal?clamp((J.focus||0)*1.4,0,1):clamp((J.toast-95)/25,0,1),t=J.clock,e=Prefs.shake?easeBack(k):k;
-  const [gx,gy]=rinseScreen(MAP.jar.x*TILE+16,MAP.jar.y*TILE+RINSE.oy+RINSE.surface+30);
-  // una balda de madera abajo a la izquierda, fuera del vaso y del grupo
-  { const y=Math.round(H-5+(1-e)*60);g.fillStyle='#3a2a22';g.fillRect(4,y-1,122,6);g.fillStyle='#8a6440';g.fillRect(4,y-2,122,4);g.fillStyle='#b88a5a';g.fillRect(4,y-2,122,1);g.fillStyle='#5a3e2a';g.fillRect(8,y+2,3,5);g.fillRect(119,y+2,3,5); }
+  if(OW.heal){drawRinseSpotlight();drawRinseRainbow();if(J.phase==='mix')drawRinseStir();}
+  // las plaquitas siguen a cada gota: se ven vacías al entrar, desaparecen en el agua y salen llenándose
   Party.forEach((p,i)=>{
-    const s=effStats(p),gn=J.gain[i],q=gn?clamp((J.clock-gn.at)/40,0,1):1,ez=1-(1-q)**3,hp=gn?lerp(gn.hp0,gn.hp,ez):p.cur.hp,mp=gn?lerp(gn.mp0,gn.mp,clamp((J.clock-gn.at-8)/40,0,1)):p.cur.mp;
-    const x=26+i*39,y=Math.round(H-12+(1-e)*60),filling=!!gn&&q<1;
-    // el chorro: gotas de su color que saltan del vaso a su frasco
-    if(gn&&J.clock-gn.at<44)for(let n=0;n<14;n++){const u=(J.clock-gn.at-n*2)/22;if(u<0||u>1)continue;const cx2=lerp(gx,x,u),cy2=lerp(gy,y-18,u)-Math.sin(u*Math.PI)*34,rr=n%3?1:2;g.fillStyle=n%4?C(p.color):'#fff8e6';g.fillRect(Math.round(cx2),Math.round(cy2),rr,rr+1);}
-    if(gn&&q>=1&&!J.full[i])J.full[i]=J.clock;
-    const full=J.full[i]?clamp((J.clock-J.full[i])/24,0,1):0;
-    drawRinseVial(i,x,y,hp/s.hp,mp/s.mp,t,filling,full>0&&full<1?full:0);
+    if(J.hidden[i])return;const s=effStats(p),gn=J.gain[i],q=gn?clamp((J.clock-gn.at)/40,0,1):1,ez=1-(1-q)**3,hp=gn?lerp(gn.hp0,gn.hp,ez):p.cur.hp,mp=gn?lerp(gn.mp0,gn.mp,clamp((J.clock-gn.at-8)/40,0,1)):p.cur.mp;
+    let wx,wy,al=1;
+    if(OW.heal){const jp=J.jump[i],pos=jp||J.pos[i];if(!pos)return;wx=pos[0];wy=pos[1]-(jp?jp[2]:0);}
+    else{const h=OW.hist[Math.min(OW.hist.length-1,i*12)];wx=i?h?.[0]??OW.x:OW.x;wy=i?h?.[1]??OW.y:OW.y;al=clamp((J.toast-100)/30,0,1);if(al<=0)return;}
+    const P=OW.heal?J.pos:Party.map((_,j)=>{const h=OW.hist[Math.min(OW.hist.length-1,j*12)];return j?h||[OW.x,OW.y]:[OW.x,OW.y];}),xs=P.map(q=>q?.[0]??0),ys=P.map(q=>q?.[1]??0),column=Math.max(...ys)-Math.min(...ys)>Math.max(...xs)-Math.min(...xs); // en fila: encima; en columna: al lado
+    const [x,y]=column?rinseScreen(wx+15,wy-7):rinseScreen(wx,wy-20-(i%2)*3);
+    if(gn&&q>=1&&!J.full[i])J.full[i]=J.clock;const full=J.full[i]?clamp((J.clock-J.full[i])/24,0,1):0;
+    drawRinsePlaque(i,x,y,hp/s.hp,mp/s.mp,al,full>0&&full<1?full:0);
   });
   // al terminar: el grupo da un saltito con chispas (el mapa ya ha vuelto)
   if(after&&J.toast>110&&Prefs.shake){const q=(150-J.toast)/40;Party.forEach((p,i)=>{const h=OW.hist[Math.min(OW.hist.length-1,i*12)],wx=i?h?.[0]??OW.x:OW.x,wy=i?h?.[1]??OW.y:OW.y,x=wx-OW.cam.x,y=wy-OW.cam.y-14-Math.sin(q*Math.PI)*6;
@@ -207,44 +265,65 @@ function rinseFocus(k,start) {
 }
 function* rinseSequence() {
   const J=OW.jar,cam={...OW.cam},hist=OW.hist.map(h=>[...h]),cx=MAP.jar.x*TILE+16,sy=MAP.jar.y*TILE+RINSE.oy+RINSE.surface;
-  const repeat=J.visits>0,focusFrames=repeat?12:24,entryFrames=repeat?23:30,mixFrames=repeat?40:78;
-  J.phase='focus';J.gain=[null,null,null];J.full=[0,0,0];J.bursts=[];J.tint=[];J.inside=[0,0,0];J.hidden=[false,false,false];J.clean=[false,false,false];J.charge=0;J.clarity=0;J.toast=0;
+  const repeat=J.visits>0,focusFrames=repeat?10:18,entryFrames=repeat?22:28;
+  J.phase='focus';J.gain=[null,null,null];J.full=[0,0,0];J.bursts=[];J.tint=[];J.inside=[0,0,0];J.hidden=[false,false,false];J.clean=[false,false,false];J.charge=0;J.clarity=0;J.toast=0;J.mud=0;J.spin=0;J.prog=0;J.rainbow=0;J.stirA=0;
   Audio.sfx('glass',{vol:.4});
   try {
     for(let n=1;n<=focusFrames;n++){rinseFocus(n/focusFrames,cam);yield;}
+    // Se tiran casi a la vez: cada una se agacha, salta en arco y se zambulle; la siguiente despega con la anterior en el aire.
     J.phase='enter';
-    for(let i=0;i<Party.length;i++){
-      const from=J.pos[i];
-      for(let n=0;n<7;n++){J.squash[i]=(n+1)/7;yield;}
-      J.squash[i]=0;Audio.sfx('whip',{semi:[0,4,7][i],vol:.26});
-      for(let n=1;n<=entryFrames;n++){
-        const q=n/entryFrames,arc=Math.sin(q*Math.PI),stretch=q<.7?1.15:1.28;
-        J.jump[i]=[lerp(from[0],cx+(i-1)*4,q),lerp(from[1],sy+7,q),arc*(i===1?43:35),Math.sin(q*Math.PI*2)*(i-1)*.18,1-arc*.12,stretch];yield;
+    const start=[0,1,2].map(i=>Math.round(i*(repeat?8:12))),crouch=7,landed=[false,false,false];
+    for(let f=0;!landed.every(Boolean)&&f<400;f++){
+      for(let i=0;i<3;i++){
+        const k=f-start[i];if(landed[i]||k<0)continue;
+        if(k<crouch){J.squash[i]=(k+1)/crouch;continue;}
+        if(k===crouch){J.squash[i]=0;Audio.sfx('whip',{semi:[0,4,7][i],vol:.26});}
+        const n=k-crouch+1,q=n/entryFrames,arc=Math.sin(q*Math.PI),from=J.pos[i];
+        J.jump[i]=[lerp(from[0],cx+(i-1)*4,q),lerp(from[1],sy+7,q),arc*(i===1?43:35),Math.sin(q*Math.PI*2)*(i-1)*.18+q*(i-1)*.6,1-arc*.12,q<.7?1.15:1.28];
+        if(n>=entryFrames){J.jump[i]=null;J.hidden[i]=true;J.inside[i]=1;J.tint.push(C(Party[i].color));J.mud=Math.min(1,J.mud+.34);rinseSplash(i);if(Prefs.shake)OW.shake=1;landed[i]=true;}
       }
-      J.jump[i]=null;J.hidden[i]=true;J.inside[i]=1;J.tint.push(C(Party[i].color));rinseSplash(i);
-      for(let n=0;n<9;n++)yield;
+      yield;
     }
-    J.phase='mix';Audio.sfx('bubbles',{vol:.3});
-    for(let n=0;n<mixFrames;n++){J.charge=Math.sin(n/mixFrames*Math.PI)*.8+.2;if(n%24===0){Audio.sfx('slow_drip',{semi:[0,4,7][n/24%3|0],vol:.3});J.rings.push({x:0,t:0,life:35,col:C(WORLD_COLORS[n/24%6|0])});}yield;}
-    J.phase='clear';Audio.sfx('heal_bells',{vol:.75});
-    for(let n=0;n<36;n++){J.clarity=(n+1)/36;J.charge*=.94;J.glow=Math.sin(n/36*Math.PI);yield;}
+    for(let n=0;n<8;n++)yield;
+    // Removerlas: cada pulsación da una vuelta al pincel; el remolino arrastra el pigmento y el agua se aclara. Sin tocar
+    // nada también se limpia, más despacio.
+    J.phase='mix';J.stirAt=J.clock;Audio.sfx('bubbles',{vol:.3});
+    const passive=repeat?.004:.0022,lazy=repeat?50:100;let idle=0,notes=0;
+    for(let n=0;J.prog<1&&n<1500;n++){
+      if(hit('ok')){J.spin=Math.min(1,J.spin+.24);J.prog=Math.min(1,J.prog+.085);idle=0;J.wob=Math.min(1.4,J.wob+.4);J.pressAt=J.clock;
+        Audio.sfx('slow_drip',{semi:[0,2,4,7,9,12,14,16,19][notes%9],vol:.34});notes++;
+        J.rings.push({x:Math.round(Math.cos(J.stirA)*6),t:0,life:26,col:C(WORLD_COLORS[notes%6])});
+        for(let b=0;b<3;b++)J.bubbles.push({x:18+((J.clock*5+b*7)%17),y:58,v:.5+b*.15,r:b%2?2:1,t:0});
+        if(Prefs.shake&&J.spin>.8)OW.shake=1;}
+      else idle++;
+      J.prog=Math.min(1,J.prog+(idle>lazy?passive*2.5:passive));
+      J.spin*=.965;J.stirA+=.04+J.spin*.3;J.charge=.2+J.spin*.8;J.mud=Math.max(0,1-J.prog);
+      if(idle>lazy&&n%30===0)Audio.sfx('slow_drip',{semi:[0,4,7][n/30%3|0],vol:.2});
+      yield;
+    }
+    J.phase='clear';J.mud=0;Audio.sfx('heal_bells',{vol:.75});if(Prefs.shake)OW.shake=2;
+    for(let n=0;n<36;n++){J.clarity=(n+1)/36;J.rainbow=(n+1)/30;J.spin*=.9;J.charge*=.94;J.glow=Math.sin(n/36*Math.PI);yield;}
+    // Salen de una en una, casi en cadena, llenas de color.
     J.phase='exit';
-    for(let i=0;i<Party.length;i++){
-      const p=Party[i],to=J.pos[i],s=effStats(p),dh=s.hp-p.cur.hp,dm=s.mp-p.cur.mp;
-      J.hidden[i]=false;J.inside[i]=0;J.clean[i]=true;p.cur.hp=s.hp;p.cur.mp=s.mp;rinseSplash(i,.65);
-      J.gain[i]={hp0:s.hp-dh,mp0:s.mp-dm,hp:s.hp,mp:s.mp,dh,dm,at:J.clock};Audio.sfx('tinkle',{semi:[0,4,7][i]+12,vol:.3,when:.35});
-      for(let n=1;n<=24;n++){
-        const q=n/24;J.jump[i]=[lerp(cx+(i-1)*4,to[0],q),lerp(sy+6,to[1],q),Math.sin(q*Math.PI)*(30+i*3),Math.sin(q*Math.PI*2)*(1-i)*.12,.93,1.08];yield;
+    const outStart=[0,1,2].map(i=>i*(repeat?9:13)),outFrames=24,out=[false,false,false],began=[false,false,false];
+    for(let f=0;!out.every(Boolean)&&f<400;f++){
+      for(let i=0;i<3;i++){
+        const k=f-outStart[i],p=Party[i],to=J.pos[i];if(out[i]||k<0)continue;
+        if(!began[i]){began[i]=true;const s=effStats(p),dh=s.hp-p.cur.hp,dm=s.mp-p.cur.mp;J.hidden[i]=false;J.inside[i]=0;J.clean[i]=true;p.cur.hp=s.hp;p.cur.mp=s.mp;rinseSplash(i,.65);
+          J.gain[i]={hp0:s.hp-dh,mp0:s.mp-dm,hp:s.hp,mp:s.mp,dh,dm,at:J.clock};Audio.sfx('tinkle',{semi:[0,4,7][i]+12,vol:.3,when:.35});}
+        const n=Math.min(outFrames,k+1),q=n/outFrames;
+        if(k<outFrames)J.jump[i]=[lerp(cx+(i-1)*4,to[0],q),lerp(sy+6,to[1],q),Math.sin(q*Math.PI)*(30+i*3),Math.sin(q*Math.PI*2)*(1-i)*.12,.93,1.08];
+        else if(k===outFrames){J.jump[i]=null;Audio.sfx('plop',{semi:[0,4,7][i],vol:.28});Audio.sfx('tinkle',{semi:[0,4,7][i],vol:.35});rinseBurst(i,to);}
+        else if(k<outFrames+9)J.squash[i]=Math.sin((k-outFrames)/8*Math.PI)*.65;
+        else{J.squash[i]=0;out[i]=true;}
       }
-      J.jump[i]=null;Audio.sfx('plop',{semi:[0,4,7][i],vol:.28});Audio.sfx('tinkle',{semi:[0,4,7][i],vol:.35});
-      rinseBurst(i,to);
-      for(let n=0;n<8;n++){J.squash[i]=Math.sin((n+1)/8*Math.PI)*.65;yield;}J.squash[i]=0;
+      yield;
     }
     J.phase='settle';
-    for(let n=0;n<24;n++){rinseFocus(1-(n+1)/24,cam);J.clarity=1;yield;}
+    for(let n=0;n<24;n++){rinseFocus(1-(n+1)/24,cam);J.clarity=1;J.rainbow=Math.max(0,J.rainbow-.05);yield;}
     J.visits++;J.toast=150;J.gain=[null,null,null];J.full=[0,0,0];
   } finally {
-    J.phase='idle';J.zoom=1;J.focus=0;J.glow=0;J.charge=0;J.clarity=0;J.inside=[0,0,0];J.hidden=[false,false,false];J.jump=[null,null,null];J.squash=[0,0,0];J.tint=[];J.cd=1;
+    J.phase='idle';J.zoom=1;J.focus=0;J.glow=0;J.charge=0;J.clarity=0;J.inside=[0,0,0];J.hidden=[false,false,false];J.jump=[null,null,null];J.squash=[0,0,0];J.tint=[];J.cd=1;J.mud=0;J.spin=0;J.rainbow=0;
     OW.hist=hist;OW.cam.x=cam.x;OW.cam.y=cam.y;OW.vx=OW.vy=0;OW.moving=false;
   }
 }

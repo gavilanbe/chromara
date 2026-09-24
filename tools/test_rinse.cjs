@@ -18,7 +18,7 @@ const base=process.argv.find(a=>a.startsWith('http'))||'http://127.0.0.1:8765';
         setup(){resetGame();Game.state='overworld';Game.paused=true;Game.intro=false;OW.msg=null;Game.overlay=null;releaseInputs();
           OW.x=MAP.jar.x*TILE+16;OW.y=MAP.jar.y*TILE+40;OW.cam.x=0;OW.cam.y=OW.y-H/2;
           OW.hist=Array.from({length:40},(_,i)=>[OW.x+Math.min(i,24),OW.y+Math.min(i,12)]);
-          Party.forEach((p,i)=>{p.cur.hp=i?1:0;p.cur.mp=0;});
+          Party.forEach((p,i)=>{p.cur.hp=i?1:0;p.cur.mp=0;});pressed.ok=true;
         },
         finish(){let n=0;while(OW.heal){if(++n>700)throw new Error('Rinse never ends');updateOverworld();render();}return n;},
         verify(){return{full:Party.every(p=>p.cur.hp===effStats(p).hp&&p.cur.mp===effStats(p).mp),visible:OW.jar.hidden.every(v=>!v)&&OW.jar.inside.every(v=>!v)&&OW.jar.jump.every(v=>!v),zoom:OW.jar.zoom,phase:OW.jar.phase,cd:OW.jar.cd};}
@@ -39,6 +39,14 @@ const base=process.argv.find(a=>a.startsWith('http'))||'http://127.0.0.1:8765';
     assert.deepEqual(first.stages,['focus','enter','mix','clear','exit','settle','idle']);assert.deepEqual(first.fills,[0,1,2,3]);
     assert.equal(first.events.filter(e=>e.name==='splash_clean').length,6);assert.equal(first.events.filter(e=>e.name==='heal_bells').length,1);
     console.log('PASS every phase, visible immersion, six splashes, full healing including KO, original positions and camera');
+    const manual=await page.evaluate(()=>{
+      rinseTest.setup();pressed.ok=false;for(let i=0;i<120;i++)updateOverworld();const waited=!OW.heal&&OW.jar.near;
+      const passive=(()=>{pressed.ok=true;updateOverworld();let n=0;while(OW.heal&&OW.jar.phase!=='clear'){if(++n>900)break;updateOverworld();}rinseTest.finish();return n;})();
+      rinseTest.setup();updateOverworld();let n=0,presses=0;while(OW.heal&&OW.jar.phase!=='clear'){if(++n>900)break;if(OW.jar.phase==='mix'&&n%6===0){pressed.ok=true;presses++;}updateOverworld();}rinseTest.finish();
+      return{waited,passive,stirred:n,presses,...rinseTest.verify()};
+    });
+    assert(manual.waited,'standing by the glass must not start the visit by itself');assert(manual.stirred<manual.passive-60,'stirring should clean faster: '+JSON.stringify(manual));assert(manual.full&&manual.visible);
+    console.log('PASS the glass waits for the player; pressing to stir clears the water faster than waiting');
     const words=await page.evaluate(()=>{rinseTest.setup();updateOverworld();const seen=new Set();let n=0;
       while(OW.heal){if(++n>900)break;updateOverworld();if(!OW.heal)break;UI_TEXT.length=0;render();for(const t of UI_TEXT)seen.add(t.text);}return[...seen];});
     assert.deepEqual(words,[],'the rinse should speak only in pictures: '+words.join(' | '));
@@ -46,7 +54,7 @@ const base=process.argv.find(a=>a.startsWith('http'))||'http://127.0.0.1:8765';
 
     const repeat=await page.evaluate(()=>{
       for(let i=0;i<180;i++)updateOverworld();const noLoop=!OW.heal&&OW.jar.visits===1;
-      OW.x+=70;OW.msg=null;updateOverworld();const rearmed=OW.jar.cd===0;OW.x-=70;OW.msg=null;updateOverworld();
+      OW.x+=70;OW.msg=null;updateOverworld();const rearmed=OW.jar.cd===0;OW.x-=70;OW.msg=null;pressed.ok=true;updateOverworld();
       const n=rinseTest.finish();return{noLoop,rearmed,n,visits:OW.jar.visits,...rinseTest.verify()};
     });
     assert(repeat.noLoop&&repeat.rearmed&&repeat.full&&repeat.visible);assert.equal(repeat.visits,2);assert(repeat.n<first.t-50);
