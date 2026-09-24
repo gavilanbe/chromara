@@ -493,7 +493,7 @@ function updateOverworld() {
     const d = Math.hypot(OW.x - f.x, OW.y - f.y);
     if (d < 56 && !f.seen) { f.seen = true; f.alert = 30; if (f.boss) { Audio.sfx('impact_sub', { vol: .35 }); OW.shake = 2; } else Audio.sfx('detect'); } else if (d > 96) f.seen = false; // la jefa no grita "!": el suelo retumba
     if (f.alert > 0) f.alert--;
-    if (f.boss) { f.x = f.hx; f.y = f.hy; }
+    if (f.boss || f.contra) { f.x = f.hx; f.y = f.hy; }
     else if (d < 56) { if (f.alert > 12) { /* se queda quieto un instante al verte */ } else { const a = Math.atan2(OW.y - f.y, OW.x - f.x); const nx = f.x + Math.cos(a) * .85, ny = f.y + Math.sin(a) * .85; if (walkable(nx, ny)) { f.x = nx; f.y = ny; } } }
     else { if (--f.t <= 0) { f.t = RI(60, 150); f.tx = f.hx + R(-24, 24); f.ty = f.hy + R(-16, 16); } const a = Math.atan2(f.ty - f.y, f.tx - f.x); if (Math.hypot(f.tx - f.x, f.ty - f.y) > 2) { const nx = f.x + Math.cos(a) * .4, ny = f.y + Math.sin(a) * .4; if (walkable(nx, ny)) { f.x = nx; f.y = ny; } } }
     f.dirLeft = (d < 56 ? OW.x < f.x : f.tx < f.x);
@@ -582,6 +582,7 @@ function drawOverworld() {
   for (const f of OW.foes) {
     if (Game.defeated.has(f.key) || OW.hideFoe === f) continue; // hideFoe: la transición lo dibuja ella (se agazapa y salta)
     const e = DATA.enemies[f.enemies[0]], core = e.color === 'negro' ? null : C(e.color);
+    if (f.contra && typeof drawContraFoe === 'function') { ents.push({ y: f.y, draw: () => drawContraFoe(f, cx, cy) }); continue; }
     if (f.boss) { // la jefa no bota ni avisa con "!": es una masa pesada que respira sobre su charco y, cuando te acercas, el charco hace ondas
       ents.push({ y: f.y, draw: () => { const x = f.x - cx, y = f.y - cy, br = 1 + Math.sin(OW.t * .045 + f.seed) * .035; g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(x, y + 4, 14, 4, 0, 0, 6.29); g.fill();
         if (f.seen) for (let r = 0; r < 2; r++) { const q = ((OW.t / 70 + r * .5) % 1); g.strokeStyle = 'rgba(74,70,100,' + (.55 * (1 - q)).toFixed(2) + ')'; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y + 4, 14 + q * 34, 4 + q * 12, 0, 0, 6.29); g.stroke(); }

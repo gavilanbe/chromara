@@ -136,5 +136,23 @@
       -24.7,
       -21.1
     ]
+  },
+  "contrarios": {
+    "duration": 99.0,
+    "peakDBFS": -2.59,
+    "integratedLUFS": -18.99,
+    "truePeakDBTP": -2.56,
+    "loudnessRangeLU": 4.3,
+    "sha256": "058c3c41a45e62c9d7a8a29af077fb6380fbf58272bd9781d5450ee8c397dc5a",
+    "loopStart": 51.0,
+    "loopEnd": 99.0,
+    "seamJump": 0.003999,
+    "localDerivativeRMS": 0.0179,
+    "eightBarRMSDB": [
+      -21.9,
+      -21.3,
+      -21.7,
+      -20.7
+    ]
   }
 }

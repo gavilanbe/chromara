@@ -19,9 +19,9 @@ import wave
 ROOT = Path(__file__).resolve().parent.parent
 MUSIC = ROOT / 'music'
 TARGETS = dict(title=-21, map=-21, battle=-19, boss=-19, victory=-18,
-               gameover=-23, atelier=-22, prelude=-24, restored=-20)
+               gameover=-23, atelier=-22, prelude=-24, restored=-20, contrarios=-19)
 TITLES = dict(title='El cuaderno se abre', map='Chromara apagada', battle='Mezcla de colores',
-              boss='La Tinta', victory='Una gota más de luz', gameover='Los colores se apagan')
+              boss='La Tinta', victory='Una gota más de luz', gameover='Los colores se apagan', contrarios='Los Contrarios')
 
 
 def run(*args):

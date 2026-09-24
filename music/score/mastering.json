@@ -70,5 +70,13 @@
     "estimatedOutputLUFS": -20.0,
     "estimatedTruePeakDB": -8.17,
     "bytes": 1669993
+  },
+  "contrarios": {
+    "inputLUFS": -19.04,
+    "inputTruePeakDB": -2.71,
+    "gainDB": 0.04,
+    "estimatedOutputLUFS": -19.0,
+    "estimatedTruePeakDB": -2.67,
+    "bytes": 1309669
   }
 }

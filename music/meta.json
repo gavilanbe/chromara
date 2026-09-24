@@ -780,5 +780,261 @@
     "maxWrittenPolyphony": 7,
     "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive",
     "edition": "suite-v4"
+  },
+  "contrarios": {
+    "title": "Los Contrarios",
+    "bpm": 160,
+    "meter": "4/4",
+    "key": "D locrian colours over D minor; mirrored Tres gotas",
+    "intro_s": 3.0,
+    "loop_s": 48.0,
+    "loop": true,
+    "loopStart": 51.0,
+    "loopEnd": 99.0,
+    "duration": 99.0,
+    "loopStartSample": 1632000,
+    "loopEndSample": 3168000,
+    "sampleRate": 32000,
+    "form": "riff:2; A:8 sax song (mirrored hook); A′:8 guitar answers, square in fourths; B:8 the stolen hook, locrian, closing on one D; C:8 riff breakdown + climb down",
+    "instruments": [
+      "bass",
+      "hat",
+      "kick",
+      "square",
+      "snare",
+      "tom",
+      "timpani",
+      "crash",
+      "sax",
+      "organ",
+      "guit",
+      "choir"
+    ],
+    "edition": "contrarios-v1",
+    "motif": "Tres gotas mirrored: three hammered eighths, leap DOWN a third, dotted RISE (D D D Bb | C. D Eb). Prism inverted: D-Bb-C-G.",
+    "performance": "Written attacks and durations; CC11 swells through the unison and the descent; velocities per note.",
+    "listeningMarks": [
+      {
+        "seconds": 0.0,
+        "label": "Riff invertido"
+      },
+      {
+        "seconds": 3.0,
+        "label": "Moho"
+      },
+      {
+        "seconds": 15.0,
+        "label": "Moratón y Óxido"
+      },
+      {
+        "seconds": 27.0,
+        "label": "La mezcla sucia"
+      },
+      {
+        "seconds": 37.5,
+        "label": "Negro"
+      },
+      {
+        "seconds": 39.0,
+        "label": "A pulso"
+      },
+      {
+        "seconds": 45.0,
+        "label": "Bajada"
+      },
+      {
+        "seconds": 51.0,
+        "label": "Bucle"
+      }
+    ],
+    "automationEvents": {
+      "sax": 1275,
+      "square": 1023,
+      "choir": 1776
+    },
+    "maxWrittenPolyphony": 11,
+    "source": "Chrono Trigger.sf2 (2011), Xouman / William Kage archive",
+    "stemBalance": {
+      "bass": {
+        "program": 38,
+        "bank": 0,
+        "gain": 0.66,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -27.3,
+        "peakDB": -16.77,
+        "eightBarRMSDB": [
+          -29.09,
+          -28.41,
+          -27.7,
+          -28.15
+        ]
+      },
+      "hat": {
+        "program": 127,
+        "bank": 0,
+        "gain": 0.85,
+        "pan": 82,
+        "echoSend": 0,
+        "activeRMSDB": -43.58,
+        "peakDB": -25.34,
+        "eightBarRMSDB": [
+          -47.0,
+          -47.0,
+          -53.52,
+          -46.81
+        ]
+      },
+      "kick": {
+        "program": 125,
+        "bank": 0,
+        "gain": 0.76,
+        "pan": 64,
+        "echoSend": 0,
+        "activeRMSDB": -27.41,
+        "peakDB": -15.65,
+        "eightBarRMSDB": [
+          -33.01,
+          -33.01,
+          -35.85,
+          -32.6
+        ]
+      },
+      "square": {
+        "program": 80,
+        "bank": 0,
+        "gain": 0.42,
+        "pan": 72,
+        "echoSend": 0.16,
+        "activeRMSDB": -32.92,
+        "peakDB": -20.83,
+        "eightBarRMSDB": [
+          -180.0,
+          -38.58,
+          -37.72,
+          -35.66
+        ]
+      },
+      "snare": {
+        "program": 124,
+        "bank": 0,
+        "gain": 0.68,
+        "pan": 66,
+        "echoSend": 0.04,
+        "activeRMSDB": -29.39,
+        "peakDB": -13.75,
+        "eightBarRMSDB": [
+          -34.81,
+          -34.81,
+          -37.73,
+          -32.04
+        ]
+      },
+      "tom": {
+        "program": 116,
+        "bank": 0,
+        "gain": 0.4,
+        "pan": 46,
+        "echoSend": 0.06,
+        "activeRMSDB": -28.42,
+        "peakDB": -15.27,
+        "eightBarRMSDB": [
+          -42.55,
+          -42.28,
+          -42.55,
+          -40.69
+        ]
+      },
+      "timpani": {
+        "program": 47,
+        "bank": 0,
+        "gain": 0.55,
+        "pan": 58,
+        "echoSend": 0.06,
+        "activeRMSDB": -34.87,
+        "peakDB": -18.7,
+        "eightBarRMSDB": [
+          -74.31,
+          -180.0,
+          -45.66,
+          -180.0
+        ]
+      },
+      "crash": {
+        "program": 123,
+        "bank": 1,
+        "gain": 0.62,
+        "pan": 50,
+        "echoSend": 0.1,
+        "activeRMSDB": -42.49,
+        "peakDB": -22.39,
+        "eightBarRMSDB": [
+          -51.75,
+          -51.75,
+          -50.36,
+          -48.74
+        ]
+      },
+      "sax": {
+        "program": 65,
+        "bank": 0,
+        "gain": 1.05,
+        "pan": 54,
+        "echoSend": 0.12,
+        "activeRMSDB": -30.01,
+        "peakDB": -13.49,
+        "eightBarRMSDB": [
+          -30.77,
+          -30.47,
+          -34.96,
+          -34.26
+        ]
+      },
+      "organ": {
+        "program": 17,
+        "bank": 0,
+        "gain": 0.34,
+        "pan": 40,
+        "echoSend": 0.08,
+        "activeRMSDB": -37.9,
+        "peakDB": -23.71,
+        "eightBarRMSDB": [
+          -43.64,
+          -43.09,
+          -180.0,
+          -43.72
+        ]
+      },
+      "guit": {
+        "program": 30,
+        "bank": 0,
+        "gain": 0.52,
+        "pan": 84,
+        "echoSend": 0.1,
+        "activeRMSDB": -37.36,
+        "peakDB": -23.45,
+        "eightBarRMSDB": [
+          -180.0,
+          -49.81,
+          -37.4,
+          -41.68
+        ]
+      },
+      "choir": {
+        "program": 52,
+        "bank": 0,
+        "gain": 0.7,
+        "pan": 64,
+        "echoSend": 0.2,
+        "activeRMSDB": -36.66,
+        "peakDB": -18.97,
+        "eightBarRMSDB": [
+          -180.0,
+          -180.0,
+          -37.0,
+          -180.0
+        ]
+      }
+    }
   }
 }

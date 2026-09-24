@@ -14,6 +14,7 @@ from compose_score import (ROOT, MUSIC, SR, PALETTE, Score, Synth, pitch,
 from combat_score import PERCUSSION
 from battle_tres_gotas import battle
 from boss_la_mancha import boss
+from battle_contrarios import contrarios
 
 PALETTE.update({
     'piano': (0,.72,60,.13), 'rhodes': (4,.66,86,.20),
@@ -154,13 +155,13 @@ def export_fallback(score,meta):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--soundfont',required=True,type=Path)
     parser.add_argument('--render-dir',type=Path,default=MUSIC)
-    parser.add_argument('--cues',nargs='+',choices=['title','map','battle','boss','victory','gameover','atelier','prelude','restored'])
+    parser.add_argument('--cues',nargs='+',choices=['title','map','battle','boss','victory','gameover','atelier','prelude','restored','contrarios'])
     args=parser.parse_args();args.render_dir.mkdir(parents=True,exist_ok=True)
     synth=Synth(args.soundfont);meta={};fallback={}
     if args.cues:
         meta=json.loads((MUSIC/'meta.json').read_text())
         src=(ROOT/'music_fallback.js').read_text();fallback=json.loads(src[src.index(' = ')+3:].rstrip(';\n'))
-    pieces=[title(),overworld(),battle(),boss(),victory(),defeat(),atelier(),prelude(),restored()]
+    pieces=[title(),overworld(),battle(),boss(),victory(),defeat(),atelier(),prelude(),restored(),contrarios()]
     if args.cues:pieces=[s for s in pieces if s.name in args.cues]
     for score in pieces:
         score.midi();m=render_score(score,synth,args.render_dir/(score.name+'.wav'));m.setdefault('edition','suite-v4')

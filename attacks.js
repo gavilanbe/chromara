@@ -29,6 +29,7 @@ function ghostsOf(u) {
 function shadowFx(wx, wy, r, dur) { const f = fx(dur, () => { const c = project(wx, wy, 0); if (c) shadow(c[0], c[1], Math.round(r * c[2])); }, true); return f; }
 function flakes(t, col, n = 8) { for (let i = 0; i < n; i++) B.particles.push({ wx: t.wx + R(-t.def.w * .4, t.def.w * .4), wy: t.wy + R(-3, 3), wz: R(2, t.def.h), vx: R(-.2, .2), vy: 0, vz: 0, g: .05, col, t: 0, life: 26, size: 2 }); }
 function drips(wx, wy, wz, col, n = 6) { for (let i = 0; i < n; i++) B.particles.push({ wx: wx + R(-6, 6), wy: wy + R(-3, 3), wz, vx: 0, vy: 0, vz: -R(.2, .6), g: .06, col, t: RI(-8, 0), life: 22, size: 2 }); }
+const teamOf = u => u.kind === 'party' ? B.party : B.enemies; // el bando de quien actúa: una mezcla de los Contrarios cura a los suyos
 function* returnHome(u, n = 12) {
   u.pose = 'hop'; yield* whop(u, u.hx, u.hy, n, 10); u.wz = 0; u.pose = 'idle';
   for (let i = 0; i < 6; i++) { const k = Math.sin((i + 1) / 6 * Math.PI) * (Prefs.shake ? .1 : 0); u.gesture = {sx:1 + k,sy:1 - k}; yield; }
@@ -805,12 +806,12 @@ function* techBrote(users, targets, tech, col) {
     if (i > 8 && i % 3 === 0) { for (const t of targets) B.particles.push({ wx: t.wx + R(-8, 8), wy: t.wy + R(-4, 4), wz: t.def.h * 1.6 + 4, vx: R(-.3, .3), vy: R(-.2, .2), vz: -R(.1, .3), g: .01, col: i % 2 ? YE : BL, t: 0, life: 40, size: 2 }); B.particles.push({ wx: sp[0] + R(-6, 6), wy: sp[1] + R(-3, 3), wz: 54, vx: R(-.4, .4), vy: 0, vz: -R(.1, .3), g: .012, col: i % 2 ? BL : YE, t: 0, life: 44, size: 2 }); }
     yield; }
   // 8) polen: motas doradas y verdes vuelan de la flor a cada gota del grupo; al llegar, cura y una florecilla se abre sobre su cabeza
-  camFocus(pc[0], pc[1], { dist: 100, turn: .25, h: 54, pitch: .56, ease: .08, subjects: alive(B.party), headroom: 34, points: [[sp[0], sp[1], 56, 10]] });
+  camFocus(pc[0], pc[1], { dist: 100, turn: .25, h: 54, pitch: .56, ease: .08, subjects: alive(teamOf(users[0])), headroom: 34, points: [[sp[0], sp[1], 56, 10]] });
   Audio.sfx('tinkle', { semi: 4 });
-  for (const p of alive(B.party)) for (let j = 0; j < 16; j++) B.particles.push({ wx: sp[0] + R(-6, 6), wy: sp[1] + R(-3, 3), wz: 52 + R(0, 8), tx: p.wx + R(-4, 4), ty: p.wy + R(-2, 2), tz: p.def.h * .6, col: j % 3 ? '#fbe28a' : LP.bud, t: -RI(0, 14), life: 30, dur: 30, arc: 24, stream: true, size: 2 });
-  const crowns = alive(B.party).map((p, j) => ({ p, k: 0, j })), cf = fx(999, () => { for (const c of crowns) { if (c.k <= 0) continue; const q = PJ(above(c.p, 1.25)); pixFlower(q[0], q[1] - 4 * c.k * q[2], c.k, q[2] * .9, cf.t + c.j * 4, c.j + 3); } });
+  for (const p of alive(teamOf(users[0]))) for (let j = 0; j < 16; j++) B.particles.push({ wx: sp[0] + R(-6, 6), wy: sp[1] + R(-3, 3), wz: 52 + R(0, 8), tx: p.wx + R(-4, 4), ty: p.wy + R(-2, 2), tz: p.def.h * .6, col: j % 3 ? '#fbe28a' : LP.bud, t: -RI(0, 14), life: 30, dur: 30, arc: 24, stream: true, size: 2 });
+  const crowns = alive(teamOf(users[0])).map((p, j) => ({ p, k: 0, j })), cf = fx(999, () => { for (const c of crowns) { if (c.k <= 0) continue; const q = PJ(above(c.p, 1.25)); pixFlower(q[0], q[1] - 4 * c.k * q[2], c.k, q[2] * .9, cf.t + c.j * 4, c.j + 3); } });
   yield* wait(30);
-  for (const p of alive(B.party)) { heal(p, Math.round(p.maxhp * tech.heal)); p.uiHeal = 20; sparkle(p.wx, p.wy, p.def.h + 8, '#fbe28a'); }
+  for (const p of alive(teamOf(users[0]))) { heal(p, Math.round(p.maxhp * tech.heal)); p.uiHeal = 20; sparkle(p.wx, p.wy, p.def.h + 8, '#fbe28a'); }
   for (let i = 1; i <= 26; i++) { crowns.forEach(c => c.k = i <= 10 ? i / 10 : i > 18 ? Math.max(0, (26 - i) / 8) : 1); if (i % 3 === 0) for (const c of crowns) B.particles.push({ wx: c.p.wx + R(-5, 5), wy: c.p.wy + R(-2, 2), wz: c.p.def.h * 1.3, vx: R(-.2, .2), vy: 0, vz: -R(.1, .25), g: .012, col: i % 2 ? YE : BL, t: 0, life: 30, size: 2 }); yield; }
   cf.dur = 0;
   // 9) el sol se apaga, el tallo vuelve a la tierra y quedan el charco verde y unas hojas caídas; los dos vuelven a su sitio
@@ -879,9 +880,9 @@ function* techSelva(users, targets, tech, col) {
   }
   roots.forEach(r => { r.t.wz = 0; r.t.sqz = 0; });
   // 5) la copa florece y suelta frutos que caen sobre el grupo: cada fruto que llega cura
-  camFocus(pc[0], pc[1], { dist: 92, turn: .3, h: 54, pitch: .48, ease: .08, subjects: alive(B.party), headroom: 40, points: [[sp[0], sp[1], TOP, 18]] });
+  camFocus(pc[0], pc[1], { dist: 92, turn: .3, h: 54, pitch: .48, ease: .08, subjects: alive(teamOf(users[0])), headroom: 40, points: [[sp[0], sp[1], TOP, 18]] });
   Audio.sfx('heal_bells'); for (let i = 1; i <= 12; i++) { tree.bloom = i / 12; yield; }
-  const fruits = alive(B.party).flatMap((p, j) => [0, 1].map(k => ({ p, from: [sp[0] + R(-14, 14), sp[1] + R(-4, 4), TOP - 6], k: -(j * 5 + k * 9), col: k ? BL : YE, done: false })));
+  const fruits = alive(teamOf(users[0])).flatMap((p, j) => [0, 1].map(k => ({ p, from: [sp[0] + R(-14, 14), sp[1] + R(-4, 4), TOP - 6], k: -(j * 5 + k * 9), col: k ? BL : YE, done: false })));
   const ff = fx(999, () => { for (const f of fruits) { if (f.k <= 0 || f.k >= 1) continue; const q = f.k, c = PJ([lerp(f.from[0], f.p.wx, q), lerp(f.from[1], f.p.wy, q), lerp(f.from[2], f.p.def.h * .9, q) + Math.sin(q * Math.PI) * 18]), r = Math.max(2, 3.5 * c[2]), rp = ramp(f.col); pixDisc(c[0], c[1], r, f.col, rp.out, rp.hi); g.fillStyle = LP.base; g.fillRect(Math.round(c[0]), Math.round(c[1] - r - 2), 1, 2); } });
   const healed = new Set();
   for (let i = 0; i < 44; i++) { for (const f of fruits) { if (f.done) continue; f.k += 1 / 18; if (f.k >= 1) { f.done = true; Audio.sfx('plop', { semi: 5 }); burst(f.p.wx, f.p.wy, f.p.def.h, f.col, 6, 1.2, 16, .06); if (!healed.has(f.p)) { healed.add(f.p); heal(f.p, Math.round(f.p.maxhp * tech.heal)); f.p.uiHeal = 20; sparkle(f.p.wx, f.p.wy, f.p.def.h + 8, '#fbe28a'); f.p.pose = 'happy'; } } }
@@ -891,7 +892,7 @@ function* techSelva(users, targets, tech, col) {
   for (let i = 1; i <= 16; i++) { tree.alpha = 1 - i / 16; yield; }
   tf.dur = 0; rg.dur = 0; rc.dur = 0;
   for (let i = 0; i < 5; i++) mark({ kind: 'blob', p: [sp[0] + R(-18, 18), sp[1] + R(-7, 7), 0], w: 5, col: i % 2 ? LP.base : LP.hi, grow: 4, life: 240, seed: 31 + i, under: true });
-  users.forEach(u => { u.pose = 'idle'; u.wz = 0; }); alive(B.party).forEach(p => { if (p.pose === 'happy') p.pose = 'idle'; }); yield* wait(6); camReset();
+  users.forEach(u => { u.pose = 'idle'; u.wz = 0; }); alive(teamOf(users[0])).forEach(p => { if (p.pose === 'happy') p.pose = 'idle'; }); yield* wait(6); camReset();
 }
 const i2 = (a, b) => Math.random() < .5 ? a : b;
 // Eclipse pintado: la página se hace de noche y Carmín pinta un sol rojo en el cielo con la brocha (tres pasadas que lo revelan por
@@ -1274,6 +1275,7 @@ function* actEnemy(u) {
     else { applyStatus(target, 'tiznado', 3); mark({ kind: 'blob', p: [target.wx, target.wy, target.def.h * .4], w: 10, col: C('negro'), seed: target.idx, life: 70 }); burst(target.wx, target.wy, target.def.h * .5, C('negro'), 12, 1.5); goop(target, C('negro'), 60); }
     u.pose = 'idle'; yield* wait(10); camReset(); return;
   }
+  if ((intent.kind === 'mix' || intent.kind === 'negro') && typeof contraAct === 'function') { yield* contraAct(u, intent, targets, target); return; }
   if (intent.kind === 'tech' && u.data.tech) { const tech = { ...DATA.techs[u.data.tech], id: u.data.tech }, all = ['rafaga','aguada','salpicon','taquigrafia'].includes(u.data.tech); yield* actTech([u], tech, all ? targets : [target], u.color); return; }
   if (u.id === 'devoralineas' && typeof devoralineasStrike === 'function') yield* devoralineasStrike(u,target);
   else yield* actAttack(u, target);

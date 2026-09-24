@@ -57,6 +57,27 @@ Duraciones y velocidades escritas por nota, como en la batalla. El coro crece co
 
 Los tres bocetos previos están en `sketches/boss1..3` (partitura en `tools/boss_sketches.py`): «La mancha», «Contorno roto» (7/8) y «Trazo y sombra» (100 bpm, coral).
 
+## Los Contrarios · 160 bpm
+
+[Escuchar](contrarios.mp3). Moho, Moratón y Óxido son lo opuesto de las tres gotas, así que su combate es **«Tres gotas» del revés**: mismo tempo, misma forma de 32 compases, los mismos ritmos, y cada contorno en espejo. La partitura está en `tools/battle_contrarios.py`.
+
+**El gancho invertido.** Tres corcheas martilleadas sobre la misma nota, pero el salto de tercera va **hacia abajo** y la caída con puntillo **sube**: Re Re Re Si♭ | Do· Re Mi♭, donde las gotas cantan Re Re Re Fa | Mi· Re Do. La célula del Prisma aparece también invertida y sucia, **Re–Si♭–Do–Sol**. El color es Re locrio: el Mi♭ pudre nuestro Mi y el La♭, a un tritono de Re, pudre nuestro La.
+
+**Cada Contrario contra un instrumento.** Moho canta con saxo, frente a la trompeta de Carmín; Moratón contesta con guitarra distorsionada, frente a la marimba de Ámbar; Óxido dobla con un solo de onda cuadrada, frente a la flauta de Añil. Donde Añil cantaba terceras cálidas por encima, Óxido dobla en cuartas frías por debajo. El riff hace raíz, raíz, octava **abajo**, tritono y un arrastre cromático hacia arriba; el bombo empuja a contratiempo.
+
+| Primera vuelta | Momento |
+|---|---|
+| 0:00 | Riff invertido y el Prisma al revés en la onda cuadrada |
+| 0:03 | A: Moho canta el gancho en espejo con saxo |
+| 0:15 | A′: la guitarra de Moratón contesta una octava abajo; Óxido dobla en cuartas |
+| 0:27 | B: la mezcla sucia; se burlan con el gancho de las gotas, teñido de locrio, sobre un pedal con el Mi♭ de la Tinta |
+| 0:37 | Los tres cierran en un solo Re con coro: juntos hacen el negro |
+| 0:39 | C: riff y batería con las gotas invertidas en ostinato |
+| 0:45 | Bajada Re–Si♭–La♭–La7, donde las gotas subían, con redoble |
+| 0:51 | Segunda vuelta, que el juego utiliza como bucle |
+
+Suena en el combate contra los tres juntos y contra El Negro. Masterizado a −19 LUFS como los otros combates. `test_score_performance.py` comprueba que encaja en el bucle sin reataques y que el gancho abre con tres notas martilleadas y salta hacia abajo. Como en el resto de la banda sonora, las comprobaciones verifican partitura y señal, no la escucha.
+
 ## Mezcla y comprobaciones
 
 La masterización usa ganancia constante, con objetivo de −19 LUFS para ambos combates. Los niveles por instrumento están en `stemBalance` de [meta.json](meta.json), y los picos y empalmes en [score/audio-audit.json](score/audio-audit.json).

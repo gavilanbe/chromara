@@ -11,6 +11,7 @@ import numpy as np
 from compose_score import Score, Synth
 from battle_tres_gotas import battle
 from boss_la_mancha import boss
+from battle_contrarios import contrarios
 
 
 class PerformanceTests(unittest.TestCase):
@@ -41,7 +42,14 @@ class PerformanceTests(unittest.TestCase):
         self.assertEqual(first,second)
 
     def test_battle_events_fit_loop_and_do_not_retrigger_held_pitches(self):
-        for make in (battle,boss):self.check_score(make())
+        for make in (battle,boss,contrarios):self.check_score(make())
+
+    def test_contrarios_mirror_the_three_drops(self):
+        # Los Contrarios open with the same three hammered eighths, but the leap goes DOWN and the dotted figure rises.
+        s=contrarios();sax=sorted(n for n in s.voices['sax'] if 8<=n[0]<12)
+        pitches=[p for _,_,p,_ in sax[:7]]
+        self.assertEqual(pitches[:3],[74,74,74]);self.assertLess(pitches[3],pitches[2]);self.assertGreater(pitches[6],pitches[4])
+        self.assertIn(32,[p for _,_,p,_ in s.voices['bass']],'the tritone (Ab1) is missing from the riff')
 
     def check_score(self,s):
         end=(s.intro+2*s.bars)*s.meter

@@ -122,7 +122,7 @@ function initBattle(foe) {
   const U = B.units.map(u => project(u.hx, u.hy, 0, SCENE.rest)).filter(Boolean);
   B.props = B.props.filter(o => { if (o.kind !== 'T') return true; const p = project(o.wx, o.wy, 0, SCENE.rest); if (!p) return true; return !U.some(q => p[3] < q[3] && Math.abs(p[0] - q[0]) < 34 && p[1] > q[1] - 12 && p[1] < q[1] + 70); });
   const ec = homeC(B.enemies); B.puddle = { wx: ec[0], wy: ec[1], rx: n === 1 ? 26 : 46, ry: n === 1 ? 12 : 20, k: 0 };
-  B.gen = foe.boss ? bossTransitionGen(foe) : transitionGen(foe);
+  B.gen = foe.contra && typeof contraTransitionGen === 'function' ? contraTransitionGen(foe) : foe.boss ? bossTransitionGen(foe) : transitionGen(foe);
   B.unitScale = .5; B.propScale = .5;
 }
 function startTransition(foe) { initBattle(foe); setState('transition'); }
@@ -223,7 +223,7 @@ function inkSplat(x, y, R, k, t, seed = 1, drips = true) {
 }
 // Transición de la jefa: el Tiznal retumba, La Tinta emerge, diálogo, la tinta inunda desde los bordes y se retira como una marea
 function* bossTransitionGen(foe) {
-  const T = B.tr; T.boss = true; T.foe = foe; OW.hideFoe = foe; Audio.prepare('prelude'); Audio.prepare('boss'); Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
+  const T = B.tr; T.boss = true; T.foe = foe; OW.hideFoe = foe; Audio.prepare('prelude'); Audio.prepare(DATA.enemies[foe.enemies[0]].music || 'boss'); Audio.stop(); Audio.sfx('hum_down', { vol: .7 });
   // retumba: la jefa pequeña del mapa se hunde en su charco (que crece) para emerger después a tamaño real, sin verse dos veces
   T.stage = 'rumble'; for (let i = 0; i < 50; i++) { T.k = i / 50; if (i % 10 === 0) { B.shake = 3; Audio.sfx('impact_sub', { vol: .35 }); } if (i === 30) Audio.sfx('slow_drip', { vol: .6 }); yield; }
   Audio.sfx('ink_jet'); Audio.sfx('splash', { when: .2 });
@@ -238,7 +238,7 @@ function* bossTransitionGen(foe) {
     if (hit('ok')) { if (T.dlg.ch < line.text.length) T.dlg.ch = line.text.length; else { T.dlg.i++; T.dlg.ch = 0; T.dlg.t = 0; T.dlg.hold = 0; T.dlg.wrote = 0; Audio.sfx('page', { vol: .5 }); } }
     yield; }
   // inundación: la tinta sube por los bordes hasta cubrirlo todo
-  T.stage = 'flood'; Audio.sfx('ink_jet'); Audio.sfx('hum_down', { vol: .6 }); Audio.play('boss');
+  T.stage = 'flood'; Audio.sfx('ink_jet'); Audio.sfx('hum_down', { vol: .6 }); Audio.play(DATA.enemies[foe.enemies[0]].music || 'boss');
   for (let i = 0; i < 46; i++) { T.k = i / 46; if (i === 40) B.shake = 6; yield; }
   T.overworld = false; T.stage = 'tide'; camSet(SCENE.rest); B.unitScale = 1; B.propScale = 1; B.puddle.k = 1;
   B.enemies.forEach(u => { u.wz = 0; }); B.party.forEach(u => { u.wx = u.hx; u.wy = u.hy; u.wz = 0; u.pose = 'idle'; });
@@ -278,6 +278,7 @@ function inkBlob(x, y, R, t, seed = 1, col = '#0b0912') {
 }
 function drawTransitionFx() {
   const T = B.tr; if (!T || !T.stage) return;
+  if (T.contra && typeof drawContraFx === 'function') { drawContraFx(T); return; }
   const lead = B.party[0];
   if (T.boss) { // jefa
     const foe = T.foe, fx0 = foe.x - Math.round(OW.cam.x), fy0 = foe.y - Math.round(OW.cam.y);

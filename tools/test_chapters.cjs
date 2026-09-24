@@ -90,23 +90,42 @@ test('the third leaf opens after the Devoralíneas, and its bridges only after t
   const near=(x,y)=>q.some(([a,b])=>Math.hypot(a-x,b-y)<24);return {lairs:CONTRA_LAIRS.map(l=>near(l.x*16+8,l.y*16+12)),fold:near(chapterPortal(1).x,chapterPortal(1).y),island:near(20*16+8,14*16+12)};})()`);
  assert.deepEqual(Array.from(reach.lairs),[true,true,true]);assert(reach.fold);assert.equal(reach.island,false);
  run(`['m','v','o'].forEach(k=>Game.defeated.add(k));`);assert.equal(run('walkable(20*16+8,10*16)'),true,'the bridges stay sealed');
- for(const k of ['m','v','o','X'])assert(run(`OW.foes.some(f=>f.key==='${k}')`),k);assert(run(`OW.foes.find(f=>f.key==='X').boss`));
+ for(const k of ['m','v','o','X'])assert(run(`OW.foes.some(f=>f.key==='${k}')`),k);assert(run(`OW.foes.find(f=>f.key==='X').contra`));assert.equal(run(`OW.foes.some(f=>f.key==='Z')`),false,'El Negro before the three fall');
  travel(1);travel(2);assert.equal(run('Game.page'),2);
 });
-test('each Contrario is its painter reversed: doubled colour both ways, its own tool and its colour technique',()=>{
- for(const [hero,contra] of [['rojo','moho'],['amarillo','moraton'],['azul','naranja']]) { const c=contra==='naranja'?'oxido':contra; assert.equal(run(`colorMult('${hero}','${c}')`),2);assert.equal(run(`colorMult('${c}','${hero}')`),2); }
- for(const key of ['m','v','o']){
-  run(`Party.forEach(p=>{const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'${key}',enemies:DATA.encounters['${key}'],boss:false});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();`);
-  const id=run('B.enemies[0].id');assert(run(`!!B.enemies[0].data.weapon&&!!B.enemies[0].data.tech`),id);
-  for(const kind of ['attack','tech']){const hp=run('B.party.reduce((a,u)=>a+u.hp,0)');
-   run(`(()=>{const u=B.enemies[0];u.acts=${kind==='tech'?1:0};planEnemy(u);if(u.intent.kind!=='${kind}')throw Error('intent '+u.intent.kind);B.actQueue.push(tracked(u,actEnemy(u),[u],{type:'enemy'}));})()`);
-   for(let i=0;run('B.actions.length||B.actQueue.length');i++){if(i>2000)throw Error(id+' '+kind+' never ends');run('updateBattle();render();');}
-   assert(run('B.party.reduce((a,u)=>a+u.hp,0)')<hp,id+' '+kind+' did no damage');assert.equal(run('B.currentAction'),null);
-   run('B.party.forEach(u=>{u.hp=u.maxhp;u.alive=true;u.pose="idle";})');}
- }
+test('the three Contrarios fight together as we do: tools, colour techniques, dirty mixes and a black rainbow',()=>{
+ for(const [hero,c] of [['rojo','moho'],['amarillo','moraton'],['azul','oxido']]) { assert.equal(run(`colorMult('${hero}','${c}')`),2);assert.equal(run(`colorMult('${c}','${hero}')`),2); }
+ const setup=()=>run(`Party.forEach(p=>{const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'X',enemies:DATA.encounters.X,boss:false});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();B.negroPlanned=false;`);
+ setup();assert.deepEqual(Array.from(run('B.enemies.map(e=>e.id)')),['moho','moraton','oxido']);
+ const play=(who,acts,expect)=>{const hp=run('B.party.reduce((a,u)=>a+u.hp,0)');
+  run(`(()=>{const u=B.enemies.find(e=>e.id==='${who}');u.acts=${acts};planEnemy(u);if(u.intent.kind!=='${expect}')throw Error('${who} planned '+u.intent.kind+' not ${expect}');B.actQueue.push(tracked(u,actEnemy(u),[u],{type:'enemy'}));})()`);
+  for(let i=0;run('B.actions.length||B.actQueue.length');i++){if(i>3000)throw Error(who+' '+expect+' never ends');run('updateBattle();render();');}
+  assert(run('B.party.reduce((a,u)=>a+u.hp,0)')<hp,who+' '+expect+' did no damage');assert.equal(run('B.currentAction'),null);
+  assert(run('B.enemies.every(e=>!e.acting)'),'a partner was left acting');run('B.party.forEach(u=>{u.hp=u.maxhp;u.alive=true;u.pose="idle";})');};
+ play('moho',0,'attack');play('moraton',1,'tech');play('oxido',1,'tech');
+ play('moho',2,'mix');play('moraton',2,'mix');
+ play('oxido',3,'negro');assert.equal(run('B.negroPlanned'),true);
+});
+test('the Contrarios have their own intro: they surface, talk, face each drop, flood the page and start their track',()=>{
+ run(`resetGame();Game.intro=false;OW.msg=null;CHAPTER.complete=true;chapterInstall(1);chapterInstall(2);['m','v','o'].forEach(k=>Game.defeated.add(k));OW.msg=null;var played=[];Audio.play=(n)=>played.push(n);`);
+ const stages=run(`(()=>{const foe=OW.foes.find(f=>f.key==='X');OW.x=foe.x;OW.y=foe.y+20;startTransition(foe);const seen=[];let n=0;
+  while(Game.state==='transition'){if(++n>4000)throw Error('intro never ends');if(B.tr&&B.tr.stage==='dialogue')pressed.ok=true;updateTransition();drawTransition();for(const k in pressed)pressed[k]=false;const s=B.tr&&B.tr.stage;if(s&&seen[seen.length-1]!==s)seen.push(s);}
+  return seen;})()`);
+ assert.deepEqual(Array.from(stages),['surface','dialogue','versus','flood','tide']);assert.equal(run('Game.state'),'battle');
+ assert(run(`played.includes('contrarios')`));assert.equal(run('DATA.bossDialogue'),run('DIRTY_DIALOGUE'),'the trio borrowed El Negro\'s dialogue and kept it');
+ run(`Audio.play=()=>{}`);
+});
+test('the three together can be beaten with the shared combat and starting supplies',()=>{
+ run(`Game.inventory={...DATA.inventory};Party.forEach((p,i)=>{p.weapon=DATA.party[i].weapon;p.acc=DATA.party[i].acc;const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'X',enemies:DATA.encounters.X,boss:false});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();B.negroPlanned=false;`);
+ const result=run(`(()=>{for(let f=0;f<60000&&B.phase==='fight';f++){
+  if(B.menu&&!B.currentAction){const u=B.menu.unit,dead=B.party.find(p=>!p.alive),weak=alive(B.party).sort((a,b)=>a.hp/a.maxhp-b.hp/b.maxhp)[0];let p={type:'attack'},t=alive(B.enemies).sort((a,b)=>a.hp-b.hp)[0];
+   if(dead&&Game.inventory.savia){p={type:'item',item:'savia'};t=dead;}else if(weak.hp<weak.maxhp*.55&&Game.inventory.gota_agua){p={type:'item',item:'gota_agua'};t=weak;}
+   if(!executeCommand(u,p,[t]))throw Error('Cannot perform selected action');}
+  updateBattle();if(f%9===0)render();}return {phase:B.phase,hp:B.party.map(p=>p.hp),enemies:B.enemies.map(e=>e.hp)};})()`);
+ assert.equal(result.phase,'victory',JSON.stringify(result));
 });
 test('El Negro fuses the three, changes with its phases and can be beaten with the shared combat',()=>{
- run(`Game.inventory={...DATA.inventory};Party.forEach((p,i)=>{p.weapon=DATA.party[i].weapon;p.acc=DATA.party[i].acc;const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'X',enemies:DATA.encounters.X,boss:true});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();var boss=B.enemies[0];`);
+ run(`Game.inventory={...DATA.inventory};Party.forEach((p,i)=>{p.weapon=DATA.party[i].weapon;p.acc=DATA.party[i].acc;const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'Z',enemies:DATA.encounters.Z,boss:true});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();var boss=B.enemies[0];`);
  run(`boss.hp=Math.ceil(boss.maxhp*.67);bossPhaseCheck(boss);render();`);assert(run('unitSpriteInfo(boss,0).spr.__key.includes("el_negro_2")'));
  run(`boss.hp=boss.maxhp;boss.bossPhase=1;`);
  const result=run(`(()=>{for(let f=0;f<60000&&B.phase==='fight';f++){
@@ -115,6 +134,6 @@ test('El Negro fuses the three, changes with its phases and can be beaten with t
    if(!executeCommand(u,p,[t]))throw Error('Cannot perform selected action');}
   updateBattle();if(f%9===0)render();}return {phase:B.phase,hp:B.party.map(p=>p.hp),boss:B.enemies[0].hp};})()`);
  assert.equal(result.phase,'victory',JSON.stringify(result));
- run(`setState('overworld');Game.page=2;OW.msg=null;chapterWon({boss:true,key:'X'});`);assert(run('CHAPTER.complete2'));assert.equal(run('Game.palette'),'vivo');
+ run(`setState('overworld');Game.page=2;OW.msg=null;chapterWon({key:'X'});`);assert(run(`OW.foes.some(f=>f.key==='Z'&&f.boss)`),'El Negro does not rise');run(`OW.msg=null;chapterWon({boss:true,key:'Z'});`);assert(run('CHAPTER.complete2'));assert.equal(run('Game.palette'),'vivo');
 });
 console.log(tests+' shared-book integration checks passed.');
