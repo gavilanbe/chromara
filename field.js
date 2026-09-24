@@ -98,7 +98,7 @@ function fieldCheck(art, target) {
 function fieldNearby() { const t = fieldFacing(); if (!t || t.kind !== 'chest' || Math.hypot(t.hitX - OW.x, t.hitY - OW.y) > 30) return []; const z = Game.puzzle; return (t.pluma ? z.opened : z.looted[t.id]) ? [] : [t]; }
 function fieldReachable(target) { return !!target && fieldFacing()?.id === target.id; }
 function fieldInteract() { const t = fieldNearby()[0]; if (!t) return false; OW.act = t.pluma ? openEstucheGen() : openChestGen(t); return true; }
-// ---- El anillo de magias: giran alrededor del líder; la elegida queda arriba.
+// ---- La paleta de magias de campo (C): elegir en la paleta y luego apuntar.
 function openRing() {
   ARTUI.tracks.delete('field');
   OW.ring = { idx: OW.fieldSelection || 0, t: 0, notice: null, spin: OW.fieldSelection || 0 };
@@ -108,14 +108,24 @@ function openRing() {
 // una de las cuatro direcciones y se apunta sola al primer sitio donde funcionará.
 const FIELD_AIM = ['up', 'right', 'down', 'left'];
 function fieldAimOptions(art) { return FIELD_AIM.map(dir => { const target = fieldFacing(dir); return { dir, target, check: fieldCheck(art, target) }; }); }
-function fieldBestAim(opts) { const cur = opts.find(o => o.dir === OW.dir); return cur && cur.check.ok ? cur : opts.find(o => o.check.ok) || opts.find(o => o.target) || cur; }
 function fieldRingCache(r) { if (!r.cache || r.cache.x !== OW.x || r.cache.y !== OW.y) r.cache = { x: OW.x, y: OW.y, opts: FIELD.map(a => fieldAimOptions(a)) }; return r.cache; }
 function fieldAim() {
   const r = OW.ring; if (!r || OW.act) return; const art = FIELD[r.idx];
   if (!fieldOk(art) || !fieldAfford(art)) { r.notice = fieldCheck(art, null).why; r.deniedAt = r.t; Audio.sfx('nope', { vol: .3 }); return; }
-  const best = fieldBestAim(fieldRingCache(r).opts[r.idx]);
-  r.mode = 'aim'; r.aimAt = r.t; r.aimDir = best.dir; OW.dir = best.dir; r.notice = null; Audio.sfx('page', { vol: .35 }); Audio.sfx('cursor', { semi: 7 });
+  const valid = fieldRingCache(r).opts[r.idx].filter(o => o.check.ok);
+  if (!valid.length) { r.notice = 'Aquí cerca no hay nada que pida ' + art.name.toLowerCase() + '.'; r.deniedAt = r.t; Audio.sfx('nope', { vol: .3 }); return; }
+  const best = valid.find(o => o.dir === OW.dir) || valid[0];
+  r.mode = 'aim'; r.aimAt = r.t; r.backAt = null; r.aimAng = null; r.aimDir = best.dir; OW.dir = best.dir; r.notice = null; Audio.sfx('page', { vol: .35 }); Audio.sfx('cursor', { semi: 7 });
 }
+// Con las flechas: si en esa dirección hay sitio, a él; si no, al siguiente (o anterior) de los que hay.
+function fieldAimStep(dir) {
+  const r = OW.ring, valid = fieldRingCache(r).opts[r.idx].filter(o => o.check.ok); if (!valid.length) return;
+  const exact = valid.find(o => o.dir === dir), i = valid.findIndex(o => o.dir === r.aimDir), step = dir === 'right' || dir === 'down' ? 1 : -1;
+  const next = exact || valid[(i + step + valid.length) % valid.length];
+  if (next.dir === r.aimDir) { r.deniedAt = r.t; Audio.sfx('cursor', { vol: .2, semi: -5 }); return; }
+  fieldAimTo(next.dir);
+}
+function fieldAimBack() { const r = OW.ring; if (!r) return; r.mode = null; r.notice = null; r.backAt = r.t; Audio.sfx('cancel'); }
 function fieldAimTo(dir) { const r = OW.ring; if (!r || r.aimDir === dir) return; r.aimDir = dir; OW.dir = dir; r.notice = null; r.turnAt = r.t; Audio.sfx('cursor', { semi: FIELD_AIM.indexOf(dir) * 2 }); }
 function fieldCast() {
   const r = OW.ring; if (!r || OW.act) return;
@@ -127,14 +137,14 @@ function updateRing() {
   const r = OW.ring; r.t++;
   if (r.mode === 'aim') { // apuntando: las flechas giran al líder; A lanza; B vuelve a la rueda
     if (hit('ring')) { OW.ring = null; Audio.sfx('cancel'); return; }
-    if (hit('back')) { r.mode = null; r.notice = null; Audio.sfx('cancel'); return; }
-    for (const d of FIELD_AIM) if (hit(d)) fieldAimTo(d);
+    if (hit('back')) { fieldAimBack(); return; }
+    for (const d of FIELD_AIM) if (hit(d)) fieldAimStep(d);
     if (hit('ok')) { OW.dir = r.aimDir; fieldCast(); }
     return;
   }
   if (hit('back') || hit('ring')) { OW.ring = null; Audio.sfx('cancel'); return; }
   const step = hit('right') || hit('down') ? 1 : hit('left') || hit('up') ? -1 : 0;
-  if (step) { r.idx = (r.idx + step + FIELD.length) % FIELD.length; r.notice = null; Audio.sfx('cursor', { semi: [0, 4, 7, 2, 5, 9][r.idx] }); }
+  if (step) { r.idx = (r.idx + step + FIELD.length) % FIELD.length; r.notice = null; r.pickAt = r.t; Audio.sfx('cursor', { semi: [0, 4, 7, 2, 5, 9][r.idx] }); }
   if (hit('ok')) fieldAim();
 }
 function fieldArtIcon(art, x, y, r, dim) {
@@ -147,70 +157,39 @@ function fieldArtIcon(art, x, y, r, dim) {
 }
 // El color de la pintura de cada magia: los colores primarios son el suyo; el lápiz, grafito; la goma, rosa; el agua, agua.
 function fieldArtPaint(art) { return art.kind === 'color' ? C(art.color) : art.kind === 'trazar' ? '#6a6480' : art.kind === 'borrar' ? '#e88aa0' : '#6fb4d8'; }
-// El anillo es un círculo cromático: seis gajos pintados a la acuarela alrededor del líder, uno por magia. La rueda gira hasta
-// dejar arriba la elegida, que sobresale y gotea; el mapa se tiñe de su color; arriba, su nombre y la pintura que gastará.
-function drawRing() {
-  UI_HITS.length = 0; UI_TEXT.length = 0;
-  if (OW.ring.mode === 'aim') { drawRingAim(OW.ring); return; }
-  const r = OW.ring, art = FIELD[r.idx], paint = fieldArtPaint(art), rp = ramp(paint), cache = fieldRingCache(r), opts = cache.opts[r.idx], best = fieldBestAim(opts), target = best?.target, check = best ? best.check : fieldCheck(art, null), shake = Prefs.shake;
-  const near = opts.filter(o => o.check.ok).length;
-  const intro = shake ? Math.max(0, easeBack(clamp(r.t / 14, 0, 1))) : 1, at = artObserve('field', r.idx + ':' + r.notice), pop = artPop(at), denied = r.deniedAt != null && r.t - r.deniedAt < 14 ? Math.sin((r.t - r.deniedAt) * 1.6) * (1 - (r.t - r.deniedAt) / 14) * 3 : 0;
-  if (!shake) r.spin = r.idx; else { let d = r.idx - r.spin; if (d > FIELD.length / 2) d -= FIELD.length; if (d < -FIELD.length / 2) d += FIELD.length; r.spin += d * .25; if (Math.abs(d) < .01) r.spin = r.idx; }
-  const [fdx, fdy] = FIELD_DIRS[OW.dir] || [0, 1]; // la rueda se aparta hacia atrás para dejar a la vista lo que hay delante
-  const cx = clamp(Math.round(OW.x - OW.cam.x - fdx * 46), 52, W - 52) + Math.round(denied), cy = clamp(Math.round(OW.y - OW.cam.y - 10 - fdy * 34), 50, 100);
-  // el tiempo se detiene y el papel se tiñe del color de la magia, en capas de acuarela que se abren desde el líder
-  g.fillStyle = 'rgba(28,20,36,' + (.3 * intro).toFixed(2) + ')'; g.fillRect(0, 0, W, H);
-  g.save(); for (let k = 0; k < 3; k++) { g.globalAlpha = (.14 - k * .035) * intro; g.fillStyle = k === 1 ? rp.hi : paint; g.beginPath(); for (let i = 0; i <= 36; i++) { const a = i / 36 * 6.283, rr = (70 + k * 38) * intro * (1 + .06 * Math.sin(a * 5 + k * 2 + r.t * .02)); const X = cx + Math.cos(a) * rr, Y = cy + Math.sin(a) * rr * .8; if (i) g.lineTo(X, Y); else g.moveTo(X, Y); } g.fill(); } g.restore();
-  // dónde se puede usar: todos los sitios válidos de la magia elegida, marcados en el mapa
-  if (fieldOk(art) && fieldAfford(art)) for (const o of opts) if (o.check.ok) fieldMark(o.target, paint, .55 * intro, shake ? Math.round(Math.sin(r.t * .15 + FIELD_AIM.indexOf(o.dir)) * 1.2) : 0);
-  // la rueda: cada gajo es un trazo de pincel curvo de su color, con canto de tinta, brillo en el borde y cerdas
-  const R0 = 44 * intro, R1 = 17, n = FIELD.length, span = 6.283 / n;
-  g.save(); g.globalAlpha = .45; g.fillStyle = '#1e1a2c'; g.beginPath(); g.ellipse(cx + 2, cy + 3, R0 + 3, (R0 + 3) * .86, 0, 0, 6.29); g.fill(); g.restore();
-  FIELD.forEach((a, i) => {
-    const nearA = cache.opts[i].filter(o => o.check.ok).length, sel = i === r.idx, usable = fieldOk(a) && fieldAfford(a), col = usable ? (nearA ? fieldArtPaint(a) : mixHex(fieldArtPaint(a), '#9a8f83', .55)) : '#9a8f83', rr = ramp(col), mid = -Math.PI / 2 + (i - r.spin) * span, out = sel ? 6 + pop * 3 : 0, a0 = mid - span / 2 + .04, a1 = mid + span / 2 - .04;
-    if (intro * n * 1.3 < i) return; // se pinta gajo a gajo
-    const ox = Math.cos(mid) * out, oy = Math.sin(mid) * out * .86, pts = [];
-    for (let k = 0; k <= 10; k++) { const t = lerp(a0, a1, k / 10); pts.push([cx + ox + Math.cos(t) * (R0 + (sel ? 3 : 0)), cy + oy + Math.sin(t) * (R0 + (sel ? 3 : 0)) * .86]); }
-    for (let k = 10; k >= 0; k--) { const t = lerp(a0, a1, k / 10); pts.push([cx + ox + Math.cos(t) * R1, cy + oy + Math.sin(t) * R1 * .86]); }
-    g.fillStyle = '#241e32'; g.beginPath(); pts.forEach(([X, Y], k) => k ? g.lineTo(X + 1, Y + 1) : g.moveTo(X + 1, Y + 1)); g.closePath(); g.fill();
-    g.fillStyle = col; g.beginPath(); pts.forEach(([X, Y], k) => k ? g.lineTo(X, Y) : g.moveTo(X, Y)); g.closePath(); g.fill();
-    for (let k = 1; k < 5; k++) { const t = lerp(a0, a1, k / 5); pstroke(cx + ox + Math.cos(t) * (R1 + 3), cy + oy + Math.sin(t) * (R1 + 3) * .86, cx + ox + Math.cos(t) * (R0 - 3), cy + oy + Math.sin(t) * (R0 - 3) * .86, 1, rr.sh, 1, 0, false); } // cerdas
-    for (let k = 0; k < 10; k++) { const t = lerp(a0, a1, k / 10), t2 = lerp(a0, a1, (k + 1) / 10); pstroke(cx + ox + Math.cos(t) * (R0 - 2), cy + oy + Math.sin(t) * (R0 - 2) * .86, cx + ox + Math.cos(t2) * (R0 - 2), cy + oy + Math.sin(t2) * (R0 - 2) * .86, 1, sel ? '#fff8e6' : rr.hi, 1, 0, false); } // brillo del canto
-    const ix = Math.round(cx + ox + Math.cos(mid) * (R0 + R1) / 2), iy = Math.round(cy + oy + Math.sin(mid) * (R0 + R1) / 2 * .86);
-    fieldArtIcon(a, ix, iy, sel ? 7 : 5, !usable);
-    if (usable && nearA) { const px = Math.round(cx + ox + Math.cos(mid) * (R0 + 5)), py = Math.round(cy + oy + Math.sin(mid) * (R0 + 5) * .86), tw = shake && (r.t + i * 7) % 40 < 20; paintDab(px, py, 3, '#fff3d8'); smallText(String(nearA), px - 2, py - 4, '#3a2f2a'); if (tw) { g.fillStyle = '#fff8e6'; g.fillRect(px + 3, py - 4, 1, 3); g.fillRect(px + 2, py - 3, 3, 1); } } // cuántos sitios tiene cerca
-    if (sel && shake && usable) { const q = (r.t % 50) / 50; g.fillStyle = col; const dx = Math.round(cx + ox + Math.cos(mid + .3) * R0), dy = Math.round(cy + oy + Math.sin(mid + .3) * R0 * .86); g.fillRect(dx, dy, 2, 2 + Math.round(q * 3)); if (q > .6) { g.globalAlpha = 1 - (q - .6) / .4; g.fillRect(dx, dy + 5 + Math.round((q - .6) * 30), 2, 2); g.globalAlpha = 1; } } // gotea
-    uiHit(ix - 11, iy - 11, 22, 22, () => { if (r.idx === i) fieldAim(); else { r.idx = i; r.notice = null; Audio.sfx('cursor'); } }, () => { if (r.idx !== i) { r.idx = i; r.notice = null; Audio.sfx('cursor', { vol: .3 }); } });
+// ---- La paleta de campo: la misma paleta de madera del combate, sostenida abajo como en la mano. Seis pocillos, uno por
+// magia; el pincel moja en el elegido. Arriba, siempre en el mismo sitio, la ficha: qué es, quién la pinta y cuánto gasta.
+// En el mapa, cada sitio donde sirve lleva una chincheta de pintura con su herramienta.
+const FP = { x: 57, y: 138, w: 206, h: 50, hole: [241, 21] }; // se sale por abajo de la pantalla, como agarrada
+function fieldWell(i) { return [FP.x + 24 + i * 29, FP.y + 19 - Math.round(Math.sin(i / (FIELD.length - 1) * Math.PI) * 3)]; }
+function fieldPalettePath(q, x, y, grow = 0) {
+  const cx = x + FP.w / 2, cy = y + FP.h / 2 + 2, rx = FP.w / 2 + grow, ry = FP.h / 2 + grow, n = 3.4;
+  q.beginPath();
+  for (let i = 0; i <= 56; i++) { const a = i / 56 * 6.283, c = Math.cos(a), s = Math.sin(a), X = cx + rx * Math.sign(c) * Math.abs(c) ** (2 / n), Y = cy + ry * Math.sign(s) * Math.abs(s) ** (2 / n); if (i) q.lineTo(X, Y); else q.moveTo(X, Y); }
+  q.closePath(); const hx = x + FP.hole[0], hy = y + FP.hole[1], hr = Math.max(2, 7 - grow * .6); q.moveTo(hx + hr, hy); q.ellipse(hx, hy, hr, hr * .72, 0, 0, 6.283);
+}
+function fieldPaletteWood() {
+  return cached('field-palette-wood', () => {
+    const c = document.createElement('canvas'); c.width = FP.w + 8; c.height = FP.h + 10; const q = c.getContext('2d'), X = 3, Y = 3;
+    q.save(); q.translate(1, 3); fieldPalettePath(q, X, Y, 1); q.fillStyle = 'rgba(20,16,28,.45)'; q.fill('evenodd'); q.restore();
+    fieldPalettePath(q, X, Y, 1); q.fillStyle = '#201926'; q.fill('evenodd');
+    fieldPalettePath(q, X, Y); q.fillStyle = '#77492f'; q.fill('evenodd');
+    q.save(); q.translate(-1, -1); fieldPalettePath(q, X, Y, -1.5); q.fillStyle = '#e6be83'; q.fill('evenodd'); q.restore();
+    fieldPalettePath(q, X, Y, -2.5); q.fillStyle = '#c39660'; q.fill('evenodd');
+    q.save(); fieldPalettePath(q, X, Y, -2.5); q.clip('evenodd'); // la veta rodea el agujero; pintura vieja seca entre los pocillos
+    for (let i = 0; i < 10; i++) { q.strokeStyle = i % 2 ? '#cda266' : '#b3834f'; q.lineWidth = 1; q.beginPath(); q.ellipse(X + FP.hole[0], Y + FP.hole[1], 14 + i * 17, 7 + i * 5, -.04, 1.75, 4.55); q.stroke(); }
+    [['#ac554b', 40, 38, 5], ['#6a8d85', 96, 40, 4], ['#967287', 150, 37, 4], ['#e8cc94', 70, 42, 3], ['#5c7fa6', 180, 41, 3], ['#c49a52', 124, 44, 4]].forEach(([col, px, py, r]) => { q.globalAlpha = .5; q.fillStyle = col; q.beginPath(); q.ellipse(X + px, Y + py, r * 1.5, r * .55, .15, 0, 6.29); q.fill(); q.globalAlpha = 1; q.fillStyle = ramp(col).hi; q.fillRect(X + px - 1, Y + py - 1, 2, 1); });
+    q.restore();
+    q.strokeStyle = '#4a2e20'; q.lineWidth = 1; q.beginPath(); q.ellipse(X + FP.hole[0] + .5, Y + FP.hole[1] + .5, 6.5, 4.8, 0, 3.4, 6.2); q.stroke(); q.strokeStyle = '#e6be83'; q.beginPath(); q.ellipse(X + FP.hole[0], Y + FP.hole[1], 7.5, 5.4, 0, .3, 2.7); q.stroke();
+    return c;
   });
-  // la aguja arriba de la rueda y el hueco del centro, donde queda el líder
-  g.fillStyle = '#241e32'; g.beginPath(); g.moveTo(cx - 4, cy - R0 * .86 - 11); g.lineTo(cx + 4, cy - R0 * .86 - 11); g.lineTo(cx, cy - R0 * .86 - 5); g.fill(); g.fillStyle = '#fff3d8'; g.beginPath(); g.moveTo(cx - 3, cy - R0 * .86 - 10); g.lineTo(cx + 3, cy - R0 * .86 - 10); g.lineTo(cx, cy - R0 * .86 - 6); g.fill();
-  g.strokeStyle = '#fff3d8'; g.lineWidth = 1; g.beginPath(); g.ellipse(cx, cy, R1, R1 * .86, 0, 0, 6.29); g.stroke();
-  { const own = fieldOwners(art); g.fillStyle = '#f1e9d6'; g.beginPath(); g.ellipse(cx, cy, R1 - 1, (R1 - 1) * .86, 0, 0, 6.29); g.fill(); own.forEach((p, i) => { const spr = buildSprite(p.id + '_front_mini', C(p.color), null, { eyes: 'happy' }); drawSprite(spr, cx + (own.length > 1 ? (i ? 6 : -6) : 0), cy + 7, 1); }); } // en el centro, quien pinta
-  // cabecera: el nombre a brocha sobre una banda de su pintura, quién la hace y la pintura que gastará cada uno
-  const owners = fieldOwners(art), head = art.name, hw = rotuloWidth(head) + 30 + owners.length * 46, hx = Math.round((W - hw) / 2), hy = Math.round(3 - (1 - intro) * 30);
-  brushBand(hx + 1, hy + 2, hw, 19, '#1e1a2c'); brushBand(hx, hy, hw, 19, KIT_INK); brushBand(hx + 2, hy + 15, hw - 4, 3, paint);
-  paintDab(hx + 10, hy + 9, 5, paint, pop); bigText(head, hx + 19, hy + 4, rp.hi, { outline: '#0b0912' });
-  let ox = hx + 25 + rotuloWidth(head);
-  owners.forEach(p => { const s = effStats(p), after = Math.max(0, p.cur.mp - art.mp); sticker(ox + 6, hy + 9, { id: p.id, color: p.color, alive: p.cur.hp > 0, hp: p.cur.hp, maxhp: s.hp, mp: p.cur.mp, maxmp: s.mp }, 6);
-    tubeGauge(ox + 14, hy + 4, p.cur.mp / s.mp, C(p.color), p.cur.mp < art.mp); if (p.cur.mp >= art.mp && shake && (r.t >> 3) % 2) { g.fillStyle = '#fff8e6'; g.fillRect(ox + 29 - Math.round(12 * p.cur.mp / s.mp), hy + 5, Math.max(1, Math.round(12 * art.mp / s.mp)), 1); } // parpadea lo que se gastará
-    smallText('-' + art.mp, ox + 35, hy + 5, p.cur.mp >= art.mp ? '#f4f0ea' : '#e58a8a'); ox += 46; });
-  // el objetivo: esquinas de pintura que laten y un reguero de gotas desde la rueda; su nombre, al lado
-  if (target) {
-    const xs = target.tiles.map(q => q[0]), ys = target.tiles.map(q => q[1]), tx = (Math.min(...xs) + Math.max(...xs) + 1) / 2 * TILE - OW.cam.x, ty = (Math.min(...ys) + Math.max(...ys) + 1) / 2 * TILE - OW.cam.y, w = (Math.max(...xs) - Math.min(...xs) + 1) * 8 + 3, h = (Math.max(...ys) - Math.min(...ys) + 1) * 8 + 3, pulse = shake ? Math.round(Math.sin(r.t * .2) * 1.5) : 0, c2 = check.ok ? paint : '#9a8f83';
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const X = tx + a * (w + pulse), Y = ty + b * (h + pulse); pstroke(X, Y, X - a * 5, Y, 2, '#241e32', 1, 0, false); pstroke(X, Y, X, Y - b * 5, 2, '#241e32', 1, 0, false); pstroke(X - a, Y - b, X - a * 5, Y - b, 1, c2, 1, 0, false); pstroke(X - a, Y - b, X - a, Y - b * 5, 1, c2, 1, 0, false); }
-    const mid = -Math.PI / 2, sx = cx + Math.cos(mid) * R0, sy = cy + Math.sin(mid) * R0 * .86;
-    for (let i = 1; i < 10; i++) { const k = ((i + r.t * .07) % 10) / 10; g.fillStyle = c2; g.globalAlpha = .35 + k * .6; const q = 1 - k; g.fillRect(Math.round(q * q * sx + 2 * q * k * ((sx + tx) / 2) + k * k * tx), Math.round(q * q * sy + 2 * q * k * (Math.min(sy, ty) - 18) + k * k * ty), k > .5 ? 2 : 1, k > .5 ? 2 : 1); } g.globalAlpha = 1;
-    if (target.kind === 'sketch' && art.kind === 'color' && check.ok) { const z = Game.puzzle; let x = tx - 16; [...(z.paint[target.sketch.id] || []), art.color].forEach((c, i, all) => { paintDab(x, ty - h - 10, 3, C(c)); x += 8; if (i < all.length - 1) smallText('+', x - 4, ty - h - 13, '#f4f0ea'); }); smallText('=', x - 2, ty - h - 13, '#f4f0ea'); paintDab(x + 7, ty - h - 10, 4, check.mix === 'barro' ? '#78644d' : C(check.mix)); }
-  }
-  // la ficha: qué hay delante, si funcionará y por qué
-  const aim = near ? (near > 1 ? near + ' sitios: ' : '') + target.name : 'ningún sitio cerca', note = r.notice || (near ? art.desc : (fieldOk(art) && fieldAfford(art) ? 'No hay nada cerca con lo que usarla. Acércate a algo que pida ' + art.name.toLowerCase() + '.' : check.why)), noteAt = artObserve('field-note', note);
-  g.save(); g.translate(0, Math.round((1 - intro) * 50));
-  maskingLabel(6, 134, 308, 40, '#f7efd6'); brushBand(8, 136, 4, 36, paint);
-  paintDab(20, 142, 3, near ? '#8fc07a' : '#c4665a'); smallText('Usar en: ' + aim, 27, 139, near ? UI_INK : UI_MUTED);
-  paragraph(note, 17, 151, 214, r.notice || !check.ok ? '#9c4539' : UI_MUTED, 2, { progress: shake ? (ARTUI.t - noteAt) * 2.2 : Infinity, wet: r.notice ? '#c4384a' : paint });
-  artButton('field-cast', battleKey('ok') + ' apuntar', 240, 142, 68, 15, paint, fieldAim, { disabled: !near, selected: !!near });
-  artButton('field-close', battleKey('back') + ' cerrar', 240, 158, 68, 13, '#d2bc95', () => { OW.ring = null; Audio.sfx('cancel'); });
-  g.restore();
+}
+// Una chincheta de pintura clavada sobre algo del mapa: la herramienta de la magia, en una gota con la punta hacia abajo.
+function fieldPin(art, x, y, s, alpha = 1) {
+  g.save(); g.globalAlpha *= alpha; x = Math.round(x); y = Math.round(y);
+  g.fillStyle = KIT_INK; g.beginPath(); g.moveTo(x - 4, y + s - 3); g.lineTo(x + 4, y + s - 3); g.lineTo(x, y + s + 4); g.fill();
+  g.fillStyle = fieldArtPaint(art); g.beginPath(); g.moveTo(x - 2, y + s - 3); g.lineTo(x + 2, y + s - 3); g.lineTo(x, y + s + 2); g.fill();
+  fieldArtIcon(art, x, y, s, false); g.restore();
 }
 // Esquinas de pintura alrededor de un objetivo del mapa
 function fieldMarkBox(target) { const xs = target.tiles.map(q => q[0]), ys = target.tiles.map(q => q[1]); return { x: (Math.min(...xs) + Math.max(...xs) + 1) / 2 * TILE - OW.cam.x, y: (Math.min(...ys) + Math.max(...ys) + 1) / 2 * TILE - OW.cam.y, w: (Math.max(...xs) - Math.min(...xs) + 1) * 8 + 3, h: (Math.max(...ys) - Math.min(...ys) + 1) * 8 + 3 }; }
@@ -219,38 +198,85 @@ function fieldMark(target, col, alpha = 1, pulse = 0) {
   for (const [a, c] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const X = b.x + a * (b.w + pulse), Y = b.y + c * (b.h + pulse); pstroke(X, Y, X - a * 5, Y, 2, '#241e32', 1, 0, false); pstroke(X, Y, X, Y - c * 5, 2, '#241e32', 1, 0, false); pstroke(X - a, Y - c, X - a * 5, Y - c, 1, col, 1, 0, false); pstroke(X - a, Y - c, X - a, Y - c * 5, 1, col, 1, 0, false); }
   g.restore(); return b;
 }
-// Apuntando: la rueda se recoge en el líder; cuatro flechas pintadas a su alrededor (de color las que tienen dónde, a
-// lápiz las que no); un reguero de pintura va hasta el objetivo, que late, con su nombre y lo que pasará.
-function drawRingAim(r) {
-  const art = FIELD[r.idx], paint = fieldArtPaint(art), rp = ramp(paint), opts = fieldRingCache(r).opts[r.idx], cur = opts.find(o => o.dir === r.aimDir) || opts[0], shake = Prefs.shake;
-  const k = shake ? easeBack(clamp((r.t - (r.aimAt || 0)) / 10, 0, 1)) : 1, turn = r.turnAt != null && shake ? clamp((r.t - r.turnAt) / 8, 0, 1) : 1, lx = Math.round(OW.x - OW.cam.x), ly = Math.round(OW.y - OW.cam.y - 8);
-  g.fillStyle = 'rgba(28,20,36,.32)'; g.fillRect(0, 0, W, H);
-  for (const o of opts) if (o.check.ok && o !== cur) fieldMark(o.target, paint, .4);
-  // el objetivo apuntado y el reguero de pintura hasta él
-  if (cur.target) {
-    const ok = cur.check.ok, c2 = ok ? paint : '#c4665a', pulse = shake ? Math.round(Math.sin(r.t * .22) * 1.5) : 0, b = fieldMark(cur.target, c2, 1, pulse), tx = b.x, ty = b.y;
-    for (let i = 1; i < 12; i++) { const q = ((i + r.t * .08) % 12) / 12, e = q * turn, mx = (lx + tx) / 2, my = Math.min(ly, ty) - 16; g.fillStyle = c2; g.globalAlpha = .3 + q * .7; const u = 1 - e; g.fillRect(Math.round(u * u * lx + 2 * u * e * mx + e * e * tx), Math.round(u * u * ly + 2 * u * e * my + e * e * ty), q > .5 ? 2 : 1, q > .5 ? 2 : 1); } g.globalAlpha = 1;
-    uiHit(tx - b.w - 4, ty - b.h - 4, b.w * 2 + 8, b.h * 2 + 8, () => { if (ok) { OW.dir = r.aimDir; fieldCast(); } });
+function drawRing() {
+  UI_HITS.length = 0; UI_TEXT.length = 0;
+  const r = OW.ring, shake = Prefs.shake, art = FIELD[r.idx], paint = fieldArtPaint(art), rp = ramp(paint), cache = fieldRingCache(r), opts = cache.opts[r.idx], valid = opts.filter(o => o.check.ok), able = fieldOk(art) && fieldAfford(art), aiming = r.mode === 'aim';
+  const ease = q => shake ? easeBack(clamp(q, 0, 1)) : 1, intro = ease(r.t / 14), aimK = shake ? (aiming ? clamp((r.t - r.aimAt) / 10, 0, 1) : r.backAt != null ? 1 - clamp((r.t - r.backAt) / 10, 0, 1) : 0) : aiming ? 1 : 0;
+  const lx = Math.round(OW.x - OW.cam.x), ly = Math.round(OW.y - OW.cam.y - 8), cur = aiming ? valid.find(o => o.dir === r.aimDir) || valid[0] : null;
+  // el tiempo se detiene: el papel se oscurece hacia los bordes y queda la luz alrededor del líder, teñida de la magia
+  const veil = g.createRadialGradient(lx, ly, 18, lx, ly, 170); veil.addColorStop(0, 'rgba(28,20,36,.08)'); veil.addColorStop(1, 'rgba(28,20,36,' + (.58 * Math.min(1, r.t / 8 + (shake ? 0 : 1))).toFixed(2) + ')');
+  g.fillStyle = veil; g.fillRect(0, 0, W, H); g.save(); g.globalAlpha = .1; g.fillStyle = paint; g.fillRect(0, 0, W, H); g.restore();
+  // dónde sirve: chinchetas de pintura sobre cada sitio; al apuntar, el elegido late y los demás esperan
+  if (able) valid.forEach((o, i) => { const sel = o === cur, b = fieldMark(o.target, paint, aiming && !sel ? .45 : .9 * intro, sel && shake ? Math.round(Math.sin(r.t * .22) * 1.5) : 0), bob = shake ? Math.round(Math.sin(r.t * .12 + i * 1.7) * 2) : 0; if (!sel) fieldPin(art, b.x, b.y - b.h - 13 + bob, 5, aiming ? .5 : intro); });
+  if (aiming && cur) { valid.forEach(o => { if (o === cur) return; const b = fieldMarkBox(o.target), hx = clamp(Math.round(b.x - b.w - 6), 0, W - 1), hy = clamp(Math.round(b.y - b.h - 20), 0, H - 1); uiHit(hx, hy, Math.min(W - hx, b.w * 2 + 12), Math.min(H - hy, b.h * 2 + 26), () => fieldAimTo(o.dir)); }); drawFieldAim(r, art, cur, lx, ly, aimK); }
+  drawFieldPalette(r, intro, aimK);
+  drawFieldCard(r, art, able, valid, cur, intro);
+}
+// La paleta con sus pocillos. Al apuntar se baja fuera de la vista; al volver, sube.
+function drawFieldPalette(r, intro, aimK) {
+  const shake = Prefs.shake, art = FIELD[r.idx], paint = fieldArtPaint(art), cache = fieldRingCache(r), denied = r.deniedAt != null && r.t - r.deniedAt < 14 && shake ? Math.sin((r.t - r.deniedAt) * 1.6) * (1 - (r.t - r.deniedAt) / 14) * 3 : 0;
+  const dy = Math.round((1 - intro) * 60 + aimK * 62), dx = Math.round(denied), pickNow = r.mode !== 'aim';
+  // los pocillos se tocan siempre en su sitio final, aunque la paleta aún esté entrando
+  if (pickNow) FIELD.forEach((a, i) => { const [X, Y] = fieldWell(i); uiHit(X - 13, Y - 12, 26, 24, () => { if (r.idx === i) fieldAim(); else { r.idx = i; r.notice = null; r.pickAt = r.t; Audio.sfx('cursor'); } }, () => { if (r.idx !== i) { r.idx = i; r.notice = null; r.pickAt = r.t; Audio.sfx('cursor', { vol: .3 }); } }); });
+  if (dy >= 60) return;
+  g.save(); g.translate(dx, dy); const cxp = FP.x + FP.w / 2, cyp = FP.y + FP.h / 2; g.translate(cxp, cyp); g.rotate((1 - intro) * .12 - aimK * .05); g.translate(-cxp, -cyp);
+  g.drawImage(fieldPaletteWood(), FP.x - 3, FP.y - 3);
+  FIELD.forEach((a, i) => {
+    const [X, Y] = fieldWell(i), sel = i === r.idx, near = cache.opts[i].filter(o => o.check.ok).length, usable = fieldOk(a) && fieldAfford(a), grow = shake ? clamp((r.t - 3 - i * 2) / 6, 0, 1) : 1, pop = sel && shake ? Math.round(artPop(r.pickAt ?? -99) * 2) : 0;
+    // el pocillo, hundido en la madera
+    g.fillStyle = '#4a2e20'; g.beginPath(); g.ellipse(X, Y + 2, 12, 9, 0, 0, 6.29); g.fill(); g.fillStyle = '#8a5a34'; g.beginPath(); g.ellipse(X, Y + 2, 11, 8, 0, 0, 6.29); g.fill(); g.fillStyle = '#e6be83'; g.fillRect(X - 6, Y + 10, 12, 1);
+    if (grow <= 0) return;
+    if (!usable) { paintDab(X, Y + 1, 7 * grow, '#b8ad9d'); g.fillStyle = '#8d8276'; g.fillRect(X - 3, Y, 3, 1); g.fillRect(X, Y + 1, 1, 2); g.fillRect(X + 1, Y + 3, 3, 1); g.save(); g.globalAlpha = .55; fieldArtIcon(a, X, Y, 6 * grow, true); g.restore(); } // seca y cuarteada: sin pintura o sin quien la pinte
+    else fieldArtIcon(a, X, Y - (sel ? 2 : 0) - pop, (sel ? 8 : 7) * grow, false);
+    if (sel) { g.save(); g.globalAlpha = .7 + (shake ? .3 * Math.sin(r.t * .2) : .3); g.strokeStyle = usable ? '#fff3d8' : '#d8cfc0'; g.lineWidth = 1; g.beginPath(); g.ellipse(X + .5, Y + 1.5, 13, 10, 0, 0, 6.29); g.stroke(); g.restore(); }
+    if (usable && near && grow >= 1) { const tx = X + 9, ty = Y - 9; paintDab(tx, ty, 4, '#fff3d8'); smallText(String(near), tx - 2, ty - 4, '#3a2f2a'); } // cuántos sitios hay cerca
+  });
+  // el pincel moja en el pocillo elegido: sube, se desliza y baja
+  const [wx, wy] = fieldWell(r.idx), c = r.brush = glide(r.brush || { x: wx, y: wy }, wx, wy, .3), lift = Math.abs(c.x - wx) > 2 ? Math.min(6, Math.abs(c.x - wx) * .3) : 0, dip = shake ? Math.round(Math.sin(r.t * .12)) : 0;
+  drawProp(propSprite('pincel', FIELD[r.idx] && fieldOk(art) && fieldAfford(art) ? paint : '#b8ad9d'), c.x - 3, c.y - 4 + dip - lift, .8, 1, PROP.pincel.tip[0], PROP.pincel.tip[1], .6);
+  g.restore();
+}
+// Apuntando: una chincheta grande de la magia salta de sitio en sitio (el cursor); del líder cae hasta ella un reguero de
+// su pintura. El líder se gira hacia allí.
+function drawFieldAim(r, art, cur, lx, ly, k) {
+  const shake = Prefs.shake, paint = fieldArtPaint(art), rp = ramp(paint), b = fieldMarkBox(cur.target), hop = r.pin = glide(r.pin || { x: b.x, y: b.y }, b.x, b.y, .28);
+  const far = Math.hypot(hop.x - b.x, hop.y - b.y), jump = far > 1 ? Math.min(14, far * .5) : 0, bob = shake ? Math.abs(Math.sin(r.t * .14)) * 3 : 0, py = hop.y - b.h - 16 - jump - bob;
+  // el reguero: gotas de pintura que salen del líder y caen en el sitio
+  const sx = lx, sy = ly - 4, mx = (sx + hop.x) / 2, my = Math.min(sy, hop.y) - 14;
+  for (let i = 0; i < 14; i++) { const q = ((i + (shake ? r.t * .12 : 0)) % 14) / 14, e = q * k, u = 1 - e, px = u * u * sx + 2 * u * e * mx + e * e * hop.x, pyy = u * u * sy + 2 * u * e * my + e * e * hop.y; g.globalAlpha = .3 + q * .65; g.fillStyle = i % 3 ? paint : rp.hi; const sz = q > .5 ? 2 : 1; g.fillRect(Math.round(px), Math.round(pyy), sz, sz); } g.globalAlpha = 1;
+  // donde caerá: una mancha húmeda que se abre y late
+  const sp = shake ? .85 + .15 * Math.sin(r.t * .2) : 1; g.save(); g.globalAlpha = .35 * k; g.fillStyle = paint; g.beginPath(); g.ellipse(b.x, b.y + 1, b.w * .8 * sp, b.h * .55 * sp, 0, 0, 6.29); g.fill(); g.restore();
+  // la sombra y la chincheta
+  g.save(); g.globalAlpha = .35; g.fillStyle = KIT_INK; g.beginPath(); g.ellipse(Math.round(hop.x), Math.round(hop.y - b.h - 3), 5 - Math.min(3, (jump + bob) * .2), 2, 0, 0, 6.29); g.fill(); g.restore();
+  fieldPin(art, hop.x, py, 9, k);
+  // tocar el sitio lo lanza
+  const hx = clamp(Math.round(b.x - b.w - 6), 0, W - 1), hy = clamp(Math.round(b.y - b.h - 26), 0, H - 1);
+  uiHit(hx, hy, Math.min(W - hx, b.w * 2 + 12), Math.min(H - hy, b.h * 2 + 32), () => { OW.dir = r.aimDir; fieldCast(); });
+}
+// La ficha de arriba: siempre en el mismo sitio. Eligiendo dice qué es la magia; apuntando, a qué se lanza y qué saldrá.
+function drawFieldCard(r, art, able, valid, cur, intro) {
+  const shake = Prefs.shake, paint = fieldArtPaint(art), owners = fieldOwners(art), aiming = r.mode === 'aim' && cur, y = Math.round(4 - (1 - intro) * 44);
+  g.save(); g.translate(0, y - 4);
+  maskingLabel(6, 4, 308, 34, '#f7efd6'); brushBand(8, 6, 4, 30, paint);
+  fieldArtIcon(art, 23, 19, 9, !able);
+  const head = aiming ? art.name + ' → ' + cur.target.name : art.name; smallText(head, 37, 8, able ? UI_INK : UI_MUTED);
+  if (!aiming) { let ox = 37 + textWidth(head) + 8; owners.forEach(p => { const s = effStats(p); sticker(ox + 5, 12, { id: p.id, color: p.color, alive: p.cur.hp > 0, hp: p.cur.hp, maxhp: s.hp, mp: p.cur.mp, maxmp: s.mp }, 5); tubeGauge(ox + 12, 7, p.cur.mp / s.mp, C(p.color), p.cur.mp < art.mp); smallText('-' + art.mp, ox + 33, 8, p.cur.mp >= art.mp ? UI_MUTED : '#9c4539'); ox += 48; }); }
+  let note, noteX = 37, noteW = 196;
+  if (aiming) {
+    const sk = cur.target.kind === 'sketch' && art.kind === 'color' ? cur.target.sketch : null, have = sk ? Game.puzzle.paint[sk.id] || [] : [], cname = c => (DATA.colors[c]?.name || c).toLowerCase();
+    note = r.notice || (sk ? (cur.check.mix === sk.color ? '¡Justo el ' + cname(sk.color) + ' que pide! Se volverá real.' : cur.check.mix === 'barro' ? 'Saldrá barro. Pide ' + cname(sk.color) + '.' : 'Quedará ' + cname(cur.check.mix) + '. Pide ' + cname(sk.color) + '.') : art.desc);
+    if (sk && have.length) { const all = [...(Game.puzzle.paint[cur.target.sketch.id] || []), art.color]; let x = 41; all.forEach((c, i) => { paintDab(x, 25, 3, C(c)); x += i < all.length - 1 ? 8 : 0; }); g.fillStyle = UI_MUTED; g.fillRect(x + 6, 23, 4, 1); g.fillRect(x + 6, 25, 4, 1); paintDab(x + 16, 25, 4, cur.check.mix === 'barro' ? '#78644d' : C(cur.check.mix || art.color)); noteX = x + 25; noteW = 233 - noteX; } // la mezcla que saldrá
+    if (valid.length > 1) valid.forEach((o, i) => paintDab(226 - (valid.length - 1 - i) * 6, 31, o === cur ? 2 : 1.4, o === cur ? paint : '#b3a898')); // cuál de los sitios
+  } else note = r.notice || (able ? art.desc : fieldCheck(art, null).why);
+  const noteAt = artObserve('field-card', note + (aiming ? cur.target.id : r.idx));
+  paragraph(note, noteX, 19, noteW, r.notice ? '#9c4539' : UI_MUTED, 2, { progress: shake ? (ARTUI.t - noteAt) * 2.4 : Infinity, wet: r.notice ? '#c4384a' : paint });
+  if (aiming) {
+    artButton('field-go', battleKey('ok') + ' lanzar', 240, 7, 68, 14, paint, () => { OW.dir = r.aimDir; fieldCast(); }, { selected: true });
+    artButton('field-back', battleKey('back') + ' volver', 240, 23, 68, 12, '#d2bc95', fieldAimBack);
+  } else {
+    artButton('field-aim', battleKey('ok') + ' apuntar', 240, 7, 68, 14, paint, fieldAim, { disabled: !able || !valid.length, selected: able && valid.length > 0 });
+    artButton('field-close', battleKey('back') + ' cerrar', 240, 23, 68, 12, '#d2bc95', () => { OW.ring = null; Audio.sfx('cancel'); });
   }
-  // las cuatro flechas alrededor del líder
-  g.save(); g.globalAlpha = .55 * k; g.strokeStyle = paint; g.lineWidth = 2; g.setLineDash([3, 3]); g.lineDashOffset = shake ? -r.t * .3 : 0; g.beginPath(); g.ellipse(lx + .5, ly + 8.5, 24 * k, 16 * k, 0, 0, Math.PI * 2); g.stroke(); g.restore(); // el corro de pintura a sus pies
-  const tri = (ax, ay, dx, dy, s, col) => { g.fillStyle = col; g.beginPath(); g.moveTo(ax + dx * s, ay + dy * s); g.lineTo(ax - dy * s - dx * s * .35, ay + dx * s - dy * s * .35); g.lineTo(ax + dy * s - dx * s * .35, ay - dx * s - dy * s * .35); g.closePath(); g.fill(); };
-  opts.forEach(o => { const [dx, dy] = FIELD_DIRS[o.dir], sel = o.dir === r.aimDir, ok = o.check.ok, bob = shake && sel ? Math.sin(r.t * .25) * 2 : 0, dist = (sel ? 30 : 26) * k + bob, ax = Math.round(lx + dx * dist), ay = Math.round(ly + 6 + dy * dist * .8), col = ok ? (sel ? rp.hi : paint) : '#b3a896', s = sel ? 9 : 6;
-    tri(ax + 1, ay + 2, dx, dy, s + 1, 'rgba(36,30,50,.45)'); // sombra
-    tri(ax, ay, dx, dy, s + 2, '#241e32'); tri(ax, ay, dx, dy, s, col);
-    if (ok) { g.fillStyle = '#fff8e6'; g.fillRect(ax + dx * (s - 4) - dy * 2, ay + dy * (s - 4) + dx * 2 - 1, 2, 1); }
-    if (ok && !sel && shake && r.t % 30 < 15) { g.fillStyle = '#fff8e6'; g.fillRect(ax + dx * (s + 3), ay + dy * (s + 3), 1, 1); } // guiño: por ahí también se puede
-    uiHit(ax - 12, ay - 12, 24, 24, () => { if (sel && ok) { OW.dir = r.aimDir; fieldCast(); } else fieldAimTo(o.dir); }); });
-  // la ficha: qué se lanza, a qué, y si funcionará
-  const ok = cur.check.ok, owners = fieldOwners(art), head = art.name + (cur.target ? ' → ' + cur.target.name : ''), note = r.notice || (ok ? (cur.check.mix ? 'Mezcla: ' + cur.check.mix : art.desc) : cur.check.why || 'Nada en esa dirección.'), noteAt = artObserve('field-aim-note', note + r.aimDir);
-  g.save(); g.translate(0, Math.round((1 - k) * 40));
-  const top = ly > 118 ? 4 : 148; // la ficha se aparta si el líder está abajo
-  maskingLabel(6, top, 308, 28, '#f7efd6'); brushBand(8, top + 2, 4, 24, paint);
-  fieldArtIcon(art, 21, top + 13, 6, !ok); smallText(head, 31, top + 5, ok ? UI_INK : UI_MUTED);
-  if (cur.target?.kind === 'sketch' && art.kind === 'color' && ok) { const z = Game.puzzle; let x = 206; const all = [...(z.paint[cur.target.sketch.id] || []), art.color]; x -= all.length * 8; all.forEach(c => { paintDab(x, top + 20, 3, C(c)); x += 8; }); smallText('=', x - 3, top + 17, UI_MUTED); paintDab(x + 6, top + 20, 4, C(cur.check.mix || art.color)); } // la mezcla que saldrá
-  paragraph(note, 31, top + 16, 160, ok ? UI_MUTED : '#9c4539', 1, { progress: shake ? (ARTUI.t - noteAt) * 2.4 : Infinity, wet: paint });
-  artButton('field-go', battleKey('ok') + ' lanzar', 240, top + 2, 68, 12, paint, () => { OW.dir = r.aimDir; fieldCast(); }, { disabled: !ok, selected: ok });
-  artButton('field-back', battleKey('back') + ' volver', 240, top + 15, 68, 11, '#d2bc95', () => { r.mode = null; r.notice = null; Audio.sfx('cancel'); });
   g.restore();
 }
 // ---- Usar una magia: la gota alza su color, la herramienta va hasta el objeto y actúa. El estado cambia al llegar.

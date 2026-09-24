@@ -45,17 +45,26 @@ test('drawing the ring, every stage and the page 1 leaf never throws',()=>{
  run('for(const s of fieldGroups().sketches){Game.puzzle.paint[s.id]=["rojo"];}drawOverworld();for(const s of fieldGroups().sketches)Game.puzzle.real[s.id]=true;drawOverworld();');
  run('Game.page=1');assert.equal(run('fieldTargets().length'),0);run('Game.page=0');
 });
-test('aiming like Golden Sun: A picks the art, the leader turns to a target by itself, arrows re-aim, A casts, B goes back',()=>{
+test('aiming like Golden Sun: A picks the art, the leader turns to a valid place by itself, arrows only move between valid places, A casts, B goes back',()=>{
  fresh();stand(10,22,'down');
  run(`openRing();OW.ring.idx=FIELD.findIndex(a=>a.id==='borrar');pressed.ok=true;updateRing();pressed.ok=false;`);
- assert.equal(run('OW.ring.mode'),'aim','A on the wheel aims instead of casting');assert.equal(run('!!OW.act'),false);
+ assert.equal(run('OW.ring.mode'),'aim','A on the palette aims instead of casting');assert.equal(run('!!OW.act'),false);
  assert.equal(run('OW.ring.aimDir'),'right','auto-aims at the scribble even when facing away');assert.equal(run('OW.dir'),'right');
  run('UI_HITS.length=0;drawOverworld();');
- run(`pressed.up=true;updateRing();pressed.up=false;`);assert.equal(run('OW.ring.aimDir+OW.dir'),'upup','arrows re-aim and turn the leader');
- run('drawOverworld();pressed.ok=true;updateRing();pressed.ok=false;');assert.equal(run('!!OW.act'),false,'nothing there: no cast, no cost');
- run(`pressed.back=true;updateRing();pressed.back=false;`);assert.equal(run('OW.ring&&!OW.ring.mode'),true,'B goes back to the wheel');
- run(`pressed.ok=true;updateRing();pressed.ok=false;pressed.ok=true;updateRing();pressed.ok=false;`);assert.equal(run('!!OW.act'),true,'A, A casts at the auto-aimed target');
+ run(`pressed.up=true;updateRing();pressed.up=false;`);assert.equal(run('OW.ring.aimDir+OW.dir'),'rightright','an empty direction is never aimed at');
+ run(`pressed.back=true;updateRing();pressed.back=false;`);assert.equal(run('OW.ring&&!OW.ring.mode'),true,'B goes back to the palette');
+ run(`pressed.ok=true;updateRing();pressed.ok=false;pressed.ok=true;updateRing();pressed.ok=false;`);assert.equal(run('!!OW.act'),true,'A, A casts at the auto-aimed place');
  run('let n=0;while(OW.act){if(++n>300)throw Error("never");if(OW.act.next().done)OW.act=null;}');assert.equal(reach(15,20),true);
- stand(16,24,'down');run(`openRing();OW.ring.idx=FIELD.findIndex(a=>a.id==='borrar');fieldAim();`);assert.equal(run('OW.ring.mode||null'),'aim');run('drawOverworld();OW.ring=null;');
+ stand(16,24,'down');const mp=run('Party.map(p=>p.cur.mp).join()');run(`openRing();OW.ring.idx=FIELD.findIndex(a=>a.id==='borrar');fieldAim();`);
+ assert.equal(run('OW.ring.mode||null'),null,'nothing near: no aiming');assert(/cerca/.test(run('OW.ring.notice')));assert.equal(run('Party.map(p=>p.cur.mp).join()'),mp);run('drawOverworld();OW.ring=null;');
+});
+test('with two places around, arrows cycle between them and tapping a place casts there',()=>{
+ fresh();const spot=run(`(()=>{for(let y=1;y<MAP.h-1;y++)for(let x=1;x<MAP.w-1;x++){OW.x=x*TILE+8;OW.y=y*TILE+8;if(!walkable(OW.x,OW.y))continue;for(let i=0;i<FIELD.length;i++){const v=fieldAimOptions(FIELD[i]).filter(o=>o.check.ok);if(v.length>1)return [x,y,i,v.map(o=>o.dir)];}}return null;})()`);
+ if(!spot){console.log('  (no spot with two places on this map)');return;}
+ const [x,y,i,dirs]=spot;stand(x,y,dirs[0]);run(`OW.cam.x=clamp(OW.x-W/2,0,MAP.w*TILE-W);OW.cam.y=clamp(OW.y-H/2,0,MAP.h*TILE-H);openRing();OW.ring.idx=${i};fieldAim();`);
+ assert.equal(run('OW.ring.aimDir'),dirs[0]);run(`pressed.${dirs[1]}=true;updateRing();pressed.${dirs[1]}=false;`);assert.equal(run('OW.ring.aimDir+OW.dir'),dirs[1]+dirs[1]);
+ const empty=['up','right','down','left'].find(d=>!dirs.includes(d));if(empty){run(`pressed.${empty}=true;updateRing();pressed.${empty}=false;`);assert(dirs.includes(run('OW.ring.aimDir')),'an empty direction moves to another valid place');}
+ const aimed=run('OW.ring.aimDir');run('OW.ring.t+=20;UI_HITS.length=0;drawRing();UI_HITS.filter(h=>h.w>6&&h.y>40&&h.y<130)[0].run()');assert.notEqual(run('OW.ring.aimDir'),aimed,'tapping another place re-aims');assert.equal(run('!!OW.act'),false);
+ run('UI_HITS.length=0;drawRing();UI_HITS.filter(h=>h.w>6&&h.y>40&&h.y<130).pop().run()');assert.equal(run('!!OW.act'),true,'tapping the aimed place casts');run('OW.act=null');
 });
 console.log(checks+' field magic checks passed.');

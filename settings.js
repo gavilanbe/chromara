@@ -146,7 +146,7 @@ function contextualHint() {
   if (Game.overlay) return '↑↓ elegir · ←→ cambiar · ' + keyLabel('ok') + ' confirmar · ' + keyLabel('back') + ' cerrar';
   if(Game.state==='battle'&&B.menu?.level==='cmd')return [keyLabel('up')+keyLabel('down')+keyLabel('left')+keyLabel('right')+' herramienta','Rueda cambiar',keyLabel('ok')+' elegir',keyLabel('swap')+' otra gota',keyLabel('options')+' opciones'].join(' · ');
   if (Game.state === 'battle') return keyLabel('ok') + ' confirmar · ' + keyLabel('back') + ' volver · ' + keyLabel('swap') + ' cambiar gota · ' + keyLabel('release') + ' liberar mezcla · ' + keyLabel('options') + ' opciones · ' + keyLabel('help') + ' guía';
-  if (Game.state === 'overworld' && OW.ring) return '←→ magia · ' + keyLabel('ok') + ' usar hacia donde miras · ' + keyLabel('back') + ' cerrar';
+  if (Game.state === 'overworld' && OW.ring) return OW.ring.mode === 'aim' ? 'flechas: otro sitio · ' + keyLabel('ok') + ' lanzar · ' + keyLabel('back') + ' volver' : '←→ magia · ' + keyLabel('ok') + ' apuntar · ' + keyLabel('back') + ' cerrar';
   const confirm = Game.state === 'overworld' && !OW.menu && !OW.msg && (worldNearby() || fieldNearby().length) ? ' examinar · ' : ' menú · ';
   return 'Flechas/WASD mover · ' + keyLabel('ok') + confirm + keyLabel('ring') + ' magias de campo · ' + keyLabel('journal') + ' estudios · ' + keyLabel('options') + ' opciones · M sonido';
 }
