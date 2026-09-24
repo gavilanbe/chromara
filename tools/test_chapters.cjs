@@ -23,7 +23,7 @@ const ctx = vm.createContext({
   Audio: new Proxy({ positions:{}, muted:false, sfx:noop, play:noop, init:noop, prepare:noop, stop:noop, bend:noop }, {get:(o,k)=>o[k] || noop}), SFX:{ambient:noop}, MUSIC:{},
 });
 ctx.window = ctx; ctx.Math.random = () => .5;
-for (const file of ['data.js','font.js','sprites.js','world_art.js','rinse.js','field.js','scene.js','gui.js','battle.js','ink_transition.js','attacks.js','combat.js','battle_ui.js','settings.js','mobile.js','chapter_art.js','chapters.js','game.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
+for (const file of ['data.js','font.js','sprites.js','world_art.js','rinse.js','field.js','scene.js','gui.js','battle.js','ink_transition.js','attacks.js','combat.js','battle_ui.js','settings.js','mobile.js','chapter_art.js','chapters.js','level_select.js','game.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
 const run = code => vm.runInContext(code,ctx);
 function scenario(group='5') {
   run(`resetGame(); Game.overlay = null; initBattle(OW.foes.find(f=>f.key==='${group}') || {...OW.foes[0],key:'${group}',enemies:DATA.encounters['${group}'],boss:'${group}'==='B'}); B.gen=null; B.tr=null; B.phase='fight'; B.fightStart=-100; Game.state='battle'; B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;}); B.unitScale=1; B.propScale=1; camSet(SCENE.rest); projectUnits(); B.party.forEach(u=>u.atb=100); ATB_ACTIVE=false; Prefs.speed=1;`);
@@ -135,5 +135,19 @@ test('El Negro fuses the three, changes with its phases and can be beaten with t
   updateBattle();if(f%9===0)render();}return {phase:B.phase,hp:B.party.map(p=>p.hp),boss:B.enemies[0].hp};})()`);
  assert.equal(result.phase,'victory',JSON.stringify(result));
  run(`setState('overworld');Game.page=2;OW.msg=null;chapterWon({key:'X'});`);assert(run(`OW.foes.some(f=>f.key==='Z'&&f.boss)`),'El Negro does not rise');run(`OW.msg=null;chapterWon({boss:true,key:'Z'});`);assert(run('CHAPTER.complete2'));assert.equal(run('Game.palette'),'vivo');
+});
+test('the notebook index explores every leaf and goes straight to every final boss',()=>{
+ const combos=run('LEVELS.flatMap((L,i)=>levelOptions(L).map((o,n)=>[i,n,L.page,o.boss?o.boss.key:null]))');
+ assert.equal(combos.length,7);
+ for(const [i,n,page,boss] of combos){
+  run(`resetGame();CHAPTER.complete=false;CHAPTER.complete2=false;Game.defeated=new Set();setState('title');TITLE.t=300;TITLE.exit=0;TITLE.go=null;TITLE.select=null;levelSelectOpen();TITLE.select.i=${i};TITLE.select.opt=${n};pressed.ok=true;updateTitle();for(const k in pressed)pressed[k]=false;`);
+  assert(run('TITLE.exit>0'),'did not leave the title');
+  run(`for(let f=0;f<120&&Game.state==='title';f++){updateTitle();render();}`);
+  assert.equal(run('Game.page'),page,`${i}/${n}`);
+  if(boss){assert.equal(run('Game.state'),'transition',`${i}/${n}`);assert.equal(run('B.foe.key'),boss);assert(run('Party.every(p=>p.cur.hp===effStats(p).hp)'));run('B.tr=null;B.gen=null;setState("overworld")');}
+  else {assert.equal(run('Game.state'),'overworld');assert.equal(run('OW.landT>0'),true,'the drops should drop in');}
+ }
+ // B closes the index and gives the palette back
+ run(`resetGame();setState('title');TITLE.t=300;TITLE.exit=0;TITLE.select=null;levelSelectOpen();pressed.back=true;updateTitle();`);assert.equal(run('TITLE.select'),null);assert.equal(run('TITLE.exit'),0);
 });
 console.log(tests+' shared-book integration checks passed.');

@@ -210,13 +210,13 @@ function chapterPreview(){if(Game.state!=='title'||TITLE.exit)return;Audio.init(
 let chapterTitleButton;
 function chapterInitialize(){
   Game.page=0;
-  chapterTitleButton=document.createElement('button');chapterTitleButton.type='button';chapterTitleButton.textContent='Pasar página · Los Negros';chapterTitleButton.setAttribute('aria-label','Pasar página: Los Negros');
+  chapterTitleButton=document.createElement('button');chapterTitleButton.type='button';chapterTitleButton.textContent='Elegir hoja';chapterTitleButton.setAttribute('aria-label','Elegir hoja: explorar o ir al jefe final de cada hoja');
   chapterTitleButton.style.cssText='position:fixed;display:none;border:0;padding:0;background:transparent;color:transparent;cursor:pointer;outline:none;';
-  chapterTitleButton.addEventListener('click',chapterPreview);['pointerenter','focus'].forEach(ev=>chapterTitleButton.addEventListener(ev,()=>{if(Game.state==='title'&&!TITLE.exit&&TITLE.sel!==1){TITLE.sel=1;Audio.sfx('cursor');}}));document.body.appendChild(chapterTitleButton);
+  chapterTitleButton.addEventListener('click',()=>{if(Game.state==='title'&&!TITLE.exit&&typeof levelSelectOpen==='function')levelSelectOpen();});['pointerenter','focus'].forEach(ev=>chapterTitleButton.addEventListener(ev,()=>{if(Game.state==='title'&&!TITLE.exit&&TITLE.sel!==1){TITLE.sel=1;Audio.sfx('cursor');}}));document.body.appendChild(chapterTitleButton);
   CHAPTER.direct=new URLSearchParams(location.search).get('hoja')==='reverso';
 }
 function chapterTitleUI(){
-  if(!chapterTitleButton)return;const show=Game.state==='title'&&TITLE.t>=LOGO_BEATS.ready&&!TITLE.exit;
+  if(!chapterTitleButton)return;const show=Game.state==='title'&&TITLE.t>=LOGO_BEATS.ready&&!TITLE.exit&&!TITLE.select;
   chapterTitleButton.style.display=show?'block':'none';if(!show)return;
   // se dibuja dentro de la paleta del título (drawTitleMenu); aquí sólo se coloca el botón accesible sobre su pocillo
   const [x,y]=TITLE_MENU.rows[1],r=cv.getBoundingClientRect(),s=r.width/W;

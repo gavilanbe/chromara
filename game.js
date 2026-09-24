@@ -654,6 +654,7 @@ function drawMessage(lines) {
 // 7. Título, bucle principal, debug
 // =====================================================================
 // ---- Título: el logo se pinta y sus gotas dan vida a una ilustración a lápiz.
+const titleEase = k => k * k * (3 - 2 * k); // suavizado propio del título (no depende de prologue.js)
 const TITLE = { t: 0, exit: 0, letters: 'CHROMARA', cols: ['rojo', 'naranja', 'amarillo', 'verde', 'azul', 'violeta', 'rojo', 'amarillo'] };
 // ---- El logo, rotulado a brocha plana: cada letra es un trazo de pintura de su color con gruesos y finos según la dirección
 // (brocha plana a 45°), cerdas visibles a lo largo del trazo, colas secas que se deshilachan y un canto de tinta. La «O» es una
@@ -821,7 +822,7 @@ function drawLogo(t, x0, y0) {
 function titleDrip(x, y, age, seed, rp, exitAge = 0) {
   if (age < 0) return; const rnd = seeded(seed * 13 + 1), Lmax = 4 + rnd() * 6, period = 190 + (seed % 5) * 23, cyc = Math.floor(age / period), a = age % period, first = cyc === 0;
   let L, bulb = 1.6, drop = null; const base = first ? 0 : Lmax * .35;
-  if (a < 70) L = lerp(base, Lmax, ease(a / 70));
+  if (a < 70) L = lerp(base, Lmax, titleEase(a / 70));
   else if (a < 110) { L = Lmax + Math.sin((a - 70) * .25) * .6 * Prefs.shake; bulb = 1.6 + (a - 70) / 40 * .9; }
   else { L = Lmax * .35; const q = (a - 110) / 18; if (q < 1) drop = { y: y + Lmax + q * q * 22, r: 2.2 }; else if (a < 110 + 18 + 70) drop = { splat: (a - 128) / 70 }; }
   L += exitAge > 0 ? exitAge * (1.6 + seed % 3 * .5) : 0;
@@ -1328,11 +1329,11 @@ const TITLE_VISIT_HOPS = [24, 38, 50, 60];
 function drawTitleVisit(t) {
   const v = titleVisit(t); if (!v) return; const { id, L, p } = v, home = TITLE_HOME[id].home, [sx, sy] = logoToScreen(L * LOGO.cw + 14, logoLetterY(L) + 17), col = C(TITLE_HOME[id].col);
   let x, y, sc = 1.6, sq = [1, 1], eyes = 'normal';
-  if (p < 24) { const q = p / 24; x = lerp(home[0], sx, ease(q)); y = lerp(home[1], sy, q) - Math.sin(q * Math.PI) * 40; sc = 1 + q * .6; sq = q < .3 ? [.8, 1.25] : [1, 1]; }
+  if (p < 24) { const q = p / 24; x = lerp(home[0], sx, titleEase(q)); y = lerp(home[1], sy, q) - Math.sin(q * Math.PI) * 40; sc = 1 + q * .6; sq = q < .3 ? [.8, 1.25] : [1, 1]; }
   else if (p < 62) { const hop = TITLE_VISIT_HOPS.findIndex((h, i) => p < (TITLE_VISIT_HOPS[i + 1] ?? 62)), a = TITLE_VISIT_HOPS[hop], b = TITLE_VISIT_HOPS[hop + 1] ?? 62, q = (p - a) / (b - a);
     x = sx; y = sy - Math.sin(q * Math.PI) * (hop === 2 ? 14 : 9); eyes = 'happy'; if (q < .18) sq = [1.3, .72]; else if (q > .85) sq = [.85, 1.2];
     if (q < .3 && Prefs.shake) { const r = seeded(t + L); g.fillStyle = col; for (let n = 0; n < 5; n++) g.fillRect(Math.round(sx + (r() - .5) * 26), Math.round(sy + 2 - r() * 8 - q * 10), 1, 1); } }
-  else { const q = (p - 62) / 30; x = lerp(sx, home[0], ease(q)); y = lerp(sy, home[1], q) - Math.sin(q * Math.PI) * 30; sc = 1.6 - q * .6; }
+  else { const q = (p - 62) / 30; x = lerp(sx, home[0], titleEase(q)); y = lerp(sy, home[1], q) - Math.sin(q * Math.PI) * 30; sc = 1.6 - q * .6; }
   shadow(Math.round(x), Math.round(p >= 24 && p < 62 ? sy + 1 : y), 6);
   drawSprite(buildSprite(id + '_side_mini', col, null, { eyes }), Math.round(x), Math.round(y), sc * sq[0], x > home[0], sq[1]);
 }
@@ -1340,7 +1341,7 @@ function drawTitleRaid(t) {
   const r = titleRaid(t); if (!r) return;
   const { L, p, painter } = r, [lx, ly] = logoToScreen(L * LOGO.cw + 14, logoLetterY(L) + 3), start = [W + 14, 14];
   // la tinta: avanza por el borde superior dejando un rastro, se posa sobre la letra y huye cuando llega la brocha
-  const come = clamp(p / 70, 0, 1), flee = clamp((p - 160) / 30, 0, 1), k = come * (1 - flee), hx = lerp(start[0], lx, ease(k)), hy = lerp(start[1], ly - 4, ease(k)) - Math.sin(k * Math.PI) * 6;
+  const come = clamp(p / 70, 0, 1), flee = clamp((p - 160) / 30, 0, 1), k = come * (1 - flee), hx = lerp(start[0], lx, titleEase(k)), hy = lerp(start[1], ly - 4, titleEase(k)) - Math.sin(k * Math.PI) * 6;
   if (k > 0 && (p < 190)) {
     const N = 14; for (let i = 1; i <= N; i++) { const a = (i - 1) / N, b = i / N, ax = lerp(start[0], hx, a), ay = lerp(start[1], hy, a) + Math.sin(a * 9 + t * .1) * 2, bx = lerp(start[0], hx, b), by = lerp(start[1], hy, b) + Math.sin(b * 9 + t * .1) * 2; pstroke(ax, ay, bx, by, 1 + b * 2.5, '#0b0912', 1, 0, false); }
     inkSplat(hx, hy, 5 + (p > 60 && p < 150 ? 3 + Math.sin(t * .2) : 0), 1, t, 13, p > 70);
@@ -1350,10 +1351,10 @@ function drawTitleRaid(t) {
   }
   // la pintora sube del paisaje, repinta la letra con su brocha y vuelve
   const home = TITLE_HOME[painter].home, col = C(TITLE.cols[L]);
-  if (p >= 110 && p < 150) { const q = (p - 110) / 40, x = lerp(home[0], lx + 6, ease(q)), y = lerp(home[1], ly - 4, q) - Math.sin(q * Math.PI) * 34; titleDrop(painter, x, y, t, x > home[0], 1 + q, 'normal'); }
+  if (p >= 110 && p < 150) { const q = (p - 110) / 40, x = lerp(home[0], lx + 6, titleEase(q)), y = lerp(home[1], ly - 4, q) - Math.sin(q * Math.PI) * 34; titleDrop(painter, x, y, t, x > home[0], 1 + q, 'normal'); }
   else if (p >= 150 && p < 190) { const k2 = (p - 150) / 36, [tx, ty] = titleBrushTip(L, Math.min(1, k2)), [sx, sy] = logoToScreen(tx, ty), P = PROP.brocha;
     drawProp(propSprite('brocha', col), sx, sy, -2.3, 1, 58, 10, .7); titleDrop(painter, sx + 13, sy - 10 + Math.sin(t * .4), t, false, 2, 'angry'); if (k2 < 1 && Prefs.shake) { g.fillStyle = ramp(col).hi; g.fillRect(Math.round(sx) - 2, Math.round(sy) - 1, 3, 2); } }
-  else if (p >= 190 && p < 232) { const q = (p - 190) / 42, x = lerp(lx + 6, home[0], ease(q)), y = lerp(ly - 4, home[1], q) - Math.sin(q * Math.PI) * 26; titleDrop(painter, x, y, t, x > home[0], 2 - q, 'happy'); }
+  else if (p >= 190 && p < 232) { const q = (p - 190) / 42, x = lerp(lx + 6, home[0], titleEase(q)), y = lerp(ly - 4, home[1], q) - Math.sin(q * Math.PI) * 26; titleDrop(painter, x, y, t, x > home[0], 2 - q, 'happy'); }
 }
 function titleResidents(t) {
   // Each protagonist uses their own tool on the world, then settles into a quiet
@@ -1417,11 +1418,14 @@ function updateTitle() {
     // Snapshot before changing state; world setup belongs to the update, not render.
     if (ex === 20) {
       TITLE.snap = document.createElement('canvas'); TITLE.snap.width = W; TITLE.snap.height = H; TITLE.snap.getContext('2d').drawImage(buf, 0, 0);
-      initOverworld(); OW.landT = 999; OW.msgHold = true; Audio.prepare(worldCue()); Audio.sfx('page');
+      if (TITLE.go && typeof levelSelectSetup === 'function') levelSelectSetup(TITLE.go); // una hoja o un jefe elegidos en el índice
+      else { initOverworld(); OW.landT = 999; OW.msgHold = true; Audio.prepare(worldCue()); }
+      Audio.sfx('page');
     }
-    if (ex >= 60) { TITLE.exit = 0; TITLE.snap = null; OW.landT = 48; OW.msgHold = false; setState('overworld'); }
+    if (ex >= 60) { TITLE.exit = 0; TITLE.snap = null; OW.landT = 48; OW.msgHold = false; setState('overworld'); const go = TITLE.go; TITLE.go = null; if (go && typeof levelSelectFinish === 'function') levelSelectFinish(go); }
     return;
   }
+  if (TITLE.select && typeof levelSelectUpdate === 'function') { levelSelectUpdate(); return; }
   if (TITLE.t === LOGO_BEATS.ready) { titleStartButton.style.display = 'block'; placeTitleButton(); }
   for (let i = 0; i < TITLE.letters.length; i++) {
     const age = TITLE.t - LOGO_BEATS.start - i * LOGO_BEATS.step;
@@ -1434,7 +1438,7 @@ function updateTitle() {
   const raid = titleRaid(TITLE.t);
   if (raid) { const p = raid.p; if (p === 0) Audio.sfx('ink_tide', { vol: .35 }); if (p === 80) Audio.sfx('slow_drip', { vol: .35 }); if (p === 110) Audio.sfx('fwip', { semi: SEMI[raid.painter], vol: .4 }); if (p === 150) Audio.sfx('brush_sweep', { vol: .4, semi: SEMI[raid.painter] }); if (p === 166) Audio.sfx('ink_hit', { vol: .3 }); if (p === 186) Audio.sfx('plop', { semi: SEMI[raid.painter] + 5, vol: .35 }); }
   if (TITLE.t >= LOGO_BEATS.ready && titleMenuRows() > 1) { const step = hit('down') || hit('right') ? 1 : hit('up') || hit('left') ? -1 : 0; if (step) { TITLE.sel = ((TITLE.sel || 0) + step + 2) % 2; Audio.sfx('cursor'); } }
-  if (hit('ok')) { if ((TITLE.sel || 0) === 1 && TITLE.t >= LOGO_BEATS.ready && typeof chapterPreview === 'function') chapterPreview(); else beginTitleGame(); }
+  if (hit('ok')) { if ((TITLE.sel || 0) === 1 && TITLE.t >= LOGO_BEATS.ready && typeof levelSelectOpen === 'function') levelSelectOpen(); else beginTitleGame(); }
 }
 // El menú es una paleta de madera con dos pocillos: «comenzar» y «pasar página». Las flechas o el ratón llevan el cursor
 // de tres gotas de uno a otro; confirmar exprime el pocillo. Los botones HTML transparentes dan foco, clic y nombre accesible.
@@ -1460,7 +1464,7 @@ function drawTitleMenu(t) {
   if (wash > 0) { g.save(); g.globalAlpha = (pressed ? .5 : focus0 ? .32 : .12) * wash; const x0 = M.rows[0][0] + 10, len = 90 * wash; titleLine([[x0, M.rows[0][1] + 5], [x0 + len, M.rows[0][1] + 4]], '#e76b55', 4); titleLine([[x0, M.rows[0][1] + 8], [x0 + len, M.rows[0][1] + 8]], '#edc65c', 3); titleLine([[x0, M.rows[0][1] + 10], [x0 + len, M.rows[0][1] + 10]], '#638dcd', 2); g.restore(); }
   drawHand(label, label.total * k, focus0 ? '#3a2f2a' : '#6b5d4c', 2);
   if (rows > 1) { const a = titleProgress(t, LOGO_BEATS.ready + 24, 12), focus1 = sel === 1; g.save(); g.globalAlpha *= a; if (focus1) { g.globalAlpha *= .35; titleLine([[M.rows[1][0] + 10, M.rows[1][1] + 4], [M.rows[1][0] + 66, M.rows[1][1] + 4]], '#8a5aa8', 5); g.globalAlpha /= .35; }
-    smallText('pasar página', M.rows[1][0] + 12, M.rows[1][1] - 3, focus1 ? '#3a2f2a' : '#6b5d4c'); g.restore(); }
+    smallText('elegir hoja', M.rows[1][0] + 12, M.rows[1][1] - 3, focus1 ? '#3a2f2a' : '#6b5d4c'); g.restore(); }
   // los pocillos: uno de mezcla para comenzar y uno de tinta para la otra hoja; el cursor de tres gotas salta entre ellos
   paintDab(M.rows[0][0], M.rows[0][1], 5, '#e8cc94'); paintDab(M.rows[0][0] - 1, M.rows[0][1] - 1, 3, C('naranja'));
   if (rows > 1) { paintDab(M.rows[1][0], M.rows[1][1], 4, '#3a3652'); paintDab(M.rows[1][0] - 1, M.rows[1][1] - 1, 2, '#6a6480'); }
@@ -1483,6 +1487,7 @@ function drawTitle() {
   // el lema, escrito a plumilla bajo el logo
   if (t >= 190) { const line = 'El color que la Tinta robó', w = textWidth(line); writtenLines([line], Math.round((W - w) / 2), 51, '#8a7e68', Prefs.shake ? (t - 190) * .6 : Infinity, { nib: !!Prefs.shake }); }
   if (t >= LOGO_BEATS.ready || TITLE.exit) drawTitleMenu(t);
+  if (TITLE.select && typeof drawLevelSelect === 'function') drawLevelSelect(t);
 }
 function drawDebug() {
   win(W - 124, 24, 120, 70, { solid: 'rgba(11,9,18,0.85)' }); txt('DEBUG', W - 114, 28, '#f2c93a');

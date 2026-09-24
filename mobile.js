@@ -72,7 +72,7 @@ function updateTouchControls() {
     if (b.disabled !== !available) b.disabled = !available;
   }
   const battleMenu=Game.state==='battle'&&!Game.overlay&&!B.currentAction?B.menu:null;
-  const label = Game.state === 'pageTurn' ? 'Pasando hoja' : field && typeof chapterNear === 'function' && chapterNear() ? 'Pasar hoja' : Game.state === 'prologue' ? 'Saltar' : Game.state === 'title' || Game.state === 'cover' ? 'Comenzar' : Game.overlay ? 'Elegir' : battleMenu ? battleMenu.level==='target'?'Usar':'Elegir' : OW.msg && Game.state === 'overworld' ? 'Seguir' : field ? merchantNear() ? 'Comprar' : (worldNearby() || fieldNearby().length) ? 'Examinar' : 'Menú' : 'Confirmar';
+  const label = Game.state === 'pageTurn' ? 'Pasando hoja' : field && typeof chapterNear === 'function' && chapterNear() ? 'Pasar hoja' : Game.state === 'prologue' ? 'Saltar' : Game.state === 'title' && TITLE.select ? 'Entrar' : Game.state === 'title' || Game.state === 'cover' ? 'Comenzar' : Game.overlay ? 'Elegir' : battleMenu ? battleMenu.level==='target'?'Usar':'Elegir' : OW.msg && Game.state === 'overworld' ? 'Seguir' : field ? merchantNear() ? 'Comprar' : (worldNearby() || fieldNearby().length) ? 'Examinar' : 'Menú' : 'Confirmar';
   const span = document.querySelector('#touch-confirm span'), confirm = document.getElementById('touch-confirm');
   if (span.textContent !== label) { span.textContent = label; touchRelabel(confirm); }
   // A late cuando hay algo delante con lo que usarlo
