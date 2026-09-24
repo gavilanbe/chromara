@@ -1406,12 +1406,17 @@ titleStartButton.addEventListener('click', () => { if (Game.state === 'title' &&
 ['pointerenter','focus'].forEach(ev => titleStartButton.addEventListener(ev, () => { if (Game.state === 'title' && !TITLE.exit && TITLE.sel !== 0) { TITLE.sel = 0; Audio.sfx('cursor'); } }));
 function beginTitleGame() {
   if (TITLE.exit) return;
-  TITLE.t = Math.max(TITLE.t, 280); TITLE.exit = TITLE.t;
+  TITLE.ff = false; TITLE.ffDone = null; TITLE.t = Math.max(TITLE.t, 280); TITLE.exit = TITLE.t;
   TITLE.snap = null; titleStartButton.style.display = 'none';
   Audio.sfx('confirm', { semi: 0 }); Audio.sfx('confirm', { semi: 4, when: .08 }); Audio.sfx('confirm', { semi: 7, when: .16 });
 }
+// Pulsar mientras el título aún se pinta no entra en el juego: termina la animación de golpe (se ve pintarse a toda
+// velocidad) y deja el menú listo. Entrar pide otra pulsación, ya con el título quieto.
+const TITLE_SETTLE = 200; // letras pintadas y las tres gotas en su sitio
+function titleFastForward() { if (TITLE.ff || TITLE.t >= LOGO_BEATS.ready) return false; TITLE.ff = true; Audio.sfx('fwip', { vol: .4 }); Audio.sfx('brush_sweep', { vol: .3, semi: 5 }); return true; }
 function updateTitle() {
   TITLE.t++;
+  if (TITLE.ff && !TITLE.exit) { TITLE.t = Math.min(TITLE_SETTLE, TITLE.t + 7); if (TITLE.t >= TITLE_SETTLE) { TITLE.ff = false; TITLE.ffDone = TITLE.t; Audio.sfx('tinkle', { semi: 12, vol: .35 }); } }
   if (typeof CHAPTER !== 'undefined' && CHAPTER.direct && TITLE.t >= LOGO_BEATS.ready && !TITLE.exit) { CHAPTER.direct=false;chapterPreview();return; }
   if (TITLE.exit) {
     const ex = TITLE.t - TITLE.exit;
@@ -1426,7 +1431,7 @@ function updateTitle() {
     return;
   }
   if (TITLE.select && typeof levelSelectUpdate === 'function') { levelSelectUpdate(); return; }
-  if (TITLE.t === LOGO_BEATS.ready) { titleStartButton.style.display = 'block'; placeTitleButton(); }
+  if (TITLE.t >= LOGO_BEATS.ready && titleStartButton.style.display !== 'block') { titleStartButton.style.display = 'block'; placeTitleButton(); }
   for (let i = 0; i < TITLE.letters.length; i++) {
     const age = TITLE.t - LOGO_BEATS.start - i * LOGO_BEATS.step;
     if (age === 0) Audio.sfx('brush_sweep', { pan: (i - 3.5) * .14, vol: .34, len: .75, semi: i % 3 - 1 });
@@ -1438,7 +1443,7 @@ function updateTitle() {
   const raid = titleRaid(TITLE.t);
   if (raid) { const p = raid.p; if (p === 0) Audio.sfx('ink_tide', { vol: .35 }); if (p === 80) Audio.sfx('slow_drip', { vol: .35 }); if (p === 110) Audio.sfx('fwip', { semi: SEMI[raid.painter], vol: .4 }); if (p === 150) Audio.sfx('brush_sweep', { vol: .4, semi: SEMI[raid.painter] }); if (p === 166) Audio.sfx('ink_hit', { vol: .3 }); if (p === 186) Audio.sfx('plop', { semi: SEMI[raid.painter] + 5, vol: .35 }); }
   if (TITLE.t >= LOGO_BEATS.ready && titleMenuRows() > 1) { const step = hit('down') || hit('right') ? 1 : hit('up') || hit('left') ? -1 : 0; if (step) { TITLE.sel = ((TITLE.sel || 0) + step + 2) % 2; Audio.sfx('cursor'); } }
-  if (hit('ok')) { if ((TITLE.sel || 0) === 1 && TITLE.t >= LOGO_BEATS.ready && typeof levelSelectOpen === 'function') levelSelectOpen(); else beginTitleGame(); }
+  if (hit('ok')) { if (TITLE.ff || TITLE.t < LOGO_BEATS.ready) { titleFastForward(); return; } if (TITLE.t - (TITLE.ffDone ?? -99) < 18 || TITLE.t < LOGO_BEATS.ready + 8) return; /* una pulsación de más al terminar no cuenta como entrar */ if ((TITLE.sel || 0) === 1 && TITLE.t >= LOGO_BEATS.ready && typeof levelSelectOpen === 'function') levelSelectOpen(); else beginTitleGame(); }
 }
 // El menú es una paleta de madera con dos pocillos: «comenzar» y «pasar página». Las flechas o el ratón llevan el cursor
 // de tres gotas de uno a otro; confirmar exprime el pocillo. Los botones HTML transparentes dan foco, clic y nombre accesible.

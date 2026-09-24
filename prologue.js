@@ -22,7 +22,7 @@ const PRO_HEROES = [
   { id: 'anil', col: 'azul', x: 202, home: [207, 165] },
 ];
 function startPrologue() { setState('prologue'); PRO.t = 0; ANYKEY = false; for (const k in pressed) pressed[k] = false; }
-function endPrologue() { setState('title'); TITLE.t = 8; TITLE.exit = 0; TITLE.snap = null; ANYKEY = false; for (const k in pressed) pressed[k] = false; }
+function endPrologue() { setState('title'); TITLE.t = 8; TITLE.exit = 0; TITLE.ff = false; TITLE.ffDone = null; TITLE.snap = null; ANYKEY = false; for (const k in pressed) pressed[k] = false; }
 function updatePrologue() {
   const t = ++PRO.t;
   if (t > 12 && (ANYKEY || pressed.ok || pressed.back || pressed.options)) { Audio.sfx('page'); endPrologue(); return; }

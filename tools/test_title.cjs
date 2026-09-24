@@ -85,10 +85,17 @@ const base = process.argv[2] || 'http://127.0.0.1:8765';
 
     await page.evaluate(() => { Game.state = 'title'; TITLE.t = 12; TITLE.exit = 0; releaseInputs(); Game.paused = false; });
     await page.keyboard.press('Enter');
+    await page.waitForFunction(() => TITLE.t >= TITLE_SETTLE && !TITLE.ff);
+    const early = await page.evaluate(() => ({ state: Game.state, exit: TITLE.exit, button: titleStartButton.style.display }));
+    assert.deepEqual(early, { state: 'title', exit: 0, button: 'block' }, 'an early press finishes the painting instead of entering');
+    await page.waitForTimeout(400); await page.keyboard.press('Enter');
     await page.waitForFunction(() => TITLE.exit > 0);
     await page.waitForFunction(() => Game.state === 'overworld');
     await page.evaluate(() => { Game.paused = true; });
-    console.log('PASS early keyboard confirmation skips the painting without delaying entry');
+    const mashed = await page.evaluate(() => { Game.state = 'title'; TITLE.t = 12; TITLE.exit = 0; TITLE.ff = false; TITLE.ffDone = null; releaseInputs(); let frames = 0;
+      while (TITLE.t < TITLE_SETTLE && frames < 60) { pressed.ok = true; updateTitle(); frames++; } for (let i = 0; i < 10; i++) { pressed.ok = true; updateTitle(); } return { frames, exit: TITLE.exit, state: Game.state }; });
+    assert(mashed.frames < 40 && mashed.exit === 0 && mashed.state === 'title', 'mashing during the painting never enters: ' + JSON.stringify(mashed));
+    console.log('PASS an early press completes the painting in a flash; entering takes a second press once it is settled');
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -110,10 +117,13 @@ const base = process.argv[2] || 'http://127.0.0.1:8765';
     assert(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 844 && bounds.y + bounds.height <= 390);
     await mobile.getByRole('button', { name: 'Comenzar aventura' }).tap();
     assert(await mobile.evaluate(() => TITLE.exit > 0));
-    await mobile.evaluate(() => { TITLE.exit = 0; TITLE.t = 1; releaseInputs(); Game.paused = false; });
+    await mobile.evaluate(() => { TITLE.exit = 0; TITLE.t = 1; TITLE.ff = false; TITLE.ffDone = null; releaseInputs(); Game.paused = false; });
     await mobile.locator('#touch-confirm').tap();
+    await mobile.waitForFunction(() => TITLE.t >= TITLE_SETTLE && !TITLE.ff);
+    assert.equal(await mobile.evaluate(() => TITLE.exit), 0, 'the first A-button tap only completes the painting');
+    await mobile.waitForTimeout(400); await mobile.locator('#touch-confirm').tap();
     await mobile.waitForFunction(() => TITLE.exit > 0);
-    console.log('PASS landscape mobile layout, start tap and early A-button confirmation');
+    console.log('PASS landscape mobile layout, start tap, and an early A-button tap that completes the painting first');
     assert.deepEqual(errors, []);
     console.log('7 title integration checks passed with no browser errors.');
   } finally { await browser.close(); }
