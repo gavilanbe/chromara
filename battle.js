@@ -131,8 +131,8 @@ function startTransition(foe) { initBattle(foe); setState('transition'); }
 // 3. Transición: detección, caída, salpicón, mancha que se traga el mapa (y lo inclina), drenaje al charco, entrada
 // =====================================================================
 // Mantén OK pulsado para verla al doble de velocidad; con enemigos ya conocidos (Game.met) la anticipación y el salto van más cortos.
-function* transitionGen(foe) {
-  const T = B.tr, sig = foe.enemies.join(','), short = Game.met.has(sig); Game.met.add(sig);
+function* transitionGen(foe, opt = {}) {
+  const T = B.tr; T.tri = !!opt.tri; const sig = foe.enemies.join(','), short = Game.met.has(sig); Game.met.add(sig);
   T.foe = foe; OW.hideFoe = foe; // el mapa deja de dibujarlo: lo dibuja la transición (se agazapa y salta)
   // la música del mapa se hunde de tono en vez de cortarse; si el enemigo ya te vio en el mapa (¡) no se repite el aviso: gruñe y embiste
   Audio.bend(.5, short ? .4 : .7); Audio.sfx('hum_down', { vol: .5 }); Audio.sfx(foe.seen ? 'lunge' : 'detect');
@@ -144,9 +144,9 @@ function* transitionGen(foe) {
   for (let i = 0; i < nf; i++) { T.k = i / nf; OW.scare.k = T.k; yield; }
   // 3) salpicón: hit-stop, flash de tinta, sacudida vertical y golpe de zoom, gotas hacia la cámara, ondas
   T.stage = 'splash'; T.k = 0; T.punch = 1; OW.scare = { stage: 'splash', k: 0 }; OW.flash = { col: '#0b0912', a: .5 };
-  Audio.stop(.05); Audio.sfx('splash'); Audio.sfx('encounter'); B.shake = 7; Audio.play(foe.boss ? 'boss' : 'battle');
+  Audio.stop(.05); Audio.sfx('splash'); Audio.sfx('encounter'); B.shake = 7; Audio.play(opt.music || (foe.boss ? 'boss' : 'battle'));
   // gotas grandes que salen hacia la cámara y se quedan pegadas a la pantalla, escurriendo
-  T.lens = [[.16, 48, 40, 11], [.3, 262, 58, 14], [.42, 118, 138, 9], [.55, 214, 150, 12], [.66, 30, 124, 8], [.78, 296, 22, 7]].map(([at, x, y, r], i) => ({ at, x, y, r, seed: 30 + i * 7, hit: false }));
+  T.lens = [[.16, 48, 40, 11], [.3, 262, 58, 14], [.42, 118, 138, 9], [.55, 214, 150, 12], [.66, 30, 124, 8], [.78, 296, 22, 7]].map(([at, x, y, r], i) => ({ at, x, y, r, seed: 30 + i * 7, hit: false, col: opt.tri && typeof CONTRARIOS !== 'undefined' ? CONTRARIOS[CONTRA_TRIO[i % 3]].hex : null }));
   for (let i = 0; i < 5; i++) { T.hs = i; yield; } // hit-stop: fogonazo de papel y negativo
   T.hs = null;
   for (let i = 0; i < 18; i++) { T.k = i / 18; T.punch = 1 - T.k;

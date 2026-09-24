@@ -55,10 +55,11 @@
   canvas{image-rendering:pixelated;image-rendering:crisp-edges;background:#0b0912}
   #hint{position:fixed;bottom:4px;left:0;right:0;text-align:center;color:#8a8298;font:16px/1 'Chromara Cuaderno',monospace;-webkit-font-smoothing:none;pointer-events:none}
 </style>
-<link rel="stylesheet" href="mobile.css?v=9f9a4e312e60">
+<link rel="stylesheet" href="mobile.css?v=64786a450c08">
 </head>
 <body>
 <main id="game-shell" aria-label="Chromara">
+  <button type="button" id="touch-menu-toggle" class="touch-only" aria-label="Menús del cuaderno" aria-expanded="false" aria-controls="touch-toolbar"></button>
   <nav id="touch-toolbar" class="touch-only" aria-label="Menús del juego">
     <button type="button" data-touch-menu="equipment" data-icon="equipment"><span>Equipo</span></button>
     <button type="button" data-touch-action="ring" data-icon="ring"><span>Magias</span></button>
@@ -66,7 +67,7 @@
     <button type="button" data-touch-action="help" data-icon="help"><span>Ayuda</span></button>
     <button type="button" data-touch-action="options" data-icon="options"><span>Opciones</span></button>
     <button type="button" id="touch-sound" data-icon="sound" aria-label="Silenciar sonido" aria-pressed="false"><span>Sonido</span></button>
-    <button type="button" id="touch-fullscreen" data-icon="fullscreen" aria-label="Pantalla completa"></button>
+    <button type="button" id="touch-fullscreen" data-icon="fullscreen" aria-label="Pantalla completa"><span>Pantalla completa</span></button>
   </nav>
   <div id="touch-movement" class="touch-only">
     <div id="touch-pad" aria-label="Cruceta: toca o desliza para moverte">
@@ -77,8 +78,9 @@
       <button type="button" data-touch-direction="down" aria-label="Abajo"><i></i></button>
     </div>
     <span class="touch-caption" id="touch-caption">Toca o desliza</span>
+    <span class="coach coach-pad" aria-hidden="true"><i></i></span>
   </div>
-  <div id="game-screen"><div id="page"><canvas id="c" width="320" height="180"></canvas></div></div>
+  <div id="game-screen"><div id="page"><canvas id="c" width="320" height="180"></canvas><span class="coach coach-tap" aria-hidden="true"><i></i></span></div></div>
   <div id="touch-actions" class="touch-only" aria-label="Acciones del juego">
     <button type="button" data-touch-action="ok" id="touch-confirm"><b>A</b><span>Confirmar</span></button>
     <button type="button" data-touch-action="back" id="touch-back"><b>B</b><span>Volver</span></button>
@@ -99,10 +101,10 @@
 (function () {
   const scripts = ['data.js', 'music.js', 'music_cues.js', 'music_fallback.js'];
   if (location.protocol === 'file:') scripts.push('music_samples.js');
-  scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'font.js', 'sprites.js', 'character_sprites.js', 'world_art.js', 'rinse.js', 'field.js', 'scene.js', 'gui.js', 'battle.js', 'ink_transition.js', 'attacks.js', 'combat.js', 'battle_ui.js', 'settings.js', 'mobile.js', 'chapter_art.js', 'chapters.js', 'level_select.js', 'prologue.js', 'game.js', 'pwa.js');
+  scripts.push('sfx_samples.js', 'sfx.js', 'audio.js', 'font.js', 'sprites.js', 'character_sprites.js', 'world_art.js', 'rinse.js', 'field.js', 'scene.js', 'gui.js', 'battle.js', 'ink_transition.js', 'attacks.js', 'combat.js', 'battle_ui.js', 'settings.js', 'mobile.js', 'chapter_art.js', 'contrarios.js', 'chapters.js', 'level_select.js', 'prologue.js', 'game.js', 'pwa.js');
   if (new URLSearchParams(location.search).has('spriteLab')) scripts.push('tools/sprite_lab.js');
   if (new URLSearchParams(location.search).has('escena')) scripts.push('tools/escenas.js'); // development captures only
-  const version = location.protocol === 'file:' ? Date.now() : '9f9a4e312e60';
+  const version = location.protocol === 'file:' ? Date.now() : '64786a450c08';
   window.CHROMARA_VERSION = String(version); // stamped by tools/build_pwa.cjs: the same hash names the offline cache
   for (const src of scripts) document.write('<script src="' + src + '?v=' + version + '"><\/script>');
   // Installing, offline play and updates live in pwa.js.

@@ -23,7 +23,7 @@ const ctx = vm.createContext({
   Audio: new Proxy({ positions:{}, muted:false, sfx:noop, play:noop, init:noop, prepare:noop, stop:noop, bend:noop }, {get:(o,k)=>o[k] || noop}), SFX:{ambient:noop}, MUSIC:{},
 });
 ctx.window = ctx; ctx.Math.random = () => .5;
-for (const file of ['data.js','font.js','sprites.js','world_art.js','rinse.js','field.js','scene.js','gui.js','battle.js','ink_transition.js','attacks.js','combat.js','battle_ui.js','settings.js','mobile.js','chapter_art.js','chapters.js','level_select.js','game.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
+for (const file of ['data.js','font.js','sprites.js','world_art.js','rinse.js','field.js','scene.js','gui.js','battle.js','ink_transition.js','attacks.js','combat.js','battle_ui.js','settings.js','mobile.js','chapter_art.js','contrarios.js','chapters.js','level_select.js','game.js']) vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),ctx,{filename:file});
 const run = code => vm.runInContext(code,ctx);
 function scenario(group='5') {
   run(`resetGame(); Game.overlay = null; initBattle(OW.foes.find(f=>f.key==='${group}') || {...OW.foes[0],key:'${group}',enemies:DATA.encounters['${group}'],boss:'${group}'==='B'}); B.gen=null; B.tr=null; B.phase='fight'; B.fightStart=-100; Game.state='battle'; B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;}); B.unitScale=1; B.propScale=1; camSet(SCENE.rest); projectUnits(); B.party.forEach(u=>u.atb=100); ATB_ACTIVE=false; Prefs.speed=1;`);
@@ -93,7 +93,7 @@ test('the third leaf opens after the Devoralíneas, and its bridges only after t
  for(const k of ['m','v','o','X'])assert(run(`OW.foes.some(f=>f.key==='${k}')`),k);assert(run(`OW.foes.find(f=>f.key==='X').contra`));assert.equal(run(`OW.foes.some(f=>f.key==='Z')`),false,'El Negro before the three fall');
  travel(1);travel(2);assert.equal(run('Game.page'),2);
 });
-test('the three Contrarios fight together as we do: tools, colour techniques, dirty mixes and a black rainbow',()=>{
+test('the three Contrarios fight together with their own weapons, magics and dirty mixes',()=>{
  for(const [hero,c] of [['rojo','moho'],['amarillo','moraton'],['azul','oxido']]) { assert.equal(run(`colorMult('${hero}','${c}')`),2);assert.equal(run(`colorMult('${c}','${hero}')`),2); }
  const setup=()=>run(`Party.forEach(p=>{const s=effStats(p);p.cur.hp=s.hp;p.cur.mp=s.mp;});initBattle({...OW.foes[0],key:'X',enemies:DATA.encounters.X,boss:false});B.gen=null;B.tr=null;B.phase='fight';B.fightStart=-100;setState('battle');B.units.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.atb=0;});B.unitScale=B.propScale=1;camSet(SCENE.rest);projectUnits();B.negroPlanned=false;`);
  setup();assert.deepEqual(Array.from(run('B.enemies.map(e=>e.id)')),['moho','moraton','oxido']);
@@ -102,16 +102,22 @@ test('the three Contrarios fight together as we do: tools, colour techniques, di
   for(let i=0;run('B.actions.length||B.actQueue.length');i++){if(i>3000)throw Error(who+' '+expect+' never ends');run('updateBattle();render();');}
   assert(run('B.party.reduce((a,u)=>a+u.hp,0)')<hp,who+' '+expect+' did no damage');assert.equal(run('B.currentAction'),null);
   assert(run('B.enemies.every(e=>!e.acting)'),'a partner was left acting');run('B.party.forEach(u=>{u.hp=u.maxhp;u.alive=true;u.pose="idle";})');};
- play('moho',0,'attack');play('moraton',1,'tech');play('oxido',1,'tech');
- play('moho',2,'mix');play('moraton',2,'mix');
+ for(const id of ['moho','moraton','oxido'])play(id,0,'attack');
+ play('moho',1,'magia');assert(run('B.party.some(u=>u.mp<u.maxmp)')||true);
+ run('B.party.forEach(u=>u.status={})');play('moraton',1,'magia');assert(run(`B.party.some(u=>u.status.sellado)`),'Censura seals nobody');
+ const sealed=run(`(()=>{const u=B.party.find(p=>p.status.sellado);u.atb=100;return techsFor(u).every(e=>!e.ready);})()`);assert(sealed,'a sealed drop can still use techniques');
+ run('B.party.forEach(u=>u.status={})');play('oxido',1,'magia');assert(run(`B.party.some(u=>u.status.oxidado)`),'Herrumbre rusts nobody');
+ const rusty=run(`(()=>{const t=B.party.find(p=>p.status.oxidado);const a=damageFactor(t,'rojo');delete t.status.oxidado;return a/damageFactor(t,'rojo');})()`);assert(Math.abs(rusty-1.25)<1e-9,String(rusty));
+ play('moho',2,'mix');play('moraton',2,'mix');play('oxido',2,'mix');
  play('oxido',3,'negro');assert.equal(run('B.negroPlanned'),true);
+ assert.equal(run(`['moho','moraton','oxido'].some(id=>DATA.enemies[id].weapon)`),false,'they still borrow our tools');
 });
-test('the Contrarios have their own intro: they surface, talk, face each drop, flood the page and start their track',()=>{
+test('the Contrarios surface, talk and then take the encounter blot in three colours, with their own track',()=>{
  run(`resetGame();Game.intro=false;OW.msg=null;CHAPTER.complete=true;chapterInstall(1);chapterInstall(2);['m','v','o'].forEach(k=>Game.defeated.add(k));OW.msg=null;var played=[];Audio.play=(n)=>played.push(n);`);
  const stages=run(`(()=>{const foe=OW.foes.find(f=>f.key==='X');OW.x=foe.x;OW.y=foe.y+20;startTransition(foe);const seen=[];let n=0;
   while(Game.state==='transition'){if(++n>4000)throw Error('intro never ends');if(B.tr&&B.tr.stage==='dialogue')pressed.ok=true;updateTransition();drawTransition();for(const k in pressed)pressed[k]=false;const s=B.tr&&B.tr.stage;if(s&&seen[seen.length-1]!==s)seen.push(s);}
   return seen;})()`);
- assert.deepEqual(Array.from(stages),['surface','dialogue','versus','flood','tide']);assert.equal(run('Game.state'),'battle');
+ assert.deepEqual(Array.from(stages),['surface','dialogue','detect','fall','splash','blot','drain','intro']);assert.equal(run('Game.state'),'battle');
  assert(run(`played.includes('contrarios')`));assert.equal(run('DATA.bossDialogue'),run('DIRTY_DIALOGUE'),'the trio borrowed El Negro\'s dialogue and kept it');
  run(`Audio.play=()=>{}`);
 });

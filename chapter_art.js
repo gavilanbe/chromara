@@ -35,51 +35,8 @@ SPRITES.devoralineas_2=devoralineasMatrix(2);
 SPRITES.devoralineas_3=devoralineasMatrix(3);
 SPRITES.devoralineas_mini=devoralineasMatrix(1,true);
 
-// ---- Los Contrarios: lo que serían las tres gotas si fueran su opuesto. Misma forma, pero en espejo, del color
-// complementario y podrido (moho, moratón, óxido), con venas oscuras que lo agrietan y goterones de pintura pasada.
-// Juntos, los complementarios se anulan: forman El Negro.
-const CONTRARIOS = {
-  moho:    { hero: 'carmin', hex: '#6f8a3a', name: 'Moho',    col: 'verde' },
-  moraton: { hero: 'ambar',  hex: '#6a3f86', name: 'Moratón', col: 'violeta' },
-  oxido:   { hero: 'anil',   hex: '#b0582a', name: 'Óxido',   col: 'naranja' },
-};
-function contraDef(id, view, kind) {
-  const C0 = CONTRARIOS[id], base = heroDef(C0.hero, view, kind), w = Math.max(...base.rows.map(r => r.length)), rp = ramp(C0.hex), rnd = seeded(id.length * 97 + (kind === 'mini' ? 3 : kind === 'title' ? 7 : 1));
-  const flipX = x => w - 1 - x, grid = base.rows.map(r => r.padEnd(w, '.').split('').reverse());
-  const H = grid.length, body = (x, y) => y >= 0 && y < H && x >= 0 && x < w && 'BSHDW'.includes(grid[y][x]);
-  // venas: grietas oscuras que bajan quebrándose por el cuerpo
-  if (kind !== 'mini') for (let v = 0; v < 3; v++) { let x = Math.round(w * (.3 + v * .2)), y = Math.round(H * .25); for (let n = 0; n < H; n++) { if (body(x, y) && grid[y][x] !== 'D') grid[y][x] = n % 5 === 4 ? 'S' : 'D'; y++; x += rnd() < .5 ? -1 : rnd() < .5 ? 1 : 0; if (y >= H) break; } }
-  // goterones de pintura pasada colgando del borde de abajo
-  const extra = kind === 'mini' ? 2 : 4; for (let i = 0; i < extra; i++) grid.push(Array(w).fill('.'));
-  for (const f of kind === 'mini' ? [.35, .7] : [.25, .5, .78]) { const x = Math.round(w * f); let y0 = H - 1; while (y0 > 0 && !body(x, y0)) y0--; if (y0 <= 0) continue; const L = Math.min(grid.length - 2 - y0, 1 + Math.round(rnd() * (extra - 1))); if (L < 1) continue;
-    for (let k = 1; k <= L; k++) { grid[y0 + k][x] = k === L ? 'D' : 'B'; if (grid[y0 + k][x - 1] === '.') grid[y0 + k][x - 1] = 'O'; if (grid[y0 + k][x + 1] === '.') grid[y0 + k][x + 1] = 'O'; } if (grid[y0 + L + 1]) grid[y0 + L + 1][x] = 'O'; }
-  const pal = { ...base.pal, O: '#140f14', D: mixHex(rp.dk, '#140f14', .35), S: rp.sh, B: rp.base, H: mixHex(rp.hi, rp.base, .35), W: mixHex(rp.spec, '#c9d09a', .5), b: '#241a20', c: mixHex(rp.sh, '#241a20', .3), d: '#140f14' };
-  const m = ([x, y]) => [flipX(x), y];
-  return { ...base, rows: grid.map(r => r.join('')), pal, brow: 'angry', eyes: base.eyes.map(m).reverse(), mouth: base.mouth ? [flipX(base.mouth[0]) - 1, base.mouth[1]] : null, blush: null, freckles: base.freckles ? base.freckles.map(m) : null };
-}
 // se dibujan la primera vez que hacen falta (las rampas de color viven en game.js, que carga después)
 function lazySprite(name, make) { Object.defineProperty(SPRITES, name, { configurable: true, enumerable: true, get() { const d = make(); Object.defineProperty(SPRITES, name, { value: d, writable: true, enumerable: true, configurable: true }); return d; } }); }
-for (const id of Object.keys(CONTRARIOS)) { lazySprite(id, () => contraDef(id, 'front', 'battle')); lazySprite(id + '_mini', () => contraDef(id, 'front', 'mini')); lazySprite(id + '_title', () => contraDef(id, 'front', 'title')); }
-// El Negro: los tres Contrarios fundidos. En la primera fase aún se ven los tres (con su color, seis ojos); luego la
-// mezcla los ensucia y al final sólo queda negro, agrietado por los tres colores.
-function elNegroMatrix(phase = 1, mini = false) {
-  const w = 62, h = 44, rows = Array.from({ length: h }, () => Array(w).fill('.'));
-  const parts = [['carmin', 0, 18, 'x'], ['anil', 27, 23, 'z'], ['ambar', 19, 3, 'y']], coreOf = {};
-  for (const [hero, ox, oy, key] of parts) { const d = heroDef(hero, 'front', 'battle'); d.rows.forEach((r, y) => r.split('').forEach((c, x) => { if (c === '.') return; const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= w || Y >= h) return;
-    const cur = rows[Y][X]; if (c === 'O' && cur !== '.' && cur !== 'O') return; rows[Y][X] = c === 'O' ? 'O' : c === 'W' ? 'H' : 'BSHD'.includes(c) ? c : 'S'; })); coreOf[key] = [ox + d.rows[0].length / 2, oy + d.rows.length * .55, d.rows[0].length * .28]; }
-  // el color que les queda: grande al principio, sólo vetas al final
-  const rnd = seeded(40 + phase);
-  for (const [, , , key] of parts) { const [cx, cy, r0] = coreOf[key], r = phase === 1 ? r0 : phase === 2 ? r0 * .55 : 0;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (rows[y][x] !== '.' && rows[y][x] !== 'O' && ((x - cx) / r) ** 2 + ((y - cy) / (r * .8)) ** 2 <= 1) rows[y][x] = key;
-    if (phase > 1) { let x = Math.round(cx), y = Math.round(cy); for (let n = 0; n < 14; n++) { if (rows[y] && rows[y][x] && rows[y][x] !== '.' && rows[y][x] !== 'O') rows[y][x] = key; x += Math.round(rnd() * 2 - 1); y += rnd() < .6 ? 1 : -1; } } }
-  // barro que chorrea bajo el conjunto
-  for (let i = 0; i < 8; i++) { const x = 6 + i * 7, L = 2 + (i * 5) % 4; for (let k = 0; k < L; k++) if (rows[h - 3 + k - 2] && rows[h - 5 + k]) { if (rows[h - 5 + k][x] === '.') rows[h - 5 + k][x] = k === L - 1 ? 'D' : 'S'; } }
-  const pal = { x: CONTRARIOS.moho.hex, y: CONTRARIOS.moraton.hex, z: CONTRARIOS.oxido.hex };
-  const eyes = phase === 1 ? [[11, 27], [18, 27], [27, 13], [33, 13], [38, 30], [46, 30]] : phase === 2 ? [[18, 26], [27, 20], [36, 20], [44, 27]] : [[24, 22], [38, 22]];
-  if (mini) { const small = []; for (let y = 0; y < h; y += 2) small.push(rows[y].filter((_, x) => x % 2 === 0).join('')); return { rows: small, pal, eyes: eyes.map(([x, y]) => [x >> 1, y >> 1]), eyeKind: 'ink', mini: true, big: false }; }
-  return { rows: rows.map(r => r.join('')), pal, eyes, eyeKind: 'ink', big: phase === 3 };
-}
-lazySprite('el_negro', () => elNegroMatrix(1)); lazySprite('el_negro_2', () => elNegroMatrix(2)); lazySprite('el_negro_3', () => elNegroMatrix(3)); lazySprite('el_negro_mini', () => elNegroMatrix(1, true));
 
 function chapterFoldSprite() {
   return cached('chapter-fold',()=>{
@@ -125,69 +82,6 @@ function drawDirtyWater(cx,cy){
     g.fillStyle='rgba(58,52,34,.5)';g.fillRect(X,Y,TILE,TILE);
     g.fillStyle='rgba(20,15,20,.35)';for(let n=0;n<3;n++){const a=(h>>(n*3))&15;g.fillRect(X+a,Y+((h>>(n*4+2))&15),2,1);}
     const k=(h&7)+Math.floor(t/40);if(k%5===0){g.save();g.globalAlpha=.35;g.fillStyle=oil[(k/5|0)%3];const off=Math.round(Math.sin(t*.03+h)*3);g.fillRect(X+3+off,Y+6,9,1);g.fillRect(X+5+off,Y+7,6,1);g.restore();}}
-}
-// ---- Los Contrarios en el mapa y su presentación ----
-const CONTRA_TRIO=['moho','moraton','oxido'],CONTRA_HERO={moho:'carmin',moraton:'ambar',oxido:'anil'};
-function drawContraFoe(f,cx,cy){
-  const x=f.x-cx,y=f.y-cy;g.fillStyle='#2e2c22';g.beginPath();g.ellipse(x,y+4,26,7,0,0,6.29);g.fill();g.fillStyle='#4a4a36';g.beginPath();g.ellipse(x,y+3,22,5,0,0,6.29);g.fill();
-  CONTRA_TRIO.forEach((id,i)=>{const bx=x+(i-1)*14,by=y+3-(i===1?4:0)+Math.round(Math.sin(OW.t*.07+i*2)*1);drawSprite(buildSprite(id+'_mini',C('negro'),null,{eyes:f.seen?'angry':'normal'}),bx,by,1,i===2);});
-}
-function contraRise(T,x,y,k,scale){ // los tres salen del agua sucia uno a uno
-  CONTRA_TRIO.forEach((id,i)=>{const q=clamp((k-i*.26)/.3,0,1);if(q<=0)return;const bx=x+(i-1)*22*scale,sink=(1-q*q)*22*scale;
-    g.save();g.beginPath();g.rect(0,0,W,y+2);g.clip();drawSprite(buildSprite(id+'_mini',C('negro'),null,{eyes:q>.8?'angry':'normal'}),Math.round(bx),Math.round(y+sink),scale*(1+(1-q)*.2),i===2,scale);g.restore();
-    if(q<1){g.strokeStyle=DATA.colors[id].hex;g.lineWidth=1;g.globalAlpha=1-q;g.beginPath();g.ellipse(bx,y+2,6+q*20,2+q*5,0,0,6.29);g.stroke();g.globalAlpha=1;}});
-}
-function drawContraFx(T){
-  const foe=T.foe,fx0=foe.x-Math.round(OW.cam.x),fy0=foe.y-Math.round(OW.cam.y),t=B.t;
-  if(T.stage==='surface'||T.stage==='dialogue'){
-    const k=T.stage==='surface'?T.k:1;g.fillStyle='rgba(20,18,12,'+(.2+k*.3).toFixed(2)+')';g.fillRect(0,0,W,H);
-    g.fillStyle='#2e2c22';g.beginPath();g.ellipse(fx0,fy0+4,26+k*20,7+k*5,0,0,6.29);g.fill();g.fillStyle='#4a4a36';g.beginPath();g.ellipse(fx0,fy0+3,22+k*18,5+k*4,0,0,6.29);g.fill();
-    for(let i=0;i<6;i++){const q=((t*.03+i*.17)%1);g.fillStyle='rgba(111,138,58,'+(.6*(1-q)).toFixed(2)+')';g.beginPath();g.arc(fx0-30+i*12,fy0+3-q*10,1+q*2,0,6.29);g.fill();}
-    contraRise(T,fx0,fy0+3,k,1.8);
-    if(T.stage==='dialogue'&&T.dlg)drawDialogue(T.dlg);
-    return;
-  }
-  if(T.stage==='versus'){ // tres paneles: cada gota frente a su Contrario
-    const k=T.k;g.fillStyle='#0b0912';g.fillRect(0,0,W,H);
-    CONTRA_TRIO.forEach((id,i)=>{const at=i*22,q=clamp((k-at)/14,0,1);if(q<=0)return;const e=Prefs.shake?easeBack(q):q,from=i%2?W:-W,dx=Math.round((1-e)*from),y0=6+i*58,h=52,hero=CONTRA_HERO[id],hc=C(DATA.party.find(p=>p.id===hero).color),cc=DATA.colors[id].hex;
-      g.save();g.translate(dx,0);
-      g.fillStyle=hc;g.beginPath();g.moveTo(0,y0);g.lineTo(W/2+14,y0);g.lineTo(W/2-14,y0+h);g.lineTo(0,y0+h);g.fill();
-      g.fillStyle=cc;g.beginPath();g.moveTo(W/2+14,y0);g.lineTo(W,y0);g.lineTo(W,y0+h);g.lineTo(W/2-14,y0+h);g.fill();
-      g.fillStyle='rgba(11,9,18,.25)';for(let n=0;n<W;n+=6)g.fillRect(n,y0+((n*7)%h),3,1);
-      const hs=buildSprite(hero+'_title',hc,null,{eyes:'angry'}),cs=buildSprite(id+'_title',C('negro'),null,{eyes:'angry'});
-      drawSprite(hs,W/2-70,y0+h-4,1.2,false,1.2);drawSprite(cs,W/2+70,y0+h-4,1.2,false,1.2);
-      smallText(DATA.party.find(p=>p.id===hero).name,8,y0+4,'#fff8e6');const cn=DATA.enemies[id].name;smallText(cn,W-8-textWidth(cn),y0+4,'#fff8e6');
-      // la raya del choque: una mancha de tinta con VS
-      g.fillStyle='#0b0912';g.beginPath();for(let a=0;a<=20;a++){const an=a/20*6.283,r=13+((a*7)%5)*1.5;const X=W/2+Math.cos(an)*r,Y=y0+h/2+Math.sin(an)*r*.8;if(a)g.lineTo(X,Y);else g.moveTo(X,Y);}g.fill();
-      bigText('VS',W/2-9,y0+h/2-5,'#efe2c4',{outline:'#0b0912'});
-      g.restore();
-      if(q<1&&Prefs.flash){g.fillStyle='rgba(244,231,200,'+(.5*(1-q)).toFixed(2)+')';g.fillRect(0,y0,W,h);}
-    });
-    if(k>74){const q=clamp((k-74)/36,0,1);inkLayer(W/2,H/2,q*q*420,{fr:14,t});}
-    return;
-  }
-  if(T.stage==='flood'||T.stage==='tide'){ // agua sucia que sube y luego se retira sobre el combate
-    if(T.stage==='flood'&&T.overworld!==false){g.fillStyle='#2e2c22';g.beginPath();g.ellipse(fx0,fy0+4,46,12,0,0,6.29);g.fill();contraRise(T,fx0,fy0+3,1,1.8);}
-    const k=T.k,e=T.stage==='flood'?1:1-k*k,top=T.stage==='flood'?H-(H+20)*Math.sin(k*Math.PI/2):lerp(-10,H+30,k*k);
-    g.fillStyle='#2e2c22';for(let x=0;x<=W;x+=4){const y=top+Math.sin(x*.05+t*.2)*6+Math.sin(x*.17)*3;g.fillRect(x,y,4,H);g.fillStyle='#6f8a3a';g.globalAlpha=.5;g.fillRect(x,y-1,4,2);g.globalAlpha=1;g.fillStyle='#2e2c22';}
-    const oil=['#6f8a3a','#6a3f86','#b0582a'];for(let i=0;i<9;i++){const y=top+20+i*16;if(y>H)break;g.fillStyle=oil[i%3];g.globalAlpha=.35;g.fillRect(Math.round((i*53+t*1.5)%W),Math.round(y),18,1);g.globalAlpha=1;}
-  }
-}
-// El arcoíris de los Contrarios: sus tres pigmentos se funden en un orbe negro que sube y cae sobre el grupo
-function* techArcoirisNegro(users,targets,tech){
-  const mid=[users.reduce((a,u)=>a+u.wx,0)/users.length,users.reduce((a,u)=>a+u.wy,0)/users.length],pc=partyC();
-  camFocus(mid[0],mid[1],{dist:96,turn:-.3,h:52,pitch:.55,ease:.1});
-  const {of,orb}=yield* fuseAt(users,mid[0],mid[1],22,'#1a1520');yield* wait(6);
-  camFocus(pc[0],pc[1],{dist:110,turn:.2,h:58,pitch:.5,ease:.08,subjects:alive(B.party)});Audio.sfx('fwip',{semi:-7});
-  const oil=CONTRA_TRIO.map(id=>DATA.colors[id].hex),rays=fx(999,()=>{const c=PJ([orb.wx,orb.wy,orb.wz]);for(let i=0;i<3;i++){const a=rays.t*.2+i*2.09,r=26*c[2];g.fillStyle=oil[i];for(let s=0;s<8;s++){const aa=a-s*.25;g.fillRect(Math.round(c[0]+Math.cos(aa)*r*(1-s*.08)),Math.round(c[1]+Math.sin(aa)*r*.5*(1-s*.08)),2,2);}}});
-  for(let i=1;i<=22;i++){const k=i/22,e=k*k*(3-2*k);orb.wx=lerp(mid[0],pc[0],e);orb.wy=lerp(mid[1],pc[1],e);orb.wz=lerp(22,78,Math.sin(k*Math.PI/2));orb.r=lerp(orb.r,14,.08);yield;}
-  Audio.sfx('hum_down',{vol:.6});for(let i=0;i<14;i++){orb.r+=.25;yield;}
-  for(let i=1;i<=9;i++){orb.wz=lerp(78,2,(i/9)**2);yield;}
-  rays.dur=0;of.dur=0;B.shake=8;B.hitstop=4;B.slowmo=16;if(Prefs.flash)B.flash={col:'#140f14',a:.55};Audio.sfx('ink_tide',{vol:.9});Audio.sfx('impact_sub',{vol:.8});
-  lensSplatter('#140f14',8,5);mark({kind:'pool',p:[pc[0],pc[1],0],w:70,col:'#140f14',grow:14,life:180,under:true});
-  const atk=users.reduce((a,u)=>a+u.atk,0)/users.length;
-  for(const t of targets){if(!t.alive)continue;damage(t,baseDmg(atk,t.dfn,tech.power),'negro','Los Contrarios',{accent:'finish'});goop(t,'#140f14',100);burst(t.wx,t.wy,t.def.h*.5,'#140f14',10,1.8);}
-  yield* wait(30);for(const u of users){u.pose='idle';u.wz=0;}yield* wait(8);camReset();
 }
 function chapterDrawTraveller(i,cx,cy) {
   const T=CHAPTER.turn,p=Party[i],enter=T.t>=96,local=enter?T.t-174-i*10:T.t-34-i*10;

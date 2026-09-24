@@ -92,14 +92,14 @@ function drawLensDrops(T, sx, sy, k) {
   for (const d of T.lens || []) {
     const q = (k - d.at) / .12;
     if (q < 1) { if (q < -2.2) continue; const p = clamp(q / 2.2 + 1, 0, 1), x = lerp(sx, d.x, p * p), y = lerp(sy - 8, d.y, p * p) - Math.sin(p * Math.PI) * 18, r = d.r * (.15 + .85 * p * p * p);
-      g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(x, y, r, r * .9, 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4664'; g.fillRect(Math.round(x - r * .4), Math.round(y - r * .45), Math.max(1, r * .25 | 0), 1); continue; }
+      g.fillStyle = d.col || '#0b0912'; g.beginPath(); g.ellipse(x, y, r, r * .9, 0, 0, 6.29); g.fill(); g.fillStyle = '#4a4664'; g.fillRect(Math.round(x - r * .4), Math.round(y - r * .45), Math.max(1, r * .25 | 0), 1); continue; }
     drawLensSplat(d, (k - d.at) * 60);
   }
 }
 function drawLensSplat(d, age) {
   const rnd = seeded(d.seed), R0 = d.r * 1.35, lobes = []; for (let i = 0; i < 7; i++) lobes.push([rnd() * 6.28, .7 + rnd() * .5]);
   const r = a => R0 * (1 + .18 * Math.sin(a * 3 + d.seed) + .1 * Math.sin(a * 5 + d.seed * 2));
-  g.fillStyle = '#0b0912'; g.beginPath(); for (let i = 0; i <= 28; i++) { const a = i / 28 * 6.283, rr = r(a); if (i) g.lineTo(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr); else g.moveTo(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr); } g.fill();
+  g.fillStyle = d.col || '#0b0912'; g.beginPath(); for (let i = 0; i <= 28; i++) { const a = i / 28 * 6.283, rr = r(a); if (i) g.lineTo(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr); else g.moveTo(d.x + Math.cos(a) * rr, d.y + Math.sin(a) * rr); } g.fill();
   for (const [a, l] of lobes) { const X = d.x + Math.cos(a) * R0 * (1.25 + l * .4), Y = d.y + Math.sin(a) * R0 * (1.25 + l * .4); g.beginPath(); g.arc(X, Y, Math.max(1, R0 * .16 * l), 0, 6.29); g.fill(); }
   // escurre: dos regueros que bajan y engordan en la punta
   for (let j = 0; j < 2; j++) { const x = Math.round(d.x + (j ? R0 * .35 : -R0 * .2)), L = Math.min(40, Math.max(0, age - 4 - j * 5) * (.6 + j * .25)); if (L <= 0) continue;
@@ -107,12 +107,12 @@ function drawLensSplat(d, age) {
   g.fillStyle = '#3a3652'; g.fillRect(Math.round(d.x - R0 * .45), Math.round(d.y - R0 * .5), Math.max(2, R0 * .3 | 0), 1); g.fillRect(Math.round(d.x - R0 * .5), Math.round(d.y - R0 * .35), 1, 2);
 }
 // Impacto: corona de tinta que sube y se deshace en gotas, regueros radiales y anillos de papel
-function drawImpact(T, sx, sy, k) {
+function drawImpact(T, sx, sy, k, col = '#0b0912') {
   const e = 1 - (1 - k) * (1 - k);
   // charco que se abre
-  g.fillStyle = '#0b0912'; g.beginPath(); g.ellipse(sx, sy, 12 + e * 30, 5 + e * 12, 0, 0, 6.29); g.fill();
+  g.fillStyle = col; g.beginPath(); g.ellipse(sx, sy, 12 + e * 30, 5 + e * 12, 0, 0, 6.29); g.fill();
   // brazos de la salpicadura: gruesos junto al charco, afinándose, y rematados por gotas sueltas en fila
-  const rnd = seeded(77); g.fillStyle = '#0b0912';
+  const rnd = seeded(77); g.fillStyle = col;
   for (let i = 0; i < 11; i++) { const a = i / 11 * 6.283 + rnd() * .45, L = (26 + rnd() * 70) * Math.min(1, k * 3.4), w = 3 + rnd() * 3, ca = Math.cos(a), sa = Math.sin(a) * .55;
     for (let d = 8; d < L; d += 1.5) { const r = w * Math.pow(1 - d / (L + 6), .7); g.beginPath(); g.arc(sx + ca * d, sy + sa * d, Math.max(.7, r), 0, 6.29); g.fill(); }
     if (k > .15) for (let j = 1; j <= 3; j++) { const d = L + j * (5 + w), r = Math.max(.8, w * .55 - j * .5); g.beginPath(); g.arc(sx + ca * d, sy + sa * d, r, 0, 6.29); g.fill(); } }
@@ -120,11 +120,12 @@ function drawImpact(T, sx, sy, k) {
   for (let r = 0; r < 3; r++) { const kk = clamp(k * 1.5 - r * .22, 0, 1); if (kk <= 0 || kk >= 1) continue; g.strokeStyle = 'rgba(244,231,200,' + (.85 * (1 - kk)).toFixed(2) + ')'; g.lineWidth = 2 - r * .5; g.beginPath(); g.ellipse(sx, sy, 10 + kk * 90, 4 + kk * 36, 0, 0, 6.29); g.stroke(); }
   // corona: columnas que suben alrededor del impacto y sueltan una gota en la punta
   for (let i = 0; i < 14; i++) { const a = i / 14 * 6.283, cx = sx + Math.cos(a) * (13 + e * 8), cy = sy + Math.sin(a) * (5 + e * 3), up = Math.sin(Math.min(1, k * 2.4) * Math.PI / 2) * (1 - clamp((k - .45) / .5, 0, 1)), h = (10 + (i * 7) % 9) * up;
-    g.fillStyle = '#0b0912'; if (h > 1) g.fillRect(Math.round(cx - 1), Math.round(cy - h), 2 + (i & 1), Math.round(h));
+    g.fillStyle = col; if (h > 1) g.fillRect(Math.round(cx - 1), Math.round(cy - h), 2 + (i & 1), Math.round(h));
     const bk = clamp((k - .3) / .7, 0, 1), by = cy - (12 + (i * 7) % 9) * (1 - bk) - Math.sin(bk * Math.PI) * 10 + bk * bk * 16; if (k > .12) { g.beginPath(); g.arc(cx + Math.cos(a) * bk * 16, by, 1.6, 0, 6.29); g.fill(); } }
 }
 // Dibujo de las fases sobre el mapa (llamado desde drawTransitionFx)
 function drawEncounterOverworld(T, sx, sy, fx0, fy0, foe, fspr) {
+  if (T.tri && typeof drawEncounterTri === 'function') { drawEncounterTri(T, sx, sy, fx0, fy0); return; }
   const k = T.k || 0, t = B.t;
   if (T.stage === 'detect') {
     drawVignette(k * .7, fx0, fy0); g.globalAlpha = .7; drawSpeedLines(fx0, fy0, k, t); g.globalAlpha = 1;
@@ -150,6 +151,7 @@ function drawEncounterOverworld(T, sx, sy, fx0, fy0, foe, fspr) {
 }
 // ---- fase 4-5, sobre la escena de batalla ----
 function drawEncounterBlot(T, sx, sy, q) {
+  if (T.tri && typeof drawEncounterBlotTri === 'function') { drawEncounterBlotTri(T, sx, sy, q); return; }
   if (T.coverR == null) T.coverR = inkCoverRadius(sx, sy);
   const k = T.k, grow = k < .56 ? (k / .56) : 1, e = 1 - Math.pow(1 - grow, 2.2), R = e * T.coverR, t = B.t;
   if (grow < 1 && MAPC) { // el mapa congelado pierde el color según avanza la tinta

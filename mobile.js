@@ -1,6 +1,6 @@
 // Mobile shell: Pointer Events share the same commands as keyboard and gamepad.
 'use strict';
-const MOBILE = { enabled:false, portrait:false, initialized:false, forced:typeof location !== 'undefined' && /(?:^\?|&)touch=1(?:&|$)/.test(location.search), pointers:new Map(), repeats:{}, buttons:[] };
+const MOBILE = { enabled:false, portrait:false, initialized:false, origins:new Map(), coach:null, forced:typeof location !== 'undefined' && /(?:^\?|&)touch=1(?:&|$)/.test(location.search), pointers:new Map(), repeats:{}, buttons:[] };
 function useTouchLayout(width, height, coarse) { return coarse || (width <= 960 && height <= 540); }
 // Portrait has its own layout (mobile.css), so nothing pauses for orientation any more; only a hidden page does.
 function mobilePaused() { return false; }
@@ -37,7 +37,7 @@ function syncTouchInputs() {
   MOBILE.buttons.forEach(b => b.classList.toggle('is-held', !!TOUCH_HELD[b.dataset.touchAction || b.dataset.touchDirection]));
 }
 function releaseTouchControls() {
-  MOBILE.pointers.clear(); MOBILE.repeats = {}; if (typeof document !== 'undefined' && document.getElementById) touchNub(document.getElementById('touch-pad'), null);
+  MOBILE.pointers.clear(); MOBILE.repeats = {}; MOBILE.origins?.clear?.(); touchFloat(null); if (typeof document !== 'undefined' && document.getElementById) touchNub(document.getElementById('touch-pad'), null);
   MOBILE.buttons.forEach(b => b.classList.remove('is-held'));
 }
 function setTouchPointer(id, actions, pad = false) {
@@ -53,6 +53,7 @@ function touchEquipment() {
 }
 function updateTouchControls() {
   document.body.classList.toggle('ui-still', Prefs.shake === 0);
+  const inBattle = Game.state === 'battle' || Game.state === 'transition'; if (document.body.classList.contains?.('in-battle') !== inBattle) document.body.classList.toggle('in-battle', inBattle); // en combate los controles suben por encima de las fichas
   if (!MOBILE.initialized || !MOBILE.enabled) return;
   const field = Game.state === 'overworld' && !OW.menu && !OW.ring && !OW.msg && !OW.act && !OW.heal && !Game.overlay;
   // Holding the pad walks continuously. In menus it repeats at a deliberate pace.
@@ -80,7 +81,8 @@ function updateTouchControls() {
   const backSpan = document.querySelector('#touch-back span'), backLabel = Game.overlay || (Game.state === 'overworld' && (OW.menu || OW.ring)) ? 'Cerrar' : battleMenu && battleMenu.level !== 'cmd' ? 'Atrás' : 'Volver';
   if (backSpan && backSpan.textContent !== backLabel) { backSpan.textContent = backLabel; touchRelabel(backSpan.parentNode); }
   const lead = Party[0] && C(Party[0].color); if (lead && MOBILE.lead !== lead) { MOBILE.lead = lead; document.body.style?.setProperty?.('--lead', lead); }
-  touchShakeHaptics();
+  touchShakeHaptics(); touchCoachUpdate();
+  if (!field && Game.state !== 'battle' && document.body.classList?.contains?.('drawer-open') && Game.state !== 'overworld') touchDrawer(false);
   const padLabel=document.getElementById('touch-caption'),padText=battleMenu?.level==='cmd'?'Elegir herramienta':battleMenu?.level==='target'?'Elegir objetivo':field?'o toca el mapa':'Toca o desliza';
   if(padLabel.textContent!==padText)padLabel.textContent=padText;
   const sound = document.getElementById('touch-sound');
@@ -95,6 +97,52 @@ function touchNub(pad, e) {
   const r = pad.getBoundingClientRect(), dx = e.clientX - r.left - r.width / 2, dy = e.clientY - r.top - r.height / 2, d = Math.hypot(dx, dy), max = r.width * .27, k = d > max ? max / d : 1;
   nub.style.transform = `translate(${(dx * k).toFixed(1)}px,${(dy * k).toFixed(1)}px)`; nub.classList.add('is-dragged');
 }
+// Palanca flotante: donde cae el pulgar dentro de su zona aparece la paleta (y ahí está su centro); al soltar vuelve a
+// su sitio. Con zona muerta; en el mapa da ocho direcciones y en los menús encaja en cuatro.
+function touchFieldMove() { return typeof Game !== 'undefined' && Game.state === 'overworld' && !OW.menu && !OW.ring && !OW.msg && !OW.act && !OW.heal && !Game.overlay; }
+function touchStickDirections(pad, id, e) {
+  const o = MOBILE.origins.get(id), r = pad.getBoundingClientRect(), R = r.width / 2;
+  const ox = o ? o[0] : r.left + R, oy = o ? o[1] : r.top + R;
+  return touchDirections(e.clientX - ox + R, e.clientY - oy + R, 2 * R, 2 * R, touchFieldMove());
+}
+function touchFloat(e, pad = typeof document !== 'undefined' && document.getElementById ? document.getElementById('touch-pad') : null) {
+  if (!pad?.style) return;
+  if (!e) { pad.style.transform = ''; pad.classList?.remove?.('is-floating'); return; }
+  const home = pad.dataset?.home ? JSON.parse(pad.dataset.home) : null; if (!home) return;
+  pad.style.transform = `translate(${Math.round(e.clientX - home[0])}px,${Math.round(e.clientY - home[1])}px)`; pad.classList?.add?.('is-floating');
+}
+function touchPadDown(pad, e, floating) {
+  if (mobilePaused()) return; e.preventDefault?.(); Audio.init(); ANYKEY = true; touchKeepAwake(); if (touchFieldMove()) touchCoachDone();
+  try { (floating ? e.currentTarget || pad : pad).setPointerCapture?.(e.pointerId); } catch (_) {}
+  const dir = !floating && e.target?.closest?.('[data-touch-direction]')?.dataset.touchDirection, r = pad.getBoundingClientRect();
+  if (floating) { // el centro de la palanca es donde ha caído el dedo
+    if (!pad.classList?.contains?.('is-floating')) pad.dataset.home = JSON.stringify([r.left + r.width / 2, r.top + r.height / 2]);
+    MOBILE.origins.set(e.pointerId, [e.clientX, e.clientY]); touchFloat(e, pad); touchBuzz(6); setTouchPointer(e.pointerId, [], true); return; }
+  MOBILE.origins.set(e.pointerId, [r.left + r.width / 2, r.top + r.height / 2]); touchNub(pad, e);
+  setTouchPointer(e.pointerId, dir ? [dir] : touchStickDirections(pad, e.pointerId, e), true);
+}
+function touchPadMove(pad, e) {
+  const held = MOBILE.pointers.get(e.pointerId); if (!held?.pad) return;
+  const dirs = touchStickDirections(pad, e.pointerId, e); if (dirs.join() !== held.actions.join()) touchBuzz(4);
+  setTouchPointer(e.pointerId, dirs, true);
+  const o = MOBILE.origins.get(e.pointerId), r = pad.getBoundingClientRect();
+  if (o) touchNub(pad, { clientX: r.left + r.width / 2 + (e.clientX - o[0]), clientY: r.top + r.height / 2 + (e.clientY - o[1]) }); else touchNub(pad, e);
+}
+// Pestaña «cuaderno»: en horizontal las pestañas de menú se pliegan en una sola y se despliegan al tocarla
+function touchDrawer(open) {
+  const body = document.body; if (!body?.classList?.toggle) return;
+  const next = open ?? !body.classList.contains('drawer-open'); body.classList.toggle('drawer-open', next);
+  document.getElementById('touch-menu-toggle')?.setAttribute?.('aria-expanded', String(next)); if (next) touchBuzz(6);
+}
+// Primera vez en el mapa: dos marcas que se mueven solas (un pulgar sobre la palanca y un toque en la hoja), sin texto
+function touchCoachUpdate() {
+  let seen = MOBILE.coachSeen; if (seen == null) { try { seen = MOBILE.coachSeen = localStorage.getItem('chromara.coach.v1') === '1'; } catch (_) { seen = MOBILE.coachSeen = false; } }
+  const show = !seen && touchFieldMove() && !(OW.landT > 0);
+  if (show && MOBILE.coach == null) MOBILE.coach = 0; if (show) MOBILE.coach++;
+  if (MOBILE.coach > 60 * 9) touchCoachDone();
+  document.body.classList?.toggle?.('touch-coach', !!show && !MOBILE.coachSeen);
+}
+function touchCoachDone() { if (MOBILE.coachSeen) return; MOBILE.coachSeen = true; try { localStorage.setItem('chromara.coach.v1', '1'); } catch (_) {} document.body.classList?.remove?.('touch-coach'); }
 async function mobileFullscreen() {
   Audio.init(); releaseInputs();
   try {
@@ -126,27 +174,27 @@ function initMobileControls() {
       else if (e.detail === 0) pulseTouchAction(action || button.dataset.touchDirection);
     });
   });
-  pad.addEventListener('pointerdown', e => {
-    if (mobilePaused()) return; e.preventDefault(); Audio.init(); ANYKEY = true;
-    pad.setPointerCapture(e.pointerId); touchNub(pad, e); touchKeepAwake();
-    const rect = pad.getBoundingClientRect(), dir = e.target.closest('[data-touch-direction]')?.dataset.touchDirection;
-    setTouchPointer(e.pointerId, dir ? [dir] : touchDirections(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height, false), true);
-  });
-  pad.addEventListener('pointermove', e => {
-    if (!MOBILE.pointers.get(e.pointerId)?.pad) return;
-    const rect = pad.getBoundingClientRect(), field = Game.state === 'overworld' && !OW.menu && !OW.ring && !OW.msg && !OW.act && !OW.heal && !Game.overlay;
-    setTouchPointer(e.pointerId, touchDirections(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height, field), true); touchNub(pad, e);
-  });
-  for (const event of ['pointerup','pointercancel','lostpointercapture']) document.addEventListener(event, e => { if (MOBILE.pointers.get(e.pointerId)?.pad) touchNub(pad, null); if (MOBILE.pointers.has(e.pointerId)) endTouchPointer(e.pointerId); });
+  pad.addEventListener('pointerdown', e => touchPadDown(pad, e, false));
+  pad.addEventListener('pointermove', e => touchPadMove(pad, e));
+  // la zona del pulgar: tocar fuera de la paleta la trae bajo el dedo
+  const zone = document.getElementById('touch-movement');
+  if (zone && zone !== pad) { zone.addEventListener('pointerdown', e => { if (pad.contains?.(e.target)) return; touchPadDown(pad, e, true); }); zone.addEventListener('pointermove', e => { if (!pad.contains?.(e.target)) touchPadMove(pad, e); }); }
+  const toggle = document.getElementById('touch-menu-toggle');
+  if (toggle?.addEventListener) { toggle.insertAdjacentHTML?.('afterbegin', touchIcon('menu')); toggle.addEventListener('click', () => touchDrawer()); }
+  document.getElementById('touch-toolbar')?.addEventListener?.('click', e => { if (e.target?.closest?.('button') && !document.body.classList?.contains?.('is-portrait')) setTimeout(() => touchDrawer(false), 0); });
+  document.addEventListener('pointerdown', e => { if (document.body.classList?.contains?.('drawer-open') && !e.target?.closest?.('#touch-toolbar,#touch-menu-toggle')) touchDrawer(false); }, true);
+  for (const event of ['pointerup','pointercancel','lostpointercapture']) document.addEventListener(event, e => { if (MOBILE.pointers.get(e.pointerId)?.pad) { touchNub(pad, null); touchFloat(null, pad); MOBILE.origins.delete(e.pointerId); } if (MOBILE.pointers.has(e.pointerId)) endTouchPointer(e.pointerId); });
   document.addEventListener('contextmenu', e => { if (MOBILE.enabled) e.preventDefault(); });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) touchKeepAwake(); });
+  // al volver a la app (PWA en segundo plano, llamada, cambio de app): nada queda pulsado y la hoja se reencaja
+  document.addEventListener('visibilitychange', () => { releaseInputs(); touchDrawer(false); if (!document.hidden) { touchKeepAwake(); fit(); if (typeof placeTitleButton === 'function') placeTitleButton(); } });
+  document.addEventListener('gesturestart', e => { if (MOBILE.enabled) e.preventDefault(); }); // sin zoom de pellizco en iOS
   const fullscreen = document.getElementById('touch-fullscreen');
   fullscreen.hidden = typeof document.documentElement.requestFullscreen !== 'function';
   fullscreen.addEventListener('click', mobileFullscreen);
   document.getElementById('touch-sound').addEventListener('click', toggleSound);
   document.addEventListener('fullscreenchange', () => { releaseInputs(); fit(); placeTitleButton(); });
   if (window.visualViewport) visualViewport.addEventListener('resize', () => { fit(); placeTitleButton(); });
-  addEventListener('orientationchange', releaseInputs);
+  addEventListener('orientationchange', () => { releaseInputs(); touchDrawer(false); setTimeout(() => { fit(); if (typeof placeTitleButton === 'function') placeTitleButton(); }, 250); });
   MOBILE.initialized = true; mobileViewport(); updateTouchControls();
 }
 
@@ -177,6 +225,7 @@ function tapPath(wx, wy) {
 // x, y en píxeles de la página (0..320, 0..180)
 function tapWalk(x, y, quiet = false) {
   if (!tapFieldFree()) return false;
+  if (!quiet) touchCoachDone(); // ya sabe que la hoja se toca
   const wx = OW.cam.x + x, wy = OW.cam.y + y, r = tapPath(wx, wy);
   if (!r) { if (!quiet) { TAP.mark = { x:wx, y:wy, t:0, miss:true }; Audio.sfx('cursor', { vol:.3, semi:-7 }); touchBuzz(6); } return true; }
   TAP.route = { pts:r.pts, face:[wx, wy], interact:r.interact, stuck:0, last:[OW.x, OW.y] };
@@ -255,6 +304,7 @@ const TOUCH_ICONS = {
   options:['...#.#...','.#.###.#.','..#####..','.###.###.','.##...##.','.###.###.','..#####..','.#.###.#.','...#.#...'],
   sound:['.........','...#..#..','..##...#.','####.#.#.','####.#.#.','####.#.#.','..##...#.','...#..#..','.........'],
   mute:['.........','...#.....','..##.....','####.#.#.','####..#..','####.#.#.','..##.....','...#.....','.........'],
+  menu:['.#######.','.#.....#.','.#.###.#.','.#.....#.','.#.###.#.','.#.....#.','.#.##..#.','.#.....#.','.#######.'],
   fullscreen:['###...###','#.......#','#.......#','.........','.........','.........','#.......#','#.......#','###...###'],
 };
 function touchIcon(name) { const rows = TOUCH_ICONS[name]; let d = ''; rows.forEach((r, y) => { for (let x = 0; x < 9; x++) if (r[x] === '#') d += `M${x} ${y}h1v1h-1z`; }); return `<svg class="touch-icon" viewBox="0 0 9 9" aria-hidden="true" shape-rendering="crispEdges"><path fill="currentColor" d="${d}"/></svg>`; }

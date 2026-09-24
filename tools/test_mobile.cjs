@@ -97,4 +97,20 @@ test('tapping the map walks there around obstacles, and tapping Sepia opens her 
  run(`OW.x=${m.x}-60;OW.y=${m.y}+26;TAP.route=null;`);assert.equal(run('tapPath(-50,-50)'),null);
  run('drawOverworld()');
 });
+test('the floating stick: the thumb sets its own centre, eight directions on the map and four in menus, released cleanly',()=>{
+ run(`resetGame();Game.intro=false;OW.msg=null;OW.menu=null;OW.ring=null;setState('overworld');releaseInputs();globalThis.stickPad=document.getElementById('touch-pad');globalThis.stickEv=(id,x,y)=>({pointerId:id,clientX:x,clientY:y,preventDefault(){},target:{closest(){return null}}});`);
+ run(`touchPadDown(stickPad,stickEv(9,300,200),true)`);assert.equal(run('keys.left||keys.right||keys.up||keys.down'),false,'the landing spot is the centre: no direction yet');
+ run(`touchPadMove(stickPad,stickEv(9,304,203))`);assert.equal(run('keys.left||keys.right||keys.up||keys.down'),false,'dead zone');
+ run(`touchPadMove(stickPad,stickEv(9,345,200))`);assert.equal(run('keys.right&&!keys.up&&!keys.down'),true);
+ run(`touchPadMove(stickPad,stickEv(9,340,240))`);assert.equal(run('keys.right&&keys.down'),true,'diagonal on the map');
+ run(`OW.menu={t:0};touchPadMove(stickPad,stickEv(9,341,241))`);assert.equal(run('[keys.right,keys.down].filter(Boolean).length'),1,'menus snap to four');
+ events.pointerup.forEach(fn=>fn(pointer(9)));assert.equal(run('keys.right||keys.down'),false);assert.equal(run('stickPad.style.transform'),'');run('OW.menu=null');
+});
+test('landscape folds the menu tabs into one notebook tab; the first visual hint goes away once the player moves',()=>{
+ run(`document.body.classList={set:new Set(),toggle(k,v){v??=!this.set.has(k);v?this.set.add(k):this.set.delete(k);return v},contains(k){return this.set.has(k)},remove(k){this.set.delete(k)},add(k){this.set.add(k)}};`);
+ run('touchDrawer(true)');assert.equal(run(`document.body.classList.contains('drawer-open')`),true);run('touchDrawer(false)');assert.equal(run(`document.body.classList.contains('drawer-open')`),false);
+ run(`MOBILE.coachSeen=false;MOBILE.coach=null;resetGame();Game.intro=false;OW.msg=null;OW.landT=0;setState('overworld');touchCoachUpdate();`);assert.equal(run(`document.body.classList.contains('touch-coach')`),true);
+ run(`tapWalk(200,100)`);assert.equal(run('MOBILE.coachSeen'),true);run('touchCoachUpdate()');assert.equal(run(`document.body.classList.contains('touch-coach')`),false);
+ run(`document.body.classList={toggle(){},remove(){},add(){},contains(){return false}};`);
+});
 console.log(`${count} mobile integration checks passed.`);

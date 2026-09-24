@@ -6,6 +6,7 @@ const STATUS_INFO = {
   lento: ['L', 'Lento: velocidad -40%'], tiznado: ['T', 'Tiznado: ataque -30%'],
   contorno: ['C', 'Contorno: daño recibido -40%'], firmado: ['F', 'Firmado: daño recibido +30%'],
   expuesto: ['E', 'Expuesto: coraza abierta'],
+  sellado: ['S', 'Sellado: sin técnicas ni mezclas'], oxidado: ['O', 'Oxidado: daño recibido +25%'],
 };
 const ROLE_ACTIONS = {
   carmin: { name: 'Proteger', mp: 0, target: 'ally', desc: 'Cubre el próximo golpe. Recibe la mitad.' },
@@ -33,7 +34,7 @@ function techsFor(u, ignoreReservation = false) {
   return Object.keys(DATA.techs).map(id => [id, techData(id)]).filter(([, t]) => t.weapon ? t.weapon === u.data.weapon && t.user === u.id : t.users.includes(u.id)).map(([id, t]) => {
     const users = t.weapon ? [u] : t.users.map(uid => B.party.find(p => p.id === uid));
     const living = users.every(p => p.alive), free = users.every(p => !p.acting && (ignoreReservation || !isReserved(p)));
-    const ready = living && free && users.every(p => p.atb >= 100), mpOk = users.every(p => p.mp >= techCost(p, t));
+    const ready = living && free && users.every(p => p.atb >= 100 && !p.status?.sellado), mpOk = users.every(p => p.mp >= techCost(p, t));
     return { id, t, users, col: t.color || u.color, ready, mpOk, free, living, avail: ready && mpOk,
       reservable: users.length > 1 && living && free && mpOk && !B.reservation, cost: techCost(u, t), combo: users.length > 1 };
   });
@@ -50,7 +51,7 @@ function attackMultiplier(t, col) {
   return mult;
 }
 function damageFactor(t, col) {
-  return attackMultiplier(t, col) * (t.status.contorno ? .6 : 1) * (t.status.firmado && t.kind === 'enemy' ? 1.3 : 1);
+  return attackMultiplier(t, col) * (t.status.contorno ? .6 : 1) * (t.status.firmado && t.kind === 'enemy' ? 1.3 : 1) * (t.status.oxidado ? 1.25 : 1);
 }
 function basicRaw(u, t) {
   return baseDmg(u.atk * statusMult(u, 'tiznado'), t.dfn * (u.kind === 'party' && u.data.weapon === 'lapiz' ? .65 : 1), 1);
@@ -156,7 +157,7 @@ function previewAction(u, p, t) {
   if (p.techId === 'taquigrafia') { const targets = alive(B.enemies), i = targets.indexOf(t); hits = Math.floor(3 / targets.length) + (i < 3 % targets.length ? 1 : 0); }
   // Multi-hit attacks only react on their first impact.
   let factor = damageFactor(t, col);
-  if (wouldExpose(t, col)) factor = colorMult(col, t.color) * (t.status.contorno ? .6 : 1) * (t.status.firmado ? 1.3 : 1);
+  if (wouldExpose(t, col)) factor = colorMult(col, t.color) * (t.status.contorno ? .6 : 1) * (t.status.firmado ? 1.3 : 1) * (t.status.oxidado ? 1.25 : 1);
   const first = raw * factor * (reaction ? 1.25 : 1), rest = raw * factor * (reaction === 'violeta' && !t.status.firmado ? 1.3 : 1);
   const lo = Math.round(first * .92) + Math.round(rest * .92) * (hits - 1), hi = Math.round(first * 1.08) + Math.round(rest * 1.08) * (hits - 1);
   return { col, mult: wouldExpose(t, col) ? colorMult(col, t.color) : attackMultiplier(t, col), lo, hi, reaction, label: lo + '–' + hi + ' daño',

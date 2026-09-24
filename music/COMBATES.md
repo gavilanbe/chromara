@@ -57,26 +57,30 @@ Duraciones y velocidades escritas por nota, como en la batalla. El coro crece co
 
 Los tres bocetos previos están en `sketches/boss1..3` (partitura en `tools/boss_sketches.py`): «La mancha», «Contorno roto» (7/8) y «Trazo y sombra» (100 bpm, coral).
 
-## Los Contrarios · 160 bpm
+## Los Contrarios · vals de las manchas · 176 bpm, 3/4
 
-[Escuchar](contrarios.mp3). Moho, Moratón y Óxido son lo opuesto de las tres gotas, así que su combate es **«Tres gotas» del revés**: mismo tempo, misma forma de 32 compases, los mismos ritmos, y cada contorno en espejo. La partitura está en `tools/battle_contrarios.py`.
+[Escuchar](contrarios.mp3). Los Contrarios son lo que nadie quiso en el cuadro, así que su combate es **un vals grotesco**: un carrusel que se ha echado a perder. La partitura está en `tools/battle_contrarios.py`; la versión anterior, «Tres gotas» en espejo, está en la historia de Git.
 
-**El gancho invertido.** Tres corcheas martilleadas sobre la misma nota, pero el salto de tercera va **hacia abajo** y la caída con puntillo **sube**: Re Re Re Si♭ | Do· Re Mi♭, donde las gotas cantan Re Re Re Fa | Mi· Re Do. La célula del Prisma aparece también invertida y sucia, **Re–Si♭–Do–Sol**. El color es Re locrio: el Mi♭ pudre nuestro Mi y el La♭, a un tritono de Re, pudre nuestro La.
+- **La caja de música.** Empieza con su tema en Re mayor, dulce, en arpa aguda; en la última nota la caja se queda sin cuerda y se desafina hacia abajo. El carrusel bonito se pudre en el menor. Sólo suena la primera vez; el bucle empieza en el vals.
+- **El lamento.** Bajo el chunda-chunda (trompa en el uno, pizzicato y órgano en el dos y el tres) desciende un bajo cromático, Re–Do♯–Do–Si–Si♭–La: la figura clásica del duelo, aquí por los colores que nadie guardó.
+- **El tema.** Abre con **tres tiempos pesados sobre un mismo Re**: las tres gotas, sin su rebote. Dentro está el Prisma podrido: Re, luego Fa, luego Mi que se hunde en Mi♭, y el La que cae una octava.
+- **A (Moho, oboe).** El tema completo, dieciséis compases con semicadencia en La7.
+- **A′ (Moratón, saxo).** El saxo toma el tema con deslizamientos hacia las notas largas, y a la vez **el oboe lo toca invertido**: los contrarios, literalmente en contrapunto.
+- **B.** El gancho de «Tres gotas» (Re Re Re Fa | Mi· Re Do) se cuela en el vals como **hemiolia**: tres grupos de dos a través de dos compases de tres, en el piano desafinado de Óxido, que se burla. Después los tres persiguen el tema **en canon**, a un compás de distancia.
+- **C.** El carrusel se acelera en corcheas cromáticas con redoble de toms hasta que los tres se cierran **en un solo Re grave** con el coro rozando un Mi♭: juntos hacen el negro. Un respiro y la anacrusa La–Do♯ devuelve el vals.
 
-**Cada Contrario contra un instrumento.** Moho canta con saxo, frente a la trompeta de Carmín; Moratón contesta con guitarra distorsionada, frente a la marimba de Ámbar; Óxido dobla con un solo de onda cuadrada, frente a la flauta de Añil. Donde Añil cantaba terceras cálidas por encima, Óxido dobla en cuartas frías por debajo. El riff hace raíz, raíz, octava **abajo**, tritono y un arrastre cromático hacia arriba; el bombo empuja a contratiempo.
-
-| Primera vuelta | Momento |
+| Momento | Primera vuelta |
 |---|---|
-| 0:00 | Riff invertido y el Prisma al revés en la onda cuadrada |
-| 0:03 | A: Moho canta el gancho en espejo con saxo |
-| 0:15 | A′: la guitarra de Moratón contesta una octava abajo; Óxido dobla en cuartas |
-| 0:27 | B: la mezcla sucia; se burlan con el gancho de las gotas, teñido de locrio, sobre un pedal con el Mi♭ de la Tinta |
-| 0:37 | Los tres cierran en un solo Re con coro: juntos hacen el negro |
-| 0:39 | C: riff y batería con las gotas invertidas en ostinato |
-| 0:45 | Bajada Re–Si♭–La♭–La7, donde las gotas subían, con redoble |
-| 0:51 | Segunda vuelta, que el juego utiliza como bucle |
+| 0:00 | Caja de música en Re mayor, que se desafina |
+| 0:04 | A: Moho, oboe, sobre el lamento |
+| 0:20 | A′: saxo de Moratón y el tema al revés en el oboe |
+| 0:37 | B: «Tres gotas» a destiempo en el piano desafinado |
+| 0:45 | Canon de los tres |
+| 0:53 | El carrusel se acelera |
+| 0:59 | Negro |
+| 1:01 | Segunda vuelta, que el juego utiliza como bucle |
 
-Suena en el combate contra los tres juntos y contra El Negro. Masterizado a −19 LUFS como los otros combates. `test_score_performance.py` comprueba que encaja en el bucle sin reataques y que el gancho abre con tres notas martilleadas y salta hacia abajo. Como en el resto de la banda sonora, las comprobaciones verifican partitura y señal, no la escucha.
+Suena en el combate contra los tres juntos y contra El Negro. −19 LUFS, pico −7 dBFS y un empalme de bucle continuo. `test_score_performance.py` comprueba que es un 3/4, que el tema abre con tres Re en los tiempos, que el oboe invierte el tema en A′ y que el bajo baja cromáticamente. Como en el resto de la banda sonora, las comprobaciones verifican partitura y señal, no la escucha.
 
 ## Mezcla y comprobaciones
 

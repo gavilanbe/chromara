@@ -1275,7 +1275,7 @@ function* actEnemy(u) {
     else { applyStatus(target, 'tiznado', 3); mark({ kind: 'blob', p: [target.wx, target.wy, target.def.h * .4], w: 10, col: C('negro'), seed: target.idx, life: 70 }); burst(target.wx, target.wy, target.def.h * .5, C('negro'), 12, 1.5); goop(target, C('negro'), 60); }
     u.pose = 'idle'; yield* wait(10); camReset(); return;
   }
-  if ((intent.kind === 'mix' || intent.kind === 'negro') && typeof contraAct === 'function') { yield* contraAct(u, intent, targets, target); return; }
+  if (u.ai === 'contrario' && typeof contraAct === 'function') { yield* contraAct(u, intent, targets, target); return; } // sus propias armas, magias y mezclas
   if (intent.kind === 'tech' && u.data.tech) { const tech = { ...DATA.techs[u.data.tech], id: u.data.tech }, all = ['rafaga','aguada','salpicon','taquigrafia'].includes(u.data.tech); yield* actTech([u], tech, all ? targets : [target], u.color); return; }
   if (u.id === 'devoralineas' && typeof devoralineasStrike === 'function') yield* devoralineasStrike(u,target);
   else yield* actAttack(u, target);

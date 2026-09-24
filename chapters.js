@@ -6,14 +6,14 @@ Object.assign(DATA.enemies,{devoralineas:{name:'Devoralíneas',color:'negro',sha
   phaseSprites:['devoralineas','devoralineas_2','devoralineas_3'],phaseNames:['CORAZA DE TINTA','EL TINTERO ABIERTO','LA ÚLTIMA LÍNEA'],
   intentNames:{attack:'Zarpazo de plumilla',steal:'Beber el color',tide:'Tachón del ejército',erase:'Devorar la página'}}});
 Object.assign(DATA.encounters,{'7':['gota_negra','borron'],'8':['mancha','grumo'],'9':['charco','borron'],'N':['devoralineas']});
-// Hoja III: El agua sucia. Los Contrarios son lo opuesto de las tres gotas: el complementario de cada una, podrido.
-// Llevan su herramienta y su técnica de color, como ellas; los colores podridos cuentan como su color puro, así que
-// cada gota hace el doble a su Contrario... y recibe el doble de él.
+// Hoja III: El agua sucia. Los Contrarios no son gotas: son manchas que no se lavan (moho, tampón, óxido), del color
+// complementario de cada gota, podrido. Tienen sus propias armas, magias y mezclas (contrarios.js); los colores podridos
+// cuentan como su color puro, así que cada gota hace el doble a su Contrario... y recibe el doble de él.
 Object.assign(DATA.colors,{moho:{name:'Moho',hex:'#6f8a3a',base:'verde'},moraton:{name:'Moratón',hex:'#6a3f86',base:'violeta'},oxido:{name:'Óxido',hex:'#b0582a',base:'naranja'}});
 Object.assign(DATA.enemies,{
-  moho:{name:'Moho',color:'moho',shape:'round',hp:300,atk:15,def:8,spd:7,exp:45,w:26,h:26,ai:'contrario',weapon:'brocha',tech:'brochazo',intentNames:{attack:'Brocha mohosa',tech:'Brochazo podrido'}},
-  moraton:{name:'Moratón',color:'moraton',shape:'tall',hp:250,atk:14,def:6,spd:11,exp:45,w:18,h:32,ai:'contrario',weapon:'lapiz',tech:'trazo',intentNames:{attack:'Lápiz roto',tech:'Trazo amoratado'}},
-  oxido:{name:'Óxido',color:'oxido',shape:'splash',hp:270,atk:13,def:8,spd:8,exp:45,w:28,h:24,ai:'contrario',weapon:'pincel',tech:'salpicon',intentNames:{attack:'Pincel pelado',tech:'Salpicón de herrumbre'}},
+  moho:{name:'Moho',color:'moho',shape:'round',hp:300,atk:15,def:8,spd:7,exp:45,w:28,h:26,ai:'contrario',arma:'trapo',magia:'esporas',intentNames:{attack:'Trapazo'}},
+  moraton:{name:'Moratón',color:'moraton',shape:'tall',hp:260,atk:14,def:7,spd:10,exp:45,w:22,h:32,ai:'contrario',arma:'sello',magia:'censura',intentNames:{attack:'Sellazo'}},
+  oxido:{name:'Óxido',color:'oxido',shape:'splash',hp:270,atk:15,def:9,spd:8,exp:45,w:32,h:24,ai:'contrario',arma:'cuter',magia:'herrumbre',intentNames:{attack:'Raspado'}},
   el_negro:{name:'El Negro',epithet:'lo que queda al mezclarlo todo',music:'contrarios',color:'negro',shape:'blob',hp:980,atk:18,def:9,spd:8,exp:160,w:62,h:44,ai:'boss',boss:true,
     phaseSprites:['el_negro','el_negro_2','el_negro_3'],phaseNames:['TRES CONTRARIOS','LA MEZCLA SUCIA','EL NEGRO'],
     intentNames:{attack:'Golpe de barro',steal:'Ensuciar el color',tide:'Marea de agua sucia',erase:'Apagar la hoja'}}});
@@ -35,7 +35,7 @@ const TRIO_DIALOGUE=[
   {who:'anil',mood:'calm',text:'Pues ahora la miramos. Y no os vamos a tirar por el desagüe.'},
   {who:'moho',text:'Qué bonito. Vosotras juntas hacéis la luz...'},
   {who:'moraton',text:'...y nosotros juntos, la sombra. Veamos cuál pesa más.'},
-  {who:'carmin',mood:'determined',text:'Brocha contra brocha, entonces.'}
+  {who:'carmin',mood:'determined',text:'Pues a ver qué pesa más: el color o la mancha.'}
 ];
 const DIRTY_DIALOGUE=[
   {who:'el_negro',text:'Separados, perdemos. Juntos no queda ningún color.'},
@@ -45,21 +45,6 @@ const DIRTY_DIALOGUE=[
   {who:'carmin',mood:'determined',text:'Con agua limpia. Y con nosotras.'},
   {who:'el_negro',text:'Probad.'}
 ];
-// Mezclas sucias: dos Contrarios juntan su pigmento como nosotras, pero sus mezclas no dan color, dan barro
-const CONTRA_MIX={'moho+moraton':{name:'Ciénaga',tech:'brote',col:'moho'},'moho+oxido':{name:'Barro',tech:'eclipse',col:'oxido'},'moraton+oxido':{name:'Hollín',tech:'llamarada',col:'moraton'}};
-function contraPlan(u){
-  const mates=alive(B.enemies).filter(e=>e!==u&&e.ai==='contrario');
-  if(mates.length===2&&!B.negroPlanned&&u.acts>=3){B.negroPlanned=true;return {kind:'negro',name:'Arcoíris negro',all:true};}
-  if(mates.length&&u.acts%3===2){const p=mates[u.acts%mates.length],m=CONTRA_MIX[[u.id,p.id].sort().join('+')];if(m)return {kind:'mix',name:m.name,partner:p,mix:m,all:m.tech!=='eclipse'};}
-  return null;
-}
-function* contraAct(u,intent,targets,target){
-  if(intent.kind==='negro'){const users=alive(B.enemies).filter(e=>e.ai==='contrario');if(users.length<2){yield* actAttack(u,target);return;}
-    users.forEach(e=>{if(e!==u){e.atb=0;e.acting=true;}});try{yield* techArcoirisNegro(users,targets,{power:1.25,name:'Arcoíris negro'});}finally{users.forEach(e=>{if(e!==u)e.acting=false;});}return;}
-  const p=intent.partner;if(!p||!p.alive){yield* actAttack(u,target);return;}
-  p.atb=0;p.acting=true;const m=intent.mix,tech={...DATA.techs[m.tech],id:m.tech,name:m.name};
-  try{yield* actTech([u,p],tech,m.tech==='eclipse'?[target]:targets,m.col);}finally{p.acting=false;}
-}
 function dirtyMap() {
   const rows=Array.from({length:30},(_,y)=>Array.from({length:40},(_,x)=>x===0||y===0||x===39||y===29?'T':','));
   const rectangle=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)if(i>0&&j>0&&i<39&&j<29)rows[j][i]=c;};
@@ -98,25 +83,6 @@ const CHAPTER_LEAVES={
 const CHAPTER_NAMES=['El jardín de Chromara','El reverso del lienzo','El agua sucia'],CHAPTER_ROMAN=['I','II','III'];
 const CHAPTER_FIRST={1:['El reverso del lienzo','Los Negros se esconden detrás de la página.','Las tres patrullas mantienen el cerco.','Tu equipo y tus mezclas siguen contigo.'],
   2:['El agua sucia','Aquí vienen a parar las mezclas que nadie quiso.','Tres charcos podridos sellan el fondo del vaso.','Allí esperan los Contrarios: lo opuesto de cada una.']};
-// Presentación especial de los Contrarios: el agua sucia burbujea y salen los tres; hablan; tres paneles enfrentan a
-// cada gota con su Contrario (golpe a golpe); el agua sucia lo inunda todo y se retira sobre el combate.
-function* contraTransitionGen(foe){
-  const T=B.tr;T.contra=true;T.foe=foe;OW.hideFoe=foe;Audio.prepare('prelude');Audio.prepare('contrarios');Audio.stop(.6);Audio.sfx('hum_down',{vol:.6});
-  T.stage='surface';for(let i=0;i<72;i++){T.k=i/72;if(i===8||i===28||i===48)Audio.sfx('splash',{vol:.5,semi:[-5,-2,1][(i-8)/20]});if(i%12===0)Audio.sfx('bubbles',{vol:.25});yield;}
-  const saved=DATA.bossDialogue;DATA.bossDialogue=TRIO_DIALOGUE;Audio.play('prelude',{fade:.8});
-  T.stage='dialogue';T.dlg={i:0,ch:0,t:0};
-  try{while(T.dlg.i<TRIO_DIALOGUE.length){const line=TRIO_DIALOGUE[T.dlg.i];T.dlg.t++;
-    if(T.dlg.ch<line.text.length){const wrote=T.dlg.wrote||0;writerAdvance(T.dlg,line.text);if(Math.floor((T.dlg.wrote||0)/3)!==Math.floor(wrote/3))Audio.sfx('text',{vol:.65,semi:SEMI[line.who]??-7});}
-    if(hit('ok')){if(T.dlg.ch<line.text.length)T.dlg.ch=line.text.length;else{T.dlg.i++;T.dlg.ch=0;T.dlg.t=0;T.dlg.hold=0;T.dlg.wrote=0;Audio.sfx('page',{vol:.5});}}
-    yield;}}finally{DATA.bossDialogue=saved;}
-  T.stage='versus';Audio.stop(.1);Audio.play('contrarios');
-  for(let i=0;i<112;i++){T.k=i;if(i===0||i===22||i===44){B.shake=6;Audio.sfx('impact_sub',{vol:.8});Audio.sfx('brush_big',{vol:.5,when:.04});}if(i===74)Audio.sfx('ink_jet');yield;}
-  T.stage='flood';Audio.sfx('splash',{vol:.6});for(let i=0;i<40;i++){T.k=i/40;if(i===32)B.shake=5;yield;}
-  T.overworld=false;T.stage='tide';camSet(SCENE.rest);B.unitScale=1;B.propScale=1;B.puddle.k=1;
-  B.enemies.forEach(u=>{u.wz=0;});B.party.forEach(u=>{u.wx=u.hx;u.wy=u.hy;u.wz=0;u.pose='idle';});
-  for(let i=0;i<46;i++){T.k=i/46;if(i===12)Audio.sfx('slow_drip');yield;}
-  B.tr=null;OW.hideFoe=null;B.phase='fight';B.fightStart=B.t;Audio.sfx('banner');setState('battle');
-}
 // Al caer los tres, en su sitio aparece El Negro
 function contraFuse(){if(MAP.spots.some(s=>s.key==='Z'))return;MAP.spots.push({key:'Z',x:20,y:14});OW.foes.push({key:'Z',hx:20*16+8,hy:14*16+12,x:20*16+8,y:14*16+12,tx:0,ty:0,t:0,enemies:DATA.encounters.Z,boss:true,seed:147});}
 function contraDone(){return CONTRA_LAIRS.every(l=>Game.defeated.has(l.key));}

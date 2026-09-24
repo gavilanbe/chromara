@@ -44,12 +44,13 @@ class PerformanceTests(unittest.TestCase):
     def test_battle_events_fit_loop_and_do_not_retrigger_held_pitches(self):
         for make in (battle,boss,contrarios):self.check_score(make())
 
-    def test_contrarios_mirror_the_three_drops(self):
-        # Los Contrarios open with the same three hammered eighths, but the leap goes DOWN and the dotted figure rises.
-        s=contrarios();sax=sorted(n for n in s.voices['sax'] if 8<=n[0]<12)
-        pitches=[p for _,_,p,_ in sax[:7]]
-        self.assertEqual(pitches[:3],[74,74,74]);self.assertLess(pitches[3],pitches[2]);self.assertGreater(pitches[6],pitches[4])
-        self.assertIn(32,[p for _,_,p,_ in s.voices['bass']],'the tritone (Ab1) is missing from the riff')
+    def test_contrarios_waltz_identity(self):
+        # A waltz: three heavy downbeats on D open the oboe tune; A′ pairs the sax tune with its inversion; the lament bass descends.
+        s=contrarios();self.assertEqual(s.meter,3)
+        oboe=sorted(n for n in s.voices['oboe'] if 12<=n[0]<15);self.assertEqual([p for _,_,p,_ in oboe],[74,74,74]);self.assertEqual([t for t,_,_,_ in oboe],[12,13,14])
+        a2=[n for n in s.voices['oboe'] if 60<=n[0]<63];self.assertTrue(a2 and all(p==74 for _,_,p,_ in a2))  # D is its own mirror
+        mirror=sorted(n for n in s.voices['oboe'] if 63<=n[0]<66);self.assertEqual(mirror[0][2],71,'F5 should be mirrored to B4 in A′')
+        horn=[p for t,_,p,_ in sorted(s.voices['horn']) if 12<=t<30 and t%3==0];self.assertEqual(horn,[38,37,36,35,34,33])
 
     def check_score(self,s):
         end=(s.intro+2*s.bars)*s.meter

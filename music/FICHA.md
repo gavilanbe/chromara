@@ -33,7 +33,7 @@ Se han **recompuesto los seis temas principales**, incluida la batalla. Estuche,
 | Diálogo | [Debajo del color](prelude.mp3) | 72 bpm; oboe cercano, pedal, silencios y segunda bemol; espacio para leer |
 | La Tinta | [La mancha](boss.mp3) | 150 bpm; el bajo martillea las tres gotas en Re grave con vecinas cromáticas, pisada La–Fa–Mi♭–Re en trompa y cuerda, la tinta se extiende por Mi♭, Fa y Sol menor, el contorno a solas en piano, línea y color en contrapunto y ascenso hasta el bucle |
 | Victoria | [El color encuentra su sitio](victory.mp3) | 160 bpm; cuatro compases que resuelven el gesto de batalla en Re mayor; comienza tras la disolución |
-| Los Contrarios | [Los Contrarios](contrarios.mp3) | 160 bpm; «Tres gotas» en espejo: el salto baja y el puntillo sube, Prisma invertido Re–Si♭–Do–Sol, colores de Re locrio, saxo, guitarra distorsionada y onda cuadrada contra trompeta, marimba y flauta; se cierran en un solo Re: el negro |
+| Los Contrarios | [Vals de las manchas](contrarios.mp3) | 176 bpm, 3/4; vals grotesco: caja de música en Re mayor que se desafina, bajo de lamento cromático, tres tiempos pesados sobre Re con el Prisma podrido, el tema contra su inversión, «Tres gotas» como hemiolia en un piano desafinado, canon, y el unísono grave: el negro |
 | Derrota | [Una página sin terminar](gameover.mp3) | 76 bpm; la frase pierde el salto, el Mi desciende a Mi♭ y queda sobre Re |
 | Mundo recuperado | [La línea también es color](restored.mp3) | 100 bpm; la melodía del mapa abre su tercera, las voces cantan juntas y permanece un recuerdo menor |
 

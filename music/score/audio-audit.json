@@ -138,21 +138,24 @@
     ]
   },
   "contrarios": {
-    "duration": 99.0,
-    "peakDBFS": -2.59,
-    "integratedLUFS": -18.99,
-    "truePeakDBTP": -2.56,
-    "loudnessRangeLU": 4.3,
-    "sha256": "058c3c41a45e62c9d7a8a29af077fb6380fbf58272bd9781d5450ee8c397dc5a",
-    "loopStart": 51.0,
-    "loopEnd": 99.0,
-    "seamJump": 0.003999,
-    "localDerivativeRMS": 0.0179,
+    "duration": 118.636375,
+    "peakDBFS": -7.03,
+    "integratedLUFS": -19.0,
+    "truePeakDBTP": -7.03,
+    "loudnessRangeLU": 7.1,
+    "sha256": "ed931608783ce3ca5a49f382651a21cabd3ae62b39ca67c8e19289c2cdea5a6c",
+    "loopStart": 61.363625,
+    "loopEnd": 118.636375,
+    "seamJump": 0.000375,
+    "localDerivativeRMS": 0.006095,
     "eightBarRMSDB": [
-      -21.9,
-      -21.3,
-      -21.7,
-      -20.7
+      -22.1,
+      -22.1,
+      -23.9,
+      -23.8,
+      -26.4,
+      -21.5,
+      -20.4
     ]
   }
 }

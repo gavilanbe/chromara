@@ -205,7 +205,7 @@ function unitStateLabels(u) { const labels=Object.keys(u.status).filter(k=>STATU
 // Card states are tiny material glyphs with one pip per remaining action: a drip, a smudge, a pencil frame, a red flourish, a shield arc.
 function drawStatusIcons(u,x,y) {
   const items=[];
-  if(u.status.lento)items.push(['lento',u.status.lento]);if(u.status.tiznado)items.push(['tiznado',u.status.tiznado]);if(u.status.contorno)items.push(['contorno',u.status.contorno]);if(u.status.firmado)items.push(['firmado',u.status.firmado]);
+  if(u.status.lento)items.push(['lento',u.status.lento]);if(u.status.tiznado)items.push(['tiznado',u.status.tiznado]);if(u.status.contorno)items.push(['contorno',u.status.contorno]);if(u.status.firmado)items.push(['firmado',u.status.firmado]);if(u.status.sellado)items.push(['sellado',u.status.sellado]);if(u.status.oxidado)items.push(['oxidado',u.status.oxidado]);
   if(u.guard?.charges)items.push(['guard',u.guard.charges]);
   if(!items.length)return;
   maskingLabel(x,y,Math.min(23,items.length*8+1),10);
@@ -214,6 +214,8 @@ function drawStatusIcons(u,x,y) {
     if(kind==='lento'){g.fillStyle='#6a4d8a';g.fillRect(ix+2,iy,1,2);g.fillRect(ix+1,iy+2,3,3);g.fillStyle='#b796d0';g.fillRect(ix+1,iy+3,1,1);}
     else if(kind==='tiznado'){g.fillStyle='#1e1a2c';g.fillRect(ix,iy+2,5,2);g.fillRect(ix+1,iy+1,2,1);g.fillRect(ix+3,iy+4,2,1);}
     else if(kind==='contorno'){g.fillStyle='#4a4460';g.fillRect(ix,iy,2,1);g.fillRect(ix+3,iy,2,1);g.fillRect(ix,iy+4,2,1);g.fillRect(ix+3,iy+4,2,1);g.fillRect(ix,iy+2,1,1);g.fillRect(ix+4,iy+2,1,1);}
+    else if(kind==='sellado'){g.fillStyle='#6a3f86';g.fillRect(ix,iy,5,5);g.fillStyle='#f4e7c8';g.fillRect(ix+1,iy+1,1,1);g.fillRect(ix+3,iy+1,1,1);g.fillRect(ix+2,iy+2,1,1);g.fillRect(ix+1,iy+3,1,1);g.fillRect(ix+3,iy+3,1,1);}
+    else if(kind==='oxidado'){g.fillStyle='#7a3a1a';g.fillRect(ix,iy+1,5,3);g.fillStyle='#d98a4a';g.fillRect(ix+1,iy+1,1,1);g.fillRect(ix+3,iy+2,1,1);g.fillRect(ix+2,iy+4,1,1);}
     else if(kind==='firmado'){const c=C('rojo');g.fillStyle=c;g.fillRect(ix,iy+3,1,2);g.fillRect(ix+1,iy+1,1,2);g.fillRect(ix+2,iy+3,1,2);g.fillRect(ix+3,iy,1,3);g.fillRect(ix+4,iy+3,1,1);}
     else{const c=C('rojo');g.fillStyle=c;g.fillRect(ix+3,iy,2,1);g.fillRect(ix+2,iy+1,1,3);g.fillRect(ix+3,iy+4,2,1);g.fillStyle=ramp(c).hi;g.fillRect(ix+3,iy+1,1,1);}
     g.fillStyle='#79435b';for(let k=0;k<Math.min(3,turns);k++)g.fillRect(ix+k*2,iy+7,1,1);

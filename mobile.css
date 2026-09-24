@@ -180,22 +180,82 @@ body.touch-mode.is-portrait { --pad:min(44vw,190px,30vh); }
   #touch-confirm.is-ready,.is-relabel,.is-relabel span,.touch-splat { animation:none; }
   .touch-splat { display:none; }
 }
-@media (max-height:330px) and (orientation:landscape) {
-  .touch-mode #game-shell { grid-template-rows:40px minmax(0,1fr);row-gap:0; }
-  .touch-mode #touch-toolbar button { min-height:36px;padding-top:2px; }
-  .touch-mode #touch-actions { gap:4px; }
-  .touch-mode #touch-actions #touch-confirm { width:66px;height:66px;min-height:66px; }
-  .touch-mode #touch-actions #touch-confirm b { font-size:24px; }
-  .touch-mode #touch-actions button b { font-size:16px; }
-  .touch-mode #touch-actions button span { font-size:16px; }
-  body.touch-mode { --pad:104px; }
-  .touch-mode .touch-caption { display:none; }
+/* ---- horizontal: la hoja ocupa todo el alto y los útiles flotan sobre los márgenes, al alcance de los pulgares ---- */
+body.touch-mode:not(.is-portrait) { --side:72px;--pad:112px;--edge-l:max(8px,env(safe-area-inset-left));--edge-r:max(8px,env(safe-area-inset-right)); }
+.touch-mode:not(.is-portrait) #game-shell { display:block;position:relative;padding:0; }
+.touch-mode:not(.is-portrait) #game-screen {
+  position:absolute;width:auto;height:auto;top:max(4px,env(safe-area-inset-top));bottom:max(4px,env(safe-area-inset-bottom));
+  left:calc(var(--edge-l) + var(--side));right:calc(var(--edge-r) + var(--side));
+}
+.touch-mode:not(.is-portrait) #touch-movement {
+  position:absolute;z-index:6;left:0;top:30%;bottom:0;width:calc(var(--edge-l) + var(--side) + 24px);
+  flex-direction:column;align-items:flex-start;justify-content:center;padding-left:var(--edge-l);box-sizing:border-box;
+}
+.touch-mode:not(.is-portrait) .touch-caption { display:none; }
+.touch-mode:not(.is-portrait) #touch-pad { opacity:.84;transition:opacity 160ms ease,transform 200ms cubic-bezier(.3,1.6,.5,1); }
+.touch-mode:not(.is-portrait) #touch-pad.is-floating,.touch-mode:not(.is-portrait) #touch-pad:has(.is-held) { opacity:1; }
+#touch-pad.is-floating { transition:opacity 120ms ease !important; }
+/* en combate, las fichas de las gotas ocupan el pie de la página: la cruceta y los botones suben por encima y la cruceta
+   en reposo se aclara para no tapar el campo */
+.touch-mode.in-battle:not(.is-portrait) #touch-movement { top:8%;bottom:26%; }
+.touch-mode.in-battle:not(.is-portrait) #touch-actions { top:6%;bottom:24%;gap:6px; }
+.touch-mode.in-battle:not(.is-portrait) #touch-pad:not(.is-floating):not(:has(.is-held)) { opacity:.6; }
+.touch-mode:not(.is-portrait) #touch-actions {
+  position:absolute;z-index:6;right:var(--edge-r);top:26%;bottom:max(8px,env(safe-area-inset-bottom));width:88px;
+  flex-direction:column;align-items:center;justify-content:center;gap:8px;
+}
+.touch-mode:not(.is-portrait) #touch-actions #touch-confirm { width:80px;height:80px;min-height:80px;opacity:.94; }
+.touch-mode:not(.is-portrait) #touch-actions #touch-back { width:76px;min-height:52px;opacity:.94; }
+.touch-mode:not(.is-portrait) #touch-actions [data-touch-action=swap],.touch-mode:not(.is-portrait) #touch-actions [data-touch-action=release] { width:76px;min-height:42px; }
+.touch-mode:not(.is-portrait) #touch-actions button:disabled { opacity:.55; }
+/* la pestaña «cuaderno» y el cajón de menús */
+#touch-menu-toggle { display:none; }
+.touch-mode:not(.is-portrait) #touch-menu-toggle {
+  display:flex;align-items:center;justify-content:center;position:absolute;z-index:8;top:max(6px,env(safe-area-inset-top));left:var(--edge-l);
+  width:52px;height:52px;padding:0;border:1px solid #b7a07c;border-left:6px solid #c08a4c;border-radius:3px 10px 10px 3px;cursor:pointer;
+  background:linear-gradient(174deg,var(--paper) 0%,var(--paper-dk) 92%,#bca17a 93%);color:#6b4a2e;box-shadow:1px 3px 0 #07060c,inset 0 2px 0 #fff2d6;
+  -webkit-tap-highlight-color:transparent;transition:transform 180ms cubic-bezier(.3,1.7,.5,1);
+}
+.touch-mode:not(.is-portrait) #touch-menu-toggle .touch-icon { width:22px;height:22px; }
+.touch-mode.drawer-open:not(.is-portrait) #touch-menu-toggle { transform:translateX(4px) rotate(-4deg);color:#c05048; }
+.touch-mode:not(.is-portrait) #touch-toolbar {
+  position:absolute;z-index:9;top:calc(max(6px,env(safe-area-inset-top)) + 60px);left:var(--edge-l);display:flex;flex-direction:column;align-items:stretch;gap:4px;
+  pointer-events:none;opacity:0;transform:translateX(-24px) rotate(-3deg);transform-origin:0 0;transition:opacity 150ms ease,transform 240ms cubic-bezier(.3,1.5,.5,1);
+}
+.touch-mode.drawer-open:not(.is-portrait) #touch-toolbar { pointer-events:auto;opacity:1;transform:none; }
+.touch-mode:not(.is-portrait) #touch-toolbar button {
+  min-width:156px;min-height:44px;justify-content:flex-start;padding:4px 12px;border-radius:3px 12px 12px 3px;border-top:1px solid #b7a07c;border-left:6px solid var(--paint);
+  box-shadow:1px 3px 0 #07060c,inset 0 2px 0 #fff2d6;transform-origin:0 50%;
+}
+.touch-mode:not(.is-portrait) #touch-toolbar button:disabled { border-top:1px dashed #5b5468;border-left:6px dashed #5b5468; }
+.touch-mode:not(.is-portrait) #touch-toolbar button.is-held,.touch-mode:not(.is-portrait) #touch-toolbar button:active:not(:disabled) { transform:translateX(4px) scale(.97); }
+.touch-mode.drawer-open:not(.is-portrait) #game-screen::after { content:'';position:absolute;inset:0;background:rgba(11,9,18,.35);pointer-events:none; }
+@media (max-height:360px) and (orientation:landscape) {
+  body.touch-mode:not(.is-portrait) { --pad:100px;--side:64px; }
+  .touch-mode:not(.is-portrait) #touch-actions #touch-confirm { width:68px;height:68px;min-height:68px; }
+  .touch-mode:not(.is-portrait) #touch-actions #touch-confirm b { font-size:26px; }
+  .touch-mode:not(.is-portrait) #touch-actions #touch-back { min-height:46px; }
+  .touch-mode:not(.is-portrait) #touch-actions button span { font-size:16px; }
 }
 @media (min-height:420px) and (orientation:landscape) {
-  .touch-mode #game-shell { grid-template-columns:132px minmax(0,1fr) 96px; }
-  body.touch-mode { --pad:130px; }
-  .touch-mode #touch-actions #touch-confirm { width:92px;height:92px; }
+  body.touch-mode:not(.is-portrait) { --pad:124px;--side:80px; }
+  .touch-mode:not(.is-portrait) #touch-actions #touch-confirm { width:88px;height:88px; }
 }
+/* primera vez en el mapa: un pulgar que empuja la palanca y un toque que late sobre la hoja */
+.coach { display:none;position:absolute;pointer-events:none;z-index:7; }
+.touch-coach .coach { display:block; }
+.coach i { position:absolute;display:block;border-radius:50%; }
+.coach-pad { left:calc(var(--edge-l,8px) + var(--pad) / 2 - 16px);top:50%;width:32px;height:32px;margin-top:-16px; }
+.touch-mode.is-portrait .coach-pad { left:calc(50% - 16px); }
+.coach-pad i { inset:0;background:radial-gradient(circle at 40% 35%,#fff8e6 0 18%,rgba(255,248,230,.55) 20% 55%,transparent 58%);animation:coach-push 1.6s ease-in-out infinite; }
+.coach-tap { left:68%;top:52%;width:34px;height:34px;margin:-17px 0 0 -17px; }
+.coach-tap i { inset:0;border:3px solid rgba(255,248,230,.9);box-shadow:0 0 0 2px rgba(11,9,18,.35);animation:coach-tap 1.4s ease-out infinite; }
+.coach-tap::after { content:'';position:absolute;left:12px;top:12px;width:10px;height:10px;border-radius:50%;background:#fff8e6;box-shadow:0 0 0 2px rgba(11,9,18,.35);animation:coach-dot 1.4s ease-out infinite; }
+@keyframes coach-push { 0%,100% { transform:translate(0,0) scale(1);opacity:.9; } 25% { transform:translate(22px,0) scale(.92); } 50% { transform:translate(0,-22px) scale(.92); } 75% { transform:translate(-22px,0) scale(.92); } }
+@keyframes coach-tap { 0% { transform:scale(.4);opacity:0; } 30% { opacity:1; } 100% { transform:scale(1.8);opacity:0; } }
+@keyframes coach-dot { 0%,60% { transform:scale(1);opacity:1; } 30% { transform:scale(.7); } 100% { opacity:0; } }
+.touch-mode.ui-still .coach i,.touch-mode.ui-still .coach-tap::after { animation:none; }
+@media (prefers-reduced-motion:reduce) { .coach i,.coach-tap::after,#touch-toolbar,#touch-pad { animation:none;transition:none; } }
 
 /* ---- PWA: notas de papel pegadas con cinta (instalar, sin conexión, página nueva) y la hoja que se pasa al actualizar ---- */
 #pwa-note {
