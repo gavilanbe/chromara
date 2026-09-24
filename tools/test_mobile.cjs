@@ -113,4 +113,11 @@ test('landscape folds the menu tabs into one notebook tab; the first visual hint
  run(`tapWalk(200,100)`);assert.equal(run('MOBILE.coachSeen'),true);run('touchCoachUpdate()');assert.equal(run(`document.body.classList.contains('touch-coach')`),false);
  run(`document.body.classList={toggle(){},remove(){},add(){},contains(){return false}};`);
 });
+test('no zoom on repeated taps: the viewport forbids scaling and everything in touch mode refuses touch gestures',()=>{
+ const fs=require('node:fs'),path=require('node:path'),root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8'),css=fs.readFileSync(path.join(root,'mobile.css'),'utf8'),js=fs.readFileSync(path.join(root,'mobile.js'),'utf8');
+ assert(/name="viewport"[^>]*maximum-scale=1[^>]*user-scalable=no/.test(html),'viewport must block zoom');
+ assert(/\.touch-mode,\.touch-mode \* \{ touch-action:none/.test(css),'every element in touch mode refuses pan and zoom');
+ for(const ev of ['gesturestart','dblclick','touchend'])assert(js.includes(ev),'guards '+ev);
+ run('TOUCH_ART.key="";touchArtRefresh()');
+});
 console.log(`${count} mobile integration checks passed.`);

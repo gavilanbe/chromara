@@ -1,7 +1,10 @@
 /* The original canvas stays 320×180. Touch controls live outside the artwork, as the painter's things on the desk:
    the page taped down, notebook tabs for the menus, a palette pad whose drop follows the thumb, a paint pan for A and
    an eraser for B. Anything that cannot be used right now is only sketched in graphite. */
-html,body { overscroll-behavior:none; }
+html,body { overscroll-behavior:none;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%; }
+/* en modo táctil nada hace zoom: ni la hoja, ni los márgenes, ni el estuche */
+.touch-mode,.touch-mode * { touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none; }
+.touch-mode #pwa-note,.touch-mode #pwa-note * { touch-action:manipulation; }
 #game-shell,#game-screen { display:flex;align-items:center;justify-content:center; }
 #game-shell { width:100%;height:100%; }
 #game-screen { min-width:0;min-height:0; }
@@ -298,3 +301,63 @@ body.pwa-turning::after {
 .is-standalone #touch-fullscreen { display:none !important; }
 .ui-still #pwa-note,.ui-still #pwa-note button { transition:none; }
 @media (prefers-reduced-motion:reduce) { #pwa-note,#pwa-note button { transition:none; } body.pwa-turning::after { animation:none;background:#0b0912; } }
+
+/* ==== Los útiles pintados (sprites generados en mobile.js con la paleta del juego) ==== */
+body.touch-mode .touch-only button[data-touch-action],body.touch-mode #touch-pad button { image-rendering:pixelated;image-rendering:crisp-edges; }
+/* A: el godet con la pintura del líder; su palabra va en una tira de cinta de carrocero */
+body.touch-mode #touch-actions #touch-confirm {
+  border:0;border-radius:50%;background:var(--art-a) center/100% 100% no-repeat;box-shadow:0 6px 0 -1px rgba(7,6,12,.85),0 10px 16px rgba(0,0,0,.45);color:#fff8e6;justify-content:center;
+}
+body.touch-mode #touch-actions #touch-confirm.is-held,body.touch-mode #touch-actions #touch-confirm:active { background-image:var(--art-a-held);transform:translateY(4px) scale(.94,.9);box-shadow:0 2px 0 -1px rgba(7,6,12,.85); }
+body.touch-mode #touch-actions #touch-confirm.is-ready { animation:touch-pan-ready 1.2s ease-in-out infinite; }
+@keyframes touch-pan-ready { 0%,100% { filter:none; } 50% { filter:brightness(1.12) drop-shadow(0 0 6px color-mix(in srgb,var(--lead,#f2c160) 70%,transparent)); } }
+body.touch-mode #touch-actions button b {
+  position:absolute;left:-4px;top:-4px;width:22px;height:22px;display:flex!important;align-items:center;justify-content:center;border-radius:50%;
+  font:16px/1 'Chromara Rotulo','Chromara Cuaderno',system-ui,sans-serif!important;color:#241e32;background:#f7efd6;box-shadow:0 0 0 2px #241e32,0 2px 0 2px #07060c;text-shadow:none!important;
+}
+body.touch-mode #touch-actions button span {
+  position:absolute;left:50%;bottom:-9px;transform:translateX(-50%) rotate(-2deg);padding:3px 8px 2px;margin:0!important;font-size:16px;line-height:1;color:#392c3f;white-space:nowrap;
+  background:linear-gradient(180deg,rgba(244,232,196,.97),rgba(226,208,164,.97));box-shadow:0 1px 0 rgba(0,0,0,.35);
+  -webkit-mask:linear-gradient(90deg,transparent 0 1px,#000 1px calc(100% - 1px),transparent calc(100% - 1px)),repeating-linear-gradient(180deg,#000 0 2px,rgba(0,0,0,.85) 2px 3px);
+}
+body.touch-mode #touch-actions #touch-confirm span { bottom:-4px; }
+/* B: la goma de las magias, rosa y azul con su funda de cartón */
+body.touch-mode #touch-actions #touch-back {
+  border:0;border-radius:0;background:var(--art-b) center/contain no-repeat;box-shadow:none;filter:drop-shadow(0 5px 0 rgba(7,6,12,.85));min-height:56px;aspect-ratio:38/26;height:auto;
+}
+body.touch-mode #touch-actions #touch-back.is-held,body.touch-mode #touch-actions #touch-back:active { transform:translateY(3px) scale(1.08,.86) rotate(-3deg);filter:drop-shadow(0 2px 0 rgba(7,6,12,.85)); }
+/* Y y X: pastillas de acuarela en su bandeja */
+body.touch-mode #touch-actions [data-touch-action=swap],body.touch-mode #touch-actions [data-touch-action=release] {
+  border:0;border-radius:0;box-shadow:none;background:var(--art-y) center/contain no-repeat;filter:drop-shadow(0 4px 0 rgba(7,6,12,.85));aspect-ratio:26/18;height:auto;min-height:40px;
+}
+body.touch-mode #touch-actions [data-touch-action=release] { background-image:var(--art-x); }
+body.touch-mode #touch-actions [data-touch-action=swap]:not(:disabled),body.touch-mode #touch-actions [data-touch-action=release]:not(:disabled) { background-color:transparent;border:0; }
+body.touch-mode #touch-actions [data-touch-action=swap].is-held,body.touch-mode #touch-actions [data-touch-action=release].is-held { transform:translateY(3px) scale(.94);filter:drop-shadow(0 1px 0 rgba(7,6,12,.85)); }
+/* lo que no se puede usar: boceto a lápiz */
+body.touch-mode #touch-actions button:disabled { filter:grayscale(1) contrast(.55) brightness(1.25) drop-shadow(0 2px 0 rgba(7,6,12,.5));opacity:.5;border:0;background-color:transparent; }
+body.touch-mode #touch-actions button:disabled span { color:var(--graphite); }
+/* la cruceta: la paleta de madera, cuatro pegotes de pintura y la gota del líder */
+body.touch-mode #touch-pad { background:var(--art-pad) center/100% 100% no-repeat;box-shadow:none;filter:drop-shadow(0 6px 0 #1a121f) drop-shadow(0 10px 12px rgba(0,0,0,.4));image-rendering:pixelated; }
+body.touch-mode #touch-pad button { border:0;border-radius:50%;background:var(--art-dab) center/100% 100% no-repeat;box-shadow:none;image-rendering:pixelated;min-height:0; }
+body.touch-mode #touch-pad button.is-held { background-image:var(--art-dab-held);transform:scale(1.12,.9); }
+body.touch-mode #touch-pad button i { filter:none; }
+body.touch-mode #touch-pad button.is-held i { border-color:transparent!important; }
+body.touch-mode #touch-pad [data-touch-direction=up].is-held i { border-bottom-color:#fff8e6!important; }
+body.touch-mode #touch-pad [data-touch-direction=down].is-held i { border-top-color:#fff8e6!important; }
+body.touch-mode #touch-pad [data-touch-direction=left].is-held i { border-right-color:#fff8e6!important; }
+body.touch-mode #touch-pad [data-touch-direction=right].is-held i { border-left-color:#fff8e6!important; }
+body.touch-mode .pad-center { background:radial-gradient(circle at 50% 55%,#3a2a22 0 55%,#241a16 70%);box-shadow:inset 0 2px 0 #140f1a,0 1px 0 #e6be83; }
+body.touch-mode .pad-nub { background:var(--art-nub) center/100% 100% no-repeat;box-shadow:none;image-rendering:pixelated;border-radius:0;left:14%;top:4%;width:72%;height:88%;filter:drop-shadow(0 2px 0 #140f1a); }
+/* en vertical, el fondo de los controles es el estuche violeta del juego, con su cremallera */
+body.touch-mode.is-portrait #game-shell::before {
+  background:
+    repeating-linear-gradient(90deg,#d8d2e2 0 3px,#8c8ab0 3px 4px,transparent 4px 6px) 26px 11px/calc(100% - 52px) 5px no-repeat,
+    linear-gradient(#3b2d4d,#3b2d4d) 22px 10px/calc(100% - 44px) 7px no-repeat,
+    radial-gradient(ellipse at 50% 0%,rgba(255,255,255,.08),transparent 60%),
+    repeating-linear-gradient(45deg,#6b4a8c 0 2px,#62447f 2px 4px),repeating-linear-gradient(-45deg,rgba(255,255,255,.04) 0 2px,transparent 2px 4px);
+  box-shadow:inset 0 0 0 2px #2a1e38,inset 0 0 0 6px #7a58a0,inset 0 3px 18px rgba(0,0,0,.45),0 6px 0 #0b0912;
+  outline:2px dashed rgba(236,222,250,.28);outline-offset:-13px;
+}
+body.touch-mode.is-portrait .touch-caption { color:#e8dcf4; }
+.touch-mode.ui-still #touch-confirm.is-ready { animation:none; }
+@media (prefers-reduced-motion:reduce) { body.touch-mode #touch-actions #touch-confirm.is-ready { animation:none; } }

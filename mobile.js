@@ -51,10 +51,77 @@ function touchEquipment() {
   if (!OW.menu) openMenu(); else { OW.menu.closing = true; OW.menu.closeT = OW.menu.t; }
   Audio.init();
 }
+
+// ---- Los útiles pintados. Cada control es un sprite hecho con la paleta del juego y a su tamaño de píxel: A es un godet
+// con la pintura del líder, B la goma de las magias, Y y X dos pastillas de acuarela, la cruceta la paleta de madera con
+// cuatro pegotes de pintura y, en el centro, la gota del líder. Se repintan cuando cambia quién va delante.
+const TOUCH_ART = { key:'' };
+function touchSprite(w, h, draw) {
+  if (typeof document === 'undefined' || !document.createElement) return null;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext?.('2d'); if (!x || !x.fillRect) return null;
+  const P = (col, a, b, ww = 1, hh = 1) => { x.fillStyle = col; x.fillRect(a, b, ww, hh); };
+  try { draw(x, P); const url = c.toDataURL?.(); return typeof url === 'string' && url.startsWith('data:') ? url : null; } catch { return null; }
+}
+function touchDisc(P, cx, cy, r, fn) { for (let y = Math.floor(cy - r - 1); y <= cy + r; y++) for (let x = Math.floor(cx - r - 1); x <= cx + r; x++) { const dx = x + .5 - cx, dy = y + .5 - cy, d = Math.hypot(dx, dy); if (d <= r) { const col = fn(d, dx, dy); if (col) P(col, x, y); } } }
+function touchPan(col, held) { // A: un godet de cerámica lleno de pintura, con brillo húmedo; pulsado, la pintura se hunde y hace onda
+  const r = ramp(col);
+  return touchSprite(28, 28, (x, P) => {
+    touchDisc(P, 14, 14, 13.6, (d, dx, dy) => d > 12.6 ? '#241e32' : d > 10 ? (dx + dy < -5 ? '#fffaf0' : dx + dy > 6 ? '#c9bca2' : '#efe6d2') : d > 9.2 ? '#8f8272' : null);
+    touchDisc(P, 14, 14, 9.2, (d, dx, dy) => { const s = dx + dy; if (held) return d > 5.2 && d < 6.6 ? r.hi : d < 3 ? r.sh : s > 4 ? r.sh : r.base;
+      return d > 8.2 && dy > 1 ? r.sh : s < -7 ? r.hi : s > 6 ? r.sh : r.base; });
+    if (!held) { P('#ffffff', 9, 8, 3, 2); P('#ffffff', 13, 7); P(r.hi, 8, 10, 2, 1); } else { P('#ffffff', 12, 11, 2, 1); }
+    P('#fffaf0', 6, 5, 3, 1); P('#fffaf0', 5, 6, 1, 2); // brillo del borde de cerámica
+  });
+}
+function touchCake(col) { // Y, X: una pastilla de acuarela en su bandeja de latón
+  const r = ramp(col);
+  return touchSprite(26, 18, (x, P) => {
+    P('#241e32', 1, 0, 24, 18); P('#241e32', 0, 1, 26, 16);
+    P('#c9c4d4', 1, 1, 24, 16); P('#f4f0ea', 2, 1, 22, 1); P('#8c8ab0', 2, 16, 22, 1); P('#8c8ab0', 24, 2, 1, 14);
+    P(r.sh, 3, 3, 20, 12); P(r.base, 3, 3, 19, 11); P(r.hi, 4, 3, 17, 2); P(r.hi, 3, 4, 1, 7);
+    P(r.sh, 9, 7, 8, 4); P(r.base, 10, 7, 6, 3); P(r.hi, 10, 7, 4, 1); // la huella del pincel
+    P(r.sh, 5, 12, 3, 1); P(r.sh, 17, 5, 1, 3); P(r.sh, 18, 8, 2, 1); // grietas de la pastilla seca
+    P('#ffffff', 5, 4, 3, 1);
+  });
+}
+function touchPalette() { // la cruceta: paleta de madera redonda, agujero para el pulgar y restos de los tres primarios
+  return touchSprite(48, 48, (x, P) => {
+    touchDisc(P, 24, 24, 23.6, (d, dx, dy) => { if (Math.hypot(dx - 12, dy - 12) < 3.4) return null; if (d > 22.6) return '#201926'; if (d > 21.4) return dx + dy < 0 ? '#e6be83' : '#5a3a26';
+      const ring = Math.hypot(dx - 12, (dy - 12) * 1.3); return (ring | 0) % 5 === 0 ? '#b3834f' : (ring | 0) % 5 === 2 ? '#cda266' : '#c39660'; });
+    touchDisc(P, 36.5, 36.5, 4.4, (d) => d > 3.4 ? '#4a2e20' : null);
+    [[C('rojo'), 10, 12], [C('azul'), 37, 11], [C('amarillo'), 11, 37]].forEach(([c, cx, cy]) => { const r = ramp(c); touchDisc(P, cx, cy, 3.2, (d, dx, dy) => d > 2.4 ? r.sh : dx + dy < -1.5 ? r.hi : r.base); });
+  });
+}
+function touchDab(col) { // un pegote de pintura espesa sobre la paleta (cada flecha de la cruceta)
+  const r = ramp(col);
+  return touchSprite(18, 18, (x, P) => {
+    touchDisc(P, 9, 9.5, 8.6, (d, dx, dy) => { const a = Math.atan2(dy, dx), R = 7.8 + Math.sin(a * 3 + 1) * .7; if (d > R + .8) return null; if (d > R - .2) return '#241e32'; const s = dx + dy; return d > R - 1.4 && dy > 0 ? r.sh : s < -5 ? r.hi : s > 5 ? r.sh : r.base; });
+    P('#ffffff', 5, 5, 2, 1); P('#ffffff', 4, 6);
+  });
+}
+function touchDrop(col) { // la gota del líder en el centro de la cruceta
+  const r = ramp(col);
+  return touchSprite(14, 17, (x, P) => {
+    for (let y = 0; y < 17; y++) for (let xx = 0; xx < 14; xx++) { const dx = xx + .5 - 7, dy = y + .5 - 10.5, inBody = Math.hypot(dx, dy) < 6.2 || (dy < 0 && Math.abs(dx) < (dy + 10.5) * .62); if (!inBody) continue;
+      const edge = !(Math.hypot(dx, dy) < 5.2 || (dy < -1 && Math.abs(dx) < (dy + 10.5) * .62 - 1.1)) || y === 0; P(edge ? '#241e32' : dx + dy < -3 ? r.hi : dx + dy > 3 ? r.sh : r.base, xx, y); }
+    P('#ffffff', 4, 8, 2, 1); P('#ffffff', 4, 9);
+  });
+}
+function touchArtRefresh() {
+  if (typeof Party === 'undefined' || !Party[0] || typeof ramp !== 'function') return;
+  const lead = C(Party[0].color), key = lead + '|' + (Party.map(p => p.color).join()); if (key === TOUCH_ART.key) return; TOUCH_ART.key = key;
+  const st = document.body?.style; if (!st || typeof st.setProperty !== 'function') return;
+  const blue = C('azul'), red = C('rojo'), set = (name, url) => { if (url) st.setProperty('--art-' + name, 'url(' + url + ')'); };
+  set('a', touchPan(lead, false)); set('a-held', touchPan(lead, true)); set('y', touchCake(blue)); set('x', touchCake(red));
+  set('pad', touchPalette()); set('dab', touchDab('#f1e6cc')); set('dab-held', touchDab(lead)); set('nub', touchDrop(lead));
+  if (typeof spiritSprite === 'function') { try { const b = spiritSprite('goma', null).toDataURL?.(); if (typeof b === 'string' && b.startsWith('data:')) set('b', b); } catch {} }
+  st.setProperty('--lead', lead);
+}
 function updateTouchControls() {
   document.body.classList.toggle('ui-still', Prefs.shake === 0);
   const inBattle = Game.state === 'battle' || Game.state === 'transition'; if (document.body.classList.contains?.('in-battle') !== inBattle) document.body.classList.toggle('in-battle', inBattle); // en combate los controles suben por encima de las fichas
   if (!MOBILE.initialized || !MOBILE.enabled) return;
+  touchArtRefresh();
   const field = Game.state === 'overworld' && !OW.menu && !OW.ring && !OW.msg && !OW.act && !OW.heal && !Game.overlay;
   // Holding the pad walks continuously. In menus it repeats at a deliberate pace.
   if (!field) for (const k of ['up','down','left','right']) if (TOUCH_HELD[k]) {
@@ -187,7 +254,11 @@ function initMobileControls() {
   document.addEventListener('contextmenu', e => { if (MOBILE.enabled) e.preventDefault(); });
   // al volver a la app (PWA en segundo plano, llamada, cambio de app): nada queda pulsado y la hoja se reencaja
   document.addEventListener('visibilitychange', () => { releaseInputs(); touchDrawer(false); if (!document.hidden) { touchKeepAwake(); fit(); if (typeof placeTitleButton === 'function') placeTitleButton(); } });
-  document.addEventListener('gesturestart', e => { if (MOBILE.enabled) e.preventDefault(); }); // sin zoom de pellizco en iOS
+  // Nada de zoom: ni pellizco, ni doble toque, ni toques repetidos (iOS ignora a veces el viewport y el touch-action).
+  for (const ev of ['gesturestart','gesturechange','gestureend']) document.addEventListener(ev, e => e.preventDefault(), { passive:false });
+  document.addEventListener('dblclick', e => e.preventDefault(), { passive:false });
+  let lastTouchEnd = 0; document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastTouchEnd < 350 && e.cancelable && !e.target?.closest?.('input,textarea,select')) e.preventDefault(); lastTouchEnd = now; }, { passive:false });
+  document.addEventListener('touchmove', e => { if (e.touches?.length > 1 || (typeof e.scale === 'number' && e.scale !== 1)) e.preventDefault(); }, { passive:false });
   const fullscreen = document.getElementById('touch-fullscreen');
   fullscreen.hidden = typeof document.documentElement.requestFullscreen !== 'function';
   fullscreen.addEventListener('click', mobileFullscreen);
